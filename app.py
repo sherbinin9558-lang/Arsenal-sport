@@ -1,3 +1,4 @@
+
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json
@@ -69,7 +70,6 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
 
-# ТЕПЕРЬ ТРИ ВКЛАДКИ
 tab1, tab2, tab3 = st.tabs(["Создать карточку", "Каталог товаров", "Тексты для соцсетей"])
 
 with tab1:
@@ -141,7 +141,6 @@ with tab3:
     if not products:
         st.info("Сначала создайте хотя бы один товар во вкладке 'Создать карточку'.")
     else:
-        # Создаем список для выбора
         product_names = [f"{p.get('brand', '')} {p.get('name', '')} ({p.get('article', '')})" for p in products]
         selected_idx = st.selectbox("Выберите товар", range(len(product_names)), format_func=lambda x: product_names[x])
         
@@ -179,7 +178,21 @@ with tab3:
 📍 Заходите в наш магазин или пишите для оформления заказа!"""
             
             st.subheader("Текст для Instagram")
-            st.text_area("Скопируйте текст", insta_text, height=200)
+            st.text_area("Скопируйте текст", insta_text, height=200, key="insta")
+            # Кнопка скачивания для Instagram
+            st.download_button(
+                label="Скачать текст для Instagram",
+                data=insta_text,
+                file_name=f"{p.get('name', 'товар').replace(' ', '_')}_instagram.txt",
+                mime="text/plain"
+            )
             
             st.subheader("Текст для Telegram")
-            st.text_area("Скопируйте текст", tg_text, height=200)
+            st.text_area("Скопируйте текст", tg_text, height=200, key="tg")
+            # Кнопка скачивания для Telegram
+            st.download_button(
+                label="Скачать текст для Telegram",
+                data=tg_text,
+                file_name=f"{p.get('name', 'товар').replace(' ', '_')}_telegram.txt",
+                mime="text/plain"
+            )
