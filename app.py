@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
- from rembg import remove
+from rembg import remove
 
 
 PRODUCTS_FILE = Path("products.json")
