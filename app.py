@@ -1,175 +1,138 @@
-"""Простой локальный MVP для создания карточек Arsenal Sport."""
-
-import io
-import json
-from datetime import datetime
-from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-from rembg import remove
+import json
+from pathlib import Path
+import io
 
-
+# Настройки
 PRODUCTS_FILE = Path("products.json")
 CARD_SIZE = (1080, 1350)
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
+# Загрузка и сохранение данных
+def load_products():
+    if PRODUCTS_FILE.exists():
+        with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
 
-def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    """Возвращает системный шрифт для изображения."""
-    return ImageFont.truetype(FONT_BOLD if bold else FONT_REGULAR, size)
-
-
-def read_products() -> list[dict]:
-    if not PRODUCTS_FILE.exists():
-        return []
-    try:
-        return json.loads(PRODUCTS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def save_product(product: dict) -> None:
-    products = read_products()
+def save_product(product):
+    products = load_products()
     products.append(product)
-    PRODUCTS_FILE.write_text(
-        json.dumps(products, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(products, f, ensure_ascii=False, indent=4)
 
+# Генерация карточки
+def generate_card(image, name, brand, article, sizes, color, description, specs):
+    # Создаем холст
+    canvas = Image.new("RGB", CARD_SIZE, (30, 30, 30)) # Темно-серый фон
+    draw = ImageDraw.Draw(canvas)
 
-def fit_photo(photo: Image.Image, remove_background: bool) -> Image.Image:
-    photo = photo.convert("RGBA")
-    if remove_background:
-        photo = remove(photo).convert("RGBA")
+    # Вставляем фото (упрощенно, без удаления фона)
+    if image:
+        img_width, img_height = image.size
+        ratio = min(800 / img_width, 800 / img_height)
+        new_size = (int(img_width * ratio), int(img_height * ratio))
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
+        canvas.paste(image, (140, 150))
 
-    canvas = Image.new("RGBA", (1080, 700), "#e4e5e0")
-    photo.thumbnail((980, 620), Image.Resampling.LANCZOS)
-    left = (canvas.width - photo.width) // 2
-    top = (canvas.height - photo.height) // 2
-    canvas.alpha_composite(photo, (left, top))
+    # Загружаем шрифты
+    try:
+        font_title = ImageFont.truetype(FONT_BOLD, 70)
+        font_brand = ImageFont.truetype(FONT_REGULAR, 40)
+        font_text = ImageFont.truetype(FONT_REGULAR, 35)
+    except:
+        font_title = ImageFont.load_default()
+        font_brand = ImageFont.load_default()
+        font_text = ImageFont.load_default()
+
+    # Название и бренд
+    draw.text((60, 1000), brand.upper(), font=font_brand, fill=(200, 200, 200))
+    draw.text((60, 1050), name.upper(), font=font_title, fill=(255, 255, 255))
+    
+    # Описание
+    draw.text((60, 1140), description, font=font_text, fill=(180, 180, 180))
+
+    # Характеристики внизу
+    y_offset = 1200
+    draw.text((60, y_offset), f"Артикул: {article} | Размеры: {sizes} | Цвет: {color}", font=font_text, fill=(150, 150, 150))
+    
+    # Логотип Arsenal Sport
+    draw.text((800, 100), "ARSENAL SPORT", font=font_brand, fill=(255, 50, 50))
+
     return canvas
 
-
-def split_lines(draw: ImageDraw.ImageDraw, text: str, text_font, max_width: int) -> list[str]:
-    words = text.split()
-    lines, current = [], ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if draw.textbbox((0, 0), candidate, font=text_font)[2] <= max_width:
-            current = candidate
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines
-
-
-def draw_text_block(
-    draw: ImageDraw.ImageDraw,
-    text: str,
-    x: int,
-    y: int,
-    text_font,
-    fill: str,
-    max_width: int,
-    max_lines: int,
-    spacing: int,
-) -> int:
-    lines = split_lines(draw, text, text_font, max_width)[:max_lines]
-    for line in lines:
-        draw.text((x, y), line, font=text_font, fill=fill)
-        y += text_font.size + spacing
-    return y
-
-
-def create_card(product: dict, photo: Image.Image, remove_background: bool) -> Image.Image:
-    card = Image.new("RGBA", CARD_SIZE, "#1b1d1d")
-    card.alpha_composite(fit_photo(photo, remove_background), (0, 0))
-    draw = ImageDraw.Draw(card)
-
-    # Логотип и служебная строка.
-    draw.ellipse((42, 30, 76, 64), fill="#151716")
-    draw.text((51, 31), "A", font=font(24, True), fill="#d9ff36")
-    draw.text((90, 36), "ARSENAL", font=font(22, True), fill="white")
-    draw.text((209, 36), "SPORT", font=font(22, True), fill="#fb604d")
-    draw.text((895, 40), "NEW / 01", font=font(15, True), fill="#333633")
-
-    draw.text((52, 750), product["brand"].upper(), font=font(24, True), fill="#d9ff36")
-    name_bottom = draw_text_block(
-        draw, product["name"].upper(), 52, 792, font(54, True), "white", 950, 2, 5
-    )
-    description = product.get("description", "")
-    if description:
-        draw_text_block(draw, description, 52, name_bottom + 22, font(20), "#c3c6c3", 900, 2, 8)
-
-    meta = " · ".join(
-        item
-        for item in (
-            f"Размеры: {product['sizes']}" if product.get("sizes") else "",
-            f"Цвет: {product['color']}" if product.get("color") else "",
-            f"Арт.: {product['sku']}" if product.get("sku") else "",
-        )
-        if item
-    )
-    draw.text((52, 1252), meta, font=font(18), fill="#aeb3af")
-
-    features = [item.strip() for item in product.get("features", "").split(",") if item.strip()]
-    feature_y = 1130
-    for item in features[:3]:
-        draw.text((700, feature_y), f"• {item}", font=font(17), fill="#d9dcda")
-        feature_y += 28
-    return card.convert("RGB")
-
-
-st.set_page_config(page_title="Arsenal Sport Content Manager", page_icon="⚽", layout="wide")
+# Интерфейс
+st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
-st.caption("Простой MVP для вертикальной товарной карточки 4:5. Используются только ваши данные.")
 
-with st.form("product_form"):
-    uploaded_file = st.file_uploader("Фото товара", type=["jpg", "jpeg", "png", "webp"])
-    left, right = st.columns(2)
-    with left:
+# Создаем вкладки
+tab1, tab2 = st.tabs(["Создать карточку", "Каталог товаров"])
+
+with tab1:
+    st.header("Создание новой карточки товара")
+    
+    uploaded_file = st.file_uploader("Загрузите фото товара", type=["jpg", "jpeg", "png", "webp"])
+    
+    col1, col2 = st.columns(2)
+    with col1:
         name = st.text_input("Название товара *")
         brand = st.text_input("Бренд *")
-        sku = st.text_input("Артикул")
-    with right:
+        article = st.text_input("Артикул")
+    with col2:
         sizes = st.text_input("Размеры")
         color = st.text_input("Цвет")
-        description = st.text_area("Краткое описание", max_chars=160)
-        features = st.text_area("Характеристики через запятую", max_chars=220)
-    remove_background = st.checkbox("Убрать фон на фото", value=False)
-    submitted = st.form_submit_button("Создать карточку", type="primary")
+        description = st.text_area("Краткое описание")
+    
+    specs = st.text_input("Характеристики через запятую")
+    remove_bg = st.checkbox("Убрать фон на фото (временно отключено)")
 
-if submitted:
-    if not uploaded_file or not name or not brand:
-        st.error("Загрузите фото и заполните название и бренд.")
+    if st.button("Создать карточку", type="primary"):
+        if not name or not brand:
+            st.error("Пожалуйста, заполните обязательные поля: Название и Бренд.")
+        else:
+            with st.spinner("Генерация карточки..."):
+                img = None
+                if uploaded_file:
+                    img = Image.open(uploaded_file).convert("RGB")
+                
+                # Генерируем карточку
+                card = generate_card(img, name, brand, article, sizes, color, description, specs)
+                
+                # Сохраняем данные
+                product_data = {
+                    "name": name, "brand": brand, "article": article,
+                    "sizes": sizes, "color": color, "description": description,
+                    "specs": specs
+                }
+                save_product(product_data)
+                
+                # Показываем результат
+                st.success("Карточка создана! Данные сохранены в products.json.")
+                st.image(card, caption="Готовая карточка", use_container_width=True)
+                
+                # Кнопка скачивания
+                buf = io.BytesIO()
+                card.save(buf, format="PNG")
+                byte_im = buf.getvalue()
+                st.download_button(
+                    label="Скачать карточку",
+                    data=byte_im,
+                    file_name=f"{name.replace(' ', '_')}_card.png",
+                    mime="image/png"
+                )
+
+with tab2:
+    st.header("Каталог товаров")
+    products = load_products()
+    if not products:
+        st.info("Каталог пока пуст. Создайте первую карточку!")
     else:
-        product = {
-            "name": name.strip(), "brand": brand.strip(), "sku": sku.strip(),
-            "sizes": sizes.strip(), "color": color.strip(),
-            "description": description.strip(), "features": features.strip(),
-            "created_at": datetime.now().isoformat(timespec="seconds"),
-        }
-        try:
-            source_photo = Image.open(uploaded_file)
-            with st.spinner("Создаём карточку..."):
-                card = create_card(product, source_photo, remove_background)
-            output = io.BytesIO()
-            card.save(output, format="PNG")
-            save_product(product)
-            st.session_state["card_png"] = output.getvalue()
-            st.success("Карточка создана. Данные товара сохранены в products.json.")
-        except Exception as error:
-            st.error(f"Не удалось обработать фото: {error}")
-
-if "card_png" in st.session_state:
-    st.image(st.session_state["card_png"], caption="Карточка Arsenal Sport", width=480)
-    st.download_button(
-        "Скачать карточку PNG",
-        data=st.session_state["card_png"],
-        file_name="arsenal-sport-card.png",
-        mime="image/png",
-    )
+        for p in reversed(products):
+            with st.expander(f"{p.get('brand', '')} {p.get('name', '')} (Артикул: {p.get('article', 'нет')})"):
+                st.write(f"**Размеры:** {p.get('sizes', 'не указаны')}")
+                st.write(f"**Цвет:** {p.get('color', 'не указан')}")
+                st.write(f"**Описание:** {p.get('description', 'нет')}")
+                st.write(f"**Характеристики:** {p.get('specs', 'нет')}")
