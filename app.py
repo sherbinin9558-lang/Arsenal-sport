@@ -1,4 +1,3 @@
-
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json
@@ -26,41 +25,51 @@ def save_product(product):
 
 # Генерация карточки
 def generate_card(image, name, brand, article, sizes, color, description, specs):
-    # Создаем холст
-    canvas = Image.new("RGB", CARD_SIZE, (30, 30, 30)) # Темно-серый фон
+    canvas = Image.new("RGB", CARD_SIZE, (30, 30, 30))
     draw = ImageDraw.Draw(canvas)
 
-    # Вставляем фото (упрощенно, без удаления фона)
+    # Вставляем фото
     if image:
         img_width, img_height = image.size
         ratio = min(800 / img_width, 800 / img_height)
         new_size = (int(img_width * ratio), int(img_height * ratio))
         image = image.resize(new_size, Image.Resampling.LANCZOS)
-        canvas.paste(image, (140, 150))
+        # Центрируем фото
+        x_offset = (CARD_SIZE[0] - new_size[0]) // 2
+        canvas.paste(image, (x_offset, 150))
 
     # Загружаем шрифты
     try:
-        font_title = ImageFont.truetype(FONT_BOLD, 70)
-        font_brand = ImageFont.truetype(FONT_REGULAR, 40)
+        font_logo = ImageFont.truetype(FONT_BOLD, 45)
+        font_title = ImageFont.truetype(FONT_BOLD, 80)
+        font_brand = ImageFont.truetype(FONT_REGULAR, 45)
         font_text = ImageFont.truetype(FONT_REGULAR, 35)
     except:
+        font_logo = ImageFont.load_default()
         font_title = ImageFont.load_default()
         font_brand = ImageFont.load_default()
         font_text = ImageFont.load_default()
 
-    # Название и бренд
+    # Логотип (по центру сверху)
+    logo_text = "ARSENAL SPORT"
+    bbox = draw.textbbox((0, 0), logo_text, font=font_logo)
+    logo_width = bbox[2] - bbox[0]
+    draw.text(((CARD_SIZE[0] - logo_width) // 2, 50), logo_text, font=font_logo, fill=(255, 50, 50))
+
+    # Бренд и Название
     draw.text((60, 1000), brand.upper(), font=font_brand, fill=(200, 200, 200))
     draw.text((60, 1050), name.upper(), font=font_title, fill=(255, 255, 255))
     
     # Описание
-    draw.text((60, 1140), description, font=font_text, fill=(180, 180, 180))
+    draw.text((60, 1160), description, font=font_text, fill=(180, 180, 180))
 
-    # Характеристики внизу
-    y_offset = 1200
-    draw.text((60, y_offset), f"Артикул: {article} | Размеры: {sizes} | Цвет: {color}", font=font_text, fill=(150, 150, 150))
+    # Характеристики (слева внизу)
+    y_offset = 1220
+    if specs:
+        draw.text((60, y_offset), f"Характеристики: {specs}", font=font_text, fill=(150, 150, 150))
+        y_offset += 50
     
-    # Логотип Arsenal Sport
-    draw.text((800, 100), "ARSENAL SPORT", font=font_brand, fill=(255, 50, 50))
+    draw.text((60, y_offset), f"Арт: {article} | Размеры: {sizes} | Цвет: {color}", font=font_text, fill=(150, 150, 150))
 
     return canvas
 
@@ -68,7 +77,6 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
 
-# Создаем вкладки
 tab1, tab2 = st.tabs(["Создать карточку", "Каталог товаров"])
 
 with tab1:
@@ -98,10 +106,8 @@ with tab1:
                 if uploaded_file:
                     img = Image.open(uploaded_file).convert("RGB")
                 
-                # Генерируем карточку
                 card = generate_card(img, name, brand, article, sizes, color, description, specs)
                 
-                # Сохраняем данные
                 product_data = {
                     "name": name, "brand": brand, "article": article,
                     "sizes": sizes, "color": color, "description": description,
@@ -109,11 +115,10 @@ with tab1:
                 }
                 save_product(product_data)
                 
-                # Показываем результат
                 st.success("Карточка создана! Данные сохранены в products.json.")
-                st.image(card, caption="Готовая карточка", use_container_width=True)
+                # ИЗМЕНЕНИЕ: width=450 делает карточку компактной на экране
+                st.image(card, caption="Готовая карточка", width=450)
                 
-                # Кнопка скачивания
                 buf = io.BytesIO()
                 card.save(buf, format="PNG")
                 byte_im = buf.getvalue()
