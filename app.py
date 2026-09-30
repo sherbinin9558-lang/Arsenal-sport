@@ -28,17 +28,14 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
     canvas = Image.new("RGB", CARD_SIZE, (30, 30, 30))
     draw = ImageDraw.Draw(canvas)
 
-    # Вставляем фото
     if image:
         img_width, img_height = image.size
         ratio = min(800 / img_width, 800 / img_height)
         new_size = (int(img_width * ratio), int(img_height * ratio))
         image = image.resize(new_size, Image.Resampling.LANCZOS)
-        # Центрируем фото
         x_offset = (CARD_SIZE[0] - new_size[0]) // 2
         canvas.paste(image, (x_offset, 150))
 
-    # Загружаем шрифты
     try:
         font_logo = ImageFont.truetype(FONT_BOLD, 45)
         font_title = ImageFont.truetype(FONT_BOLD, 80)
@@ -50,20 +47,15 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
         font_brand = ImageFont.load_default()
         font_text = ImageFont.load_default()
 
-    # Логотип (по центру сверху)
     logo_text = "ARSENAL SPORT"
     bbox = draw.textbbox((0, 0), logo_text, font=font_logo)
     logo_width = bbox[2] - bbox[0]
     draw.text(((CARD_SIZE[0] - logo_width) // 2, 50), logo_text, font=font_logo, fill=(255, 50, 50))
 
-    # Бренд и Название
     draw.text((60, 1000), brand.upper(), font=font_brand, fill=(200, 200, 200))
     draw.text((60, 1050), name.upper(), font=font_title, fill=(255, 255, 255))
-    
-    # Описание
     draw.text((60, 1160), description, font=font_text, fill=(180, 180, 180))
 
-    # Характеристики (слева внизу)
     y_offset = 1220
     if specs:
         draw.text((60, y_offset), f"Характеристики: {specs}", font=font_text, fill=(150, 150, 150))
@@ -77,11 +69,11 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
 
-tab1, tab2 = st.tabs(["Создать карточку", "Каталог товаров"])
+# ТЕПЕРЬ ТРИ ВКЛАДКИ
+tab1, tab2, tab3 = st.tabs(["Создать карточку", "Каталог товаров", "Тексты для соцсетей"])
 
 with tab1:
     st.header("Создание новой карточки товара")
-    
     uploaded_file = st.file_uploader("Загрузите фото товара", type=["jpg", "jpeg", "png", "webp"])
     
     col1, col2 = st.columns(2)
@@ -116,7 +108,6 @@ with tab1:
                 save_product(product_data)
                 
                 st.success("Карточка создана! Данные сохранены в products.json.")
-                # ИЗМЕНЕНИЕ: width=450 делает карточку компактной на экране
                 st.image(card, caption="Готовая карточка", width=450)
                 
                 buf = io.BytesIO()
@@ -141,3 +132,54 @@ with tab2:
                 st.write(f"**Цвет:** {p.get('color', 'не указан')}")
                 st.write(f"**Описание:** {p.get('description', 'нет')}")
                 st.write(f"**Характеристики:** {p.get('specs', 'нет')}")
+
+with tab3:
+    st.header("Генератор текстов для соцсетей")
+    st.write("Выберите товар из каталога, и мы сгенерируем для него готовые тексты.")
+    
+    products = load_products()
+    if not products:
+        st.info("Сначала создайте хотя бы один товар во вкладке 'Создать карточку'.")
+    else:
+        # Создаем список для выбора
+        product_names = [f"{p.get('brand', '')} {p.get('name', '')} ({p.get('article', '')})" for p in products]
+        selected_idx = st.selectbox("Выберите товар", range(len(product_names)), format_func=lambda x: product_names[x])
+        
+        if st.button("Сгенерировать тексты"):
+            p = products[selected_idx]
+            
+            # Генерация текста для Instagram
+            insta_text = f"""🔥 НОВИНКА В ARSENAL SPORT! 🔥
+
+Представляем вам {p.get('name', '')} от {p.get('brand', '')}!
+
+📝 {p.get('description', '')}
+📏 Размеры: {p.get('sizes', 'уточняйте')}
+🎨 Цвет: {p.get('color', 'уточняйте')}
+⚙️ Характеристики: {p.get('specs', '')}
+
+🛒 Закажите прямо сейчас в нашем магазине!
+📩 Пишите в личные сообщения для заказа.
+
+#arsenal_sport #спорт #экипировка #{p.get('brand', '').lower()} #новинка"""
+            
+            # Генерация текста для Telegram
+            tg_text = f"""🏆 **Новое поступление в Arsenal Sport!**
+
+**{p.get('name', '')}** от бренда **{p.get('brand', '')}**
+
+{p.get('description', '')}
+
+**Характеристики:**
+• Артикул: {p.get('article', 'нет')}
+• Размеры: {p.get('sizes', 'уточняйте')}
+• Цвет: {p.get('color', 'уточняйте')}
+• Особенности: {p.get('specs', '')}
+
+📍 Заходите в наш магазин или пишите для оформления заказа!"""
+            
+            st.subheader("Текст для Instagram")
+            st.text_area("Скопируйте текст", insta_text, height=200)
+            
+            st.subheader("Текст для Telegram")
+            st.text_area("Скопируйте текст", tg_text, height=200)
