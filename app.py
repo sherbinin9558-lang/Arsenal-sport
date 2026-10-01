@@ -1,6 +1,6 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime
+import json, io, datetime, csv
 from pathlib import Path
 
 # ==================== КОНФИГУРАЦИЯ ====================
@@ -104,7 +104,6 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
     canvas = Image.new("RGB", CARD_SIZE, t["bg"])
     draw = ImageDraw.Draw(canvas)
 
-    # Логотип или текст
     logo_img = get_logo()
     if logo_img:
         logo_w = 450
@@ -116,13 +115,11 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
 
     draw.line([(100, 160), (CARD_SIZE[0] - 100, 160)], fill=t["accent"], width=3)
 
-    # Категория
     fcat = get_font(30, True)
     ctext = f"{CATEGORY_EMOJI.get(category,'📦')} {category.upper()}"
     bb = draw.textbbox((0, 0), ctext, font=fcat)
     draw.text((CARD_SIZE[0] - (bb[2] - bb[0]) - 60, 185), ctext, font=fcat, fill=t["sec"])
 
-    # Фото
     if image:
         iw, ih = image.size
         ratio = min(760 / iw, 760 / ih)
@@ -130,19 +127,15 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
         image = image.resize(ns, Image.Resampling.LANCZOS)
         canvas.paste(image, ((CARD_SIZE[0] - ns[0]) // 2, 260))
 
-    # Бренд
     draw.text((60, 1050), brand.upper(), font=get_font(42), fill=t["sec"])
 
-    # Название (автоподбор)
     nu = name.upper()
     ft = fit_font(draw, nu, CARD_SIZE[0] - 120)
     draw.text((60, 1100), nu, font=ft, fill=t["text"])
 
-    # Описание
     desc = description[:90] + ("..." if len(description) > 90 else "")
     draw.text((60, 1200), desc, font=get_font(30), fill=t["sec"])
 
-    # Характеристики
     fs = get_font(26)
     draw.text((60, 1255), f"Арт: {article}  |  Размеры: {sizes}  |  Цвет: {color}", font=fs, fill=t["sec"])
     if specs:
@@ -227,10 +220,9 @@ def gen_vk(p, tone):
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", page_icon="🏆")
 
-# Сайдбар
 with st.sidebar:
     st.title("🏆 Arsenal Sport")
-    st.caption("Content Manager v2.0")
+    st.caption("Content Manager v2.1")
     dark_mode = st.toggle("🌙 Тёмная тема", value=True)
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
@@ -238,13 +230,10 @@ with st.sidebar:
     st.markdown("---")
     st.caption(f"Сегодня: {datetime.date.today().strftime('%d.%m.%Y')}")
 
-# Стили
 if dark_mode:
     bg_css = "body {background: #0e1117;}"
-    text_color = "#fff"
 else:
     bg_css = "body {background: #ffffff;}"
-    text_color = "#000"
 
 st.markdown(f"""
 <style>
@@ -319,7 +308,6 @@ with tab2:
         with c3:
             sort_by = st.selectbox("Сортировка", ["Сначала новые","Сначала старые","По названию","По бренду"])
 
-        # Фильтрация
         filtered = []
         for i, p in enumerate(products):
             if search and search.lower() not in (p.get('name','') + p.get('brand','') + p.get('article','')).lower():
@@ -328,7 +316,6 @@ with tab2:
                 continue
             filtered.append((i, p))
 
-        # Сортировка
         if sort_by == "Сначала старые":
             filtered = sorted(filtered, key=lambda x: x[0])
         elif sort_by == "По названию":
@@ -343,7 +330,6 @@ with tab2:
 
         for real_i, p in filtered:
             with st.expander(f"{CATEGORY_EMOJI.get(p.get('category',''),'📦')} {p.get('brand','')} {p.get('name','')} — {p.get('article','')}"):
-                # Редактирование
                 edit = st.toggle("✏️ Редактировать", key=f"edit_{real_i}")
                 if edit:
                     ec1, ec2 = st.columns(2)
@@ -378,7 +364,7 @@ with tab2:
                     delete_product(real_i)
                     st.rerun()
 
-# ========== 3: ТЕКСТЫ ==========
+# ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
 with tab3:
     st.header("Тексты для соцсетей")
     products = load_products()
@@ -395,22 +381,53 @@ with tab3:
             tg = gen_telegram(p, tone)
             vk = gen_vk(p, tone)
 
+            st.markdown("---")
+            st.subheader("📸 Instagram")
+            st.text_area("Текст поста", insta, height=300, key="i_out")
             c1, c2 = st.columns(2)
             with c1:
-                st.subheader("📸 Instagram")
-                st.text_area("", insta, height=300, key="i_out")
-                st.download_button("⬇️ Скачать", insta,
+                st.download_button("⬇️ Скачать текст", insta,
                     file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
             with c2:
-                st.subheader("✈️ Telegram")
-                st.text_area("", tg, height=300, key="t_out")
-                st.download_button("⬇️ Скачать", tg,
-                    file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
+                st.markdown(
+                    f'<a href="https://www.instagram.com/" target="_blank" '
+                    f'style="display:inline-block;padding:10px 20px;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);'
+                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Открыть Instagram</a>',
+                    unsafe_allow_html=True
+                )
+            st.caption("ℹ️ Скопируйте текст, откройте Instagram и вставьте его в пост. Карточку скачайте выше.")
 
-            st.subheader("🅥 VK")
-            st.text_area("", vk, height=200, key="v_out")
-            st.download_button("⬇️ Скачать VK", vk,
-                file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
+            st.markdown("---")
+            st.subheader("✈️ Telegram")
+            st.text_area("Текст поста", tg, height=300, key="t_out")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.download_button("⬇️ Скачать текст", tg,
+                    file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
+            with c2:
+                tg_link = f"https://t.me/share/url?url=&text={tg}"
+                st.markdown(
+                    f'<a href="{tg_link}" target="_blank" '
+                    f'style="display:inline-block;padding:10px 20px;background:#229ED9;'
+                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Отправить в Telegram</a>',
+                    unsafe_allow_html=True
+                )
+
+            st.markdown("---")
+            st.subheader("🅥 ВКонтакте")
+            st.text_area("Текст поста", vk, height=200, key="v_out")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.download_button("⬇️ Скачать текст", vk,
+                    file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
+            with c2:
+                vk_link = f"https://vk.com/share.php?url=&title={p.get('name','')}&description={vk}"
+                st.markdown(
+                    f'<a href="{vk_link}" target="_blank" '
+                    f'style="display:inline-block;padding:10px 20px;background:#0077FF;'
+                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Отправить в VK</a>',
+                    unsafe_allow_html=True
+                )
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
@@ -509,7 +526,6 @@ with tab5:
         if not plan:
             st.info("План пуст.")
         else:
-            # Календарный вид по неделям
             st.subheader("📅 По неделям")
             weeks = {}
             for i, item in enumerate(plan):
@@ -527,7 +543,6 @@ with tab5:
                         st.write(f"{pr_icon} **{item.get('date','')}** | {item.get('platform','')} | {item.get('type','')} | _{item.get('status','')}_")
                         st.write(f"   {item.get('product','')}: {item.get('idea','')}")
 
-            # Экспорт
             st.markdown("---")
             csv_buf = io.StringIO()
             writer = csv.writer(csv_buf)
@@ -539,7 +554,6 @@ with tab5:
             st.download_button("⬇️ Экспорт в Excel (CSV)", csv_buf.getvalue(),
                 file_name=f"content_plan_{datetime.date.today()}.csv", mime="text/csv")
 
-            # Управление
             st.subheader("Управление записями")
             for i, item in enumerate(reversed(plan)):
                 ri = len(plan) - 1 - i
@@ -626,4 +640,4 @@ with tab7:
         st.rerun()
 
 st.markdown("---")
-st.caption("Arsenal Sport Content Manager v2.0 — MVP. Все данные хранятся в облаке.")
+st.caption("Arsenal Sport Content Manager v2.1 — MVP. Все данные хранятся в облаке.")
