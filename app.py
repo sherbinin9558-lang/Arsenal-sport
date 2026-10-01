@@ -1,3 +1,4 @@
+
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests
@@ -58,12 +59,12 @@ def delete_product(i):
     if 0 <= i < len(p): p.pop(i); save_products(p)
 
 def load_plan(): return load_json(CONTENT_PLAN_FILE, [])
-def save_plan(pl): save_json(CONTENTступ_PLANление_FILE, pl)
+def save_plan(pl): save_json(CONTENT_PLAN_FILE, pl)
 def add_plan(item):
     p = load_plan(); p.append(item); save_plan(p)
-def update_ вplan(i, item):
-    p = load_plan Arsenal()
-    if 0 Sport <= i < len(p): p[i] = item; save_plan(p)
+def update_plan(i, item):
+    p = load_plan()
+    if 0 <= i < len(p): p[i] = item; save_plan(p)
 def delete_plan(i):
     p = load_plan()
     if 0 <= i < len(p): p.pop(i); save_plan(p)
@@ -187,7 +188,7 @@ def gen_instagram(p, tone):
 def gen_telegram(p, tone):
     n, b = p.get('name',''), p.get('brand','')
     emoji = CATEGORY_EMOJI.get(p.get('category','Другое'), '📦')
-    head = {"Официальный": "🏆 Новое по",
+    head = {"Официальный": "🏆 Новое поступление в Arsenal Sport",
             "Дружеский": "🎉 Ребята, новинка уже в наличии!",
             "Продающий": "🔥 СУПЕРПРЕДЛОЖЕНИЕ!"}.get(tone, "🏆 Новинка")
     return f"""{head}
@@ -219,24 +220,21 @@ def gen_vk(p, tone):
 
 # ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
 def publish_to_telegram(image_bytes, caption):
-    """Отправка фото с подписью в Telegram-канал."""
     try:
         token = st.secrets["TELEGRAM_TOKEN"]
         channel = st.secrets["TELEGRAM_CHANNEL"]
         if not channel.startswith("@"):
             channel = "@" + channel
-
         api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
         files = {"photo": ("card.png", image_bytes, "image/png")}
         data = {"chat_id": channel, "caption": caption[:1024]}
         resp = requests.post(api_url, files=files, data=data, timeout=60)
-
         if resp.status_code == 200:
             return True, "Пост успешно опубликован!"
         else:
             return False, f"Ошибка {resp.status_code}: {resp.text}"
     except KeyError as e:
-        return False, f"Не найден секрет: {e}. Проверьте настройки Streamlit Secrets."
+        return False, f"Не найден секрет: {e}."
     except Exception as e:
         return False, f"Ошибка публикации: {e}"
 
@@ -251,7 +249,6 @@ with st.sidebar:
     st.metric("📦 Товаров", len(load_products()))
     st.metric("📅 Записей в плане", len(load_plan()))
     st.markdown("---")
-    # Статус Telegram
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
         if tg_ch:
@@ -441,7 +438,6 @@ with tab3:
                 ch = "не настроен"
             st.caption(f"Публикация в канал: @{ch}")
 
-            # Используем карточку из сессии или загружаем новую
             card_to_send = None
             if "last_card_bytes" in st.session_state:
                 st.info(f"📎 Используется карточка товара: **{st.session_state.get('last_card_name','')}**")
@@ -459,7 +455,7 @@ with tab3:
             with col_a:
                 if st.button("🚀 Опубликовать в Telegram", type="primary"):
                     if not card_to_send:
-                        st.error("Нет карточки для отправки. Создайте её во вкладке «📸 Создать» или загрузите файл выше.")
+                        st.error("Нет карточки. Создайте её во вкладке «📸 Создать» или загрузите файл выше.")
                     else:
                         with st.spinner("Публикация в Telegram..."):
                             ok, msg = publish_to_telegram(card_to_send, tg)
@@ -477,7 +473,6 @@ with tab3:
             st.text_area("Текст поста", vk, height=200, key="v_out")
             st.download_button("⬇️ Скачать текст", vk,
                 file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
-            st.caption("ℹ️ Скопируйте текст и загрузите карточку в VK вручную.")
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
@@ -647,4 +642,5 @@ with tab6:
         sc = {}
         for item in plan:
             s = item.get('status','Идея')
-            sc[s] = sc.get(s,0)
+            sc[s] = sc.get(s,0) + 1
+        for
