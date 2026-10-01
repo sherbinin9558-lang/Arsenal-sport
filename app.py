@@ -4,14 +4,16 @@ from PIL import Image, ImageDraw, ImageFont
 import json
 from pathlib import Path
 import io
+import datetime
 
 # Настройки
 PRODUCTS_FILE = Path("products.json")
+CONTENT_PLAN_FILE = Path("content_plan.json")
 CARD_SIZE = (1080, 1350)
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# Загрузка и сохранение данных
+# Загрузка и сохранение товаров
 def load_products():
     if PRODUCTS_FILE.exists():
         with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
@@ -23,6 +25,19 @@ def save_product(product):
     products.append(product)
     with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
         json.dump(products, f, ensure_ascii=False, indent=4)
+
+# Загрузка и сохранение контент-плана
+def load_content_plan():
+    if CONTENT_PLAN_FILE.exists():
+        with open(CONTENT_PLAN_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def save_content_plan_item(item):
+    plan = load_content_plan()
+    plan.append(item)
+    with open(CONTENT_PLAN_FILE, "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=4)
 
 # Генерация карточки
 def generate_card(image, name, brand, article, sizes, color, description, specs):
@@ -70,8 +85,13 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
 
-# ТЕПЕРЬ ЧЕТЫРЕ ВКЛАДКИ
-tab1, tab2, tab3, tab4 = st.tabs(["Создать карточку", "Каталог товаров", "Тексты для соцсетей", "Идеи для Reels/Stories"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Создать карточку", 
+    "Каталог товаров", 
+    "Тексты для соцсетей", 
+    "Идеи для Reels/Stories",
+    "Контент-план"
+])
 
 with tab1:
     st.header("Создание новой карточки товара")
@@ -211,7 +231,6 @@ with tab4:
             brand = p.get('brand', '')
             desc = p.get('description', '')
             
-            # Генерация идей
             ideas = f"""💡 ИДЕИ ДЛЯ REELS И STORIES:
 
 1. **Распаковка (Unboxing):** Крупным планом показать товар, рассказать о материалах и качестве. Текст на экране: "Новинка от {brand}!"
@@ -220,8 +239,7 @@ with tab4:
 4. **Сравнение (Before/After):** Показать старую вещь и новую, подчеркнуть преимущества. Текст: "Почувствуйте разницу".
 5. **Вопрос-Ответ (Q&A):** Ответить на частые вопросы о товаре (размеры, уход). Текст: "Отвечаем на ваши вопросы"."""
 
-            # Генерация сценария
-            script = f"""🎬 СЦЕНАРИЙ ДЛЯ REELS (30 секунд):
+            script = f'''🎬 СЦЕНАРИЙ ДЛЯ REELS (30 секунд):
 
 **Кадр 1 (0-5 сек):** Общий план. Товар лежит на столе. 
 *Текст на экране:* "Смотрите, какая новинка!"
@@ -237,8 +255,8 @@ with tab4:
 
 **Кадр 4 (25-30 сек):** Призыв к действию (CTA).
 *Текст на экране:* "Заказывайте в Arsenal Sport!"
-*Голос/Текст:* "Ссылка в шапке профиля!""" 
-            
+*Голос/Текст:* "Ссылка в шапке профиля!"'''
+
             st.subheader("Идеи для Reels и Stories")
             st.text_area("Скопируйте идеи", ideas, height=250, key="ideas")
             st.download_button(
@@ -255,4 +273,47 @@ with tab4:
                 data=script,
                 file_name=f"{name.replace(' ', '_')}_reels_script.txt",
                 mime="text/plain"
-            ) 
+            )
+
+with tab5:
+    st.header("Контент-план")
+    st.write("Планируйте посты и идеи на будущее. Выберите товар и добавьте запись.")
+    
+    products = load_products()
+    if not products:
+        st.info("Сначала создайте хотя бы один товар во вкладке 'Создать карточку'.")
+    else:
+        with st.form("plan_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                plan_date = st.date_input("Дата")
+                platform = st.selectbox("Платформа", ["Instagram", "Telegram", "VK", "Другое"])
+            with col2:
+                product_names = [f"{p.get('brand','')} {p.get('name','')} ({p.get('article','')})" for p in products]
+                selected_product = st.selectbox("Товар", product_names)
+                content_type = st.selectbox("Тип контента", ["Пост", "Reels", "Stories", "Карусель"])
+            idea = st.text_area("Идея или текст")
+            status = st.selectbox("Статус", ["Идея", "В работе", "Готово", "Опубликовано"])
+            submitted = st.form_submit_button("Добавить в план")
+            
+            if submitted:
+                item = {
+                    "date": str(plan_date),
+                    "platform": platform,
+                    "product": selected_product,
+                    "type": content_type,
+                    "idea": idea,
+                    "status": status
+                }
+                save_content_plan_item(item)
+                st.success("Запись добавлена в контент-план!")
+        
+        st.subheader("Запланировано")
+        plan = load_content_plan()
+        if not plan:
+            st.info("Пока ничего не запланировано.")
+        else:
+            for item in reversed(plan):
+                with st.expander(f"{item.get('date','')} | {item.get('platform','')} | {item.get('type','')} | {item.get('status','')}"):
+                    st.write(f"**Товар:** {item.get('product','')}")
+                    st.write(f"**Идея:** {item.get('idea','')}")
