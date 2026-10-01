@@ -1,6 +1,6 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime, csv
+import json, io, datetime, csv, requests
 from pathlib import Path
 
 # ==================== КОНФИГУРАЦИЯ ====================
@@ -58,12 +58,12 @@ def delete_product(i):
     if 0 <= i < len(p): p.pop(i); save_products(p)
 
 def load_plan(): return load_json(CONTENT_PLAN_FILE, [])
-def save_plan(pl): save_json(CONTENT_PLAN_FILE, pl)
+def save_plan(pl): save_json(CONTENTступ_PLANление_FILE, pl)
 def add_plan(item):
     p = load_plan(); p.append(item); save_plan(p)
-def update_plan(i, item):
-    p = load_plan()
-    if 0 <= i < len(p): p[i] = item; save_plan(p)
+def update_ вplan(i, item):
+    p = load_plan Arsenal()
+    if 0 Sport <= i < len(p): p[i] = item; save_plan(p)
 def delete_plan(i):
     p = load_plan()
     if 0 <= i < len(p): p.pop(i); save_plan(p)
@@ -187,7 +187,7 @@ def gen_instagram(p, tone):
 def gen_telegram(p, tone):
     n, b = p.get('name',''), p.get('brand','')
     emoji = CATEGORY_EMOJI.get(p.get('category','Другое'), '📦')
-    head = {"Официальный": "🏆 Новое поступление в Arsenal Sport",
+    head = {"Официальный": "🏆 Новое по",
             "Дружеский": "🎉 Ребята, новинка уже в наличии!",
             "Продающий": "🔥 СУПЕРПРЕДЛОЖЕНИЕ!"}.get(tone, "🏆 Новинка")
     return f"""{head}
@@ -217,16 +217,49 @@ def gen_vk(p, tone):
 📍 Заказать: напишите нам в сообщения сообщества.
 {make_hashtags(n, b, p.get('category','Другое'))}"""
 
+# ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
+def publish_to_telegram(image_bytes, caption):
+    """Отправка фото с подписью в Telegram-канал."""
+    try:
+        token = st.secrets["TELEGRAM_TOKEN"]
+        channel = st.secrets["TELEGRAM_CHANNEL"]
+        if not channel.startswith("@"):
+            channel = "@" + channel
+
+        api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        files = {"photo": ("card.png", image_bytes, "image/png")}
+        data = {"chat_id": channel, "caption": caption[:1024]}
+        resp = requests.post(api_url, files=files, data=data, timeout=60)
+
+        if resp.status_code == 200:
+            return True, "Пост успешно опубликован!"
+        else:
+            return False, f"Ошибка {resp.status_code}: {resp.text}"
+    except KeyError as e:
+        return False, f"Не найден секрет: {e}. Проверьте настройки Streamlit Secrets."
+    except Exception as e:
+        return False, f"Ошибка публикации: {e}"
+
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", page_icon="🏆")
 
 with st.sidebar:
     st.title("🏆 Arsenal Sport")
-    st.caption("Content Manager v2.1")
+    st.caption("Content Manager v2.2")
     dark_mode = st.toggle("🌙 Тёмная тема", value=True)
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
     st.metric("📅 Записей в плане", len(load_plan()))
+    st.markdown("---")
+    # Статус Telegram
+    try:
+        tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
+        if tg_ch:
+            st.success(f"📡 Telegram: @{tg_ch}")
+        else:
+            st.warning("📡 Telegram не настроен")
+    except Exception:
+        st.warning("📡 Telegram не настроен")
     st.markdown("---")
     st.caption(f"Сегодня: {datetime.date.today().strftime('%d.%m.%Y')}")
 
@@ -290,6 +323,8 @@ with tab1:
                 st.image(card, caption="Готово (1080×1350)", width=400)
                 buf = io.BytesIO()
                 card.save(buf, format="PNG")
+                st.session_state["last_card_bytes"] = buf.getvalue()
+                st.session_state["last_card_name"] = name
                 st.download_button("⬇️ Скачать карточку", buf.getvalue(),
                     file_name=f"{name.replace(' ','_')}_card.png", mime="image/png")
 
@@ -377,57 +412,72 @@ with tab3:
 
         if st.button("✨ Сгенерировать", type="primary"):
             p = products[idx]
-            insta = gen_instagram(p, tone)
-            tg = gen_telegram(p, tone)
-            vk = gen_vk(p, tone)
+            st.session_state["tg_text"] = gen_telegram(p, tone)
+            st.session_state["insta_text"] = gen_instagram(p, tone)
+            st.session_state["vk_text"] = gen_vk(p, tone)
+            st.session_state["current_product"] = p
+
+        if "tg_text" in st.session_state:
+            p = st.session_state["current_product"]
+            insta = st.session_state["insta_text"]
+            tg = st.session_state["tg_text"]
+            vk = st.session_state["vk_text"]
 
             st.markdown("---")
             st.subheader("📸 Instagram")
-            st.text_area("Текст поста", insta, height=300, key="i_out")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.download_button("⬇️ Скачать текст", insta,
-                    file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
-            with c2:
-                st.markdown(
-                    f'<a href="https://www.instagram.com/" target="_blank" '
-                    f'style="display:inline-block;padding:10px 20px;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);'
-                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Открыть Instagram</a>',
-                    unsafe_allow_html=True
-                )
-            st.caption("ℹ️ Скопируйте текст, откройте Instagram и вставьте его в пост. Карточку скачайте выше.")
+            st.text_area("Текст поста", insta, height=280, key="i_out")
+            st.download_button("⬇️ Скачать текст", insta,
+                file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
+            st.caption("ℹ️ Скопируйте текст и загрузите карточку в Instagram вручную.")
 
             st.markdown("---")
             st.subheader("✈️ Telegram")
-            st.text_area("Текст поста", tg, height=300, key="t_out")
-            c1, c2 = st.columns(2)
-            with c1:
+            st.text_area("Текст поста", tg, height=280, key="t_out")
+
+            st.markdown("### 📤 Опубликовать в Telegram")
+            try:
+                ch = st.secrets.get("TELEGRAM_CHANNEL", "не настроен")
+            except Exception:
+                ch = "не настроен"
+            st.caption(f"Публикация в канал: @{ch}")
+
+            # Используем карточку из сессии или загружаем новую
+            card_to_send = None
+            if "last_card_bytes" in st.session_state:
+                st.info(f"📎 Используется карточка товара: **{st.session_state.get('last_card_name','')}**")
+                card_to_send = st.session_state["last_card_bytes"]
+
+            up_card = st.file_uploader(
+                "Или загрузите свою карточку для отправки (PNG/JPG)",
+                type=["png", "jpg", "jpeg"],
+                key="tg_card_upload"
+            )
+            if up_card:
+                card_to_send = up_card.getvalue()
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("🚀 Опубликовать в Telegram", type="primary"):
+                    if not card_to_send:
+                        st.error("Нет карточки для отправки. Создайте её во вкладке «📸 Создать» или загрузите файл выше.")
+                    else:
+                        with st.spinner("Публикация в Telegram..."):
+                            ok, msg = publish_to_telegram(card_to_send, tg)
+                        if ok:
+                            st.success(f"✅ {msg}")
+                            st.balloons()
+                        else:
+                            st.error(f"❌ {msg}")
+            with col_b:
                 st.download_button("⬇️ Скачать текст", tg,
                     file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
-            with c2:
-                tg_link = f"https://t.me/share/url?url=&text={tg}"
-                st.markdown(
-                    f'<a href="{tg_link}" target="_blank" '
-                    f'style="display:inline-block;padding:10px 20px;background:#229ED9;'
-                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Отправить в Telegram</a>',
-                    unsafe_allow_html=True
-                )
 
             st.markdown("---")
             st.subheader("🅥 ВКонтакте")
             st.text_area("Текст поста", vk, height=200, key="v_out")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.download_button("⬇️ Скачать текст", vk,
-                    file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
-            with c2:
-                vk_link = f"https://vk.com/share.php?url=&title={p.get('name','')}&description={vk}"
-                st.markdown(
-                    f'<a href="{vk_link}" target="_blank" '
-                    f'style="display:inline-block;padding:10px 20px;background:#0077FF;'
-                    f'color:white;border-radius:6px;text-decoration:none;font-weight:600;">📤 Отправить в VK</a>',
-                    unsafe_allow_html=True
-                )
+            st.download_button("⬇️ Скачать текст", vk,
+                file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
+            st.caption("ℹ️ Скопируйте текст и загрузите карточку в VK вручную.")
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
@@ -597,47 +647,4 @@ with tab6:
         sc = {}
         for item in plan:
             s = item.get('status','Идея')
-            sc[s] = sc.get(s,0) + 1
-        for s, n in sorted(sc.items(), key=lambda x: -x[1]):
-            st.write(f"**{s}:** {n}")
-
-# ========== 7: НАСТРОЙКИ ==========
-with tab7:
-    st.header("⚙️ Настройки")
-
-    st.subheader("🖼️ Логотип магазина")
-    st.caption("Загрузите PNG-файл с прозрачным фоном — он будет появляться на всех карточках.")
-    logo_up = st.file_uploader("Загрузить логотип", type=["png"], key="logo")
-    if logo_up:
-        save_logo(logo_up)
-        st.success("Логотип сохранён!")
-        st.image(LOGO_FILE, width=200)
-    elif LOGO_FILE.exists():
-        st.image(LOGO_FILE, width=200)
-        if st.button("🗑️ Удалить логотип"):
-            LOGO_FILE.unlink()
-            st.rerun()
-
-    st.markdown("---")
-
-    st.subheader("💾 Резервное копирование")
-    products = load_products()
-    plan = load_plan()
-    backup = {"products": products, "content_plan": plan, "date": str(datetime.date.today())}
-    st.download_button("⬇️ Скачать все данные (JSON)",
-        json.dumps(backup, ensure_ascii=False, indent=2),
-        file_name=f"arsenal_backup_{datetime.date.today()}.json", mime="application/json")
-
-    st.markdown("---")
-    st.subheader("⚠️ Опасная зона")
-    if st.button("🗑️ Очистить каталог товаров"):
-        save_products([])
-        st.success("Каталог очищен!")
-        st.rerun()
-    if st.button("🗑️ Очистить контент-план"):
-        save_plan([])
-        st.success("План очищен!")
-        st.rerun()
-
-st.markdown("---")
-st.caption("Arsenal Sport Content Manager v2.1 — MVP. Все данные хранятся в облаке.")
+            sc[s] = sc.get(s,0)
