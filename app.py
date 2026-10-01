@@ -540,6 +540,39 @@ with tab4:
             st.text_area("", stories, height=150, key="st_out")
             st.download_button("⬇️ Stories", stories, file_name=f"{n}_stories.txt")
 
+        st.markdown("---")
+
+        st.subheader("🎞️ Видео-рилс из карточки")
+
+        reel_file = st.file_uploader("Карточка товара (фото)", type=["jpg", "jpeg", "png", "webp"], key="reel_card")
+
+        if reel_file and st.button("🎬 Создать видео", key="make_reel_btn"):
+
+            import tempfile, os
+
+            from reels import make_reel
+
+            with tempfile.TemporaryDirectory() as tmp:
+
+                src = os.path.join(tmp, "card.png")
+
+                Image.open(reel_file).convert("RGB").save(src)
+
+                out = os.path.join(tmp, "reel.mp4")
+
+                with st.spinner("Рендерю видео, подожди..."):
+
+                    make_reel(src, out, duration=8)
+
+                video_bytes = open(out, "rb").read()
+
+            st.video(video_bytes)
+
+            st.download_button("⬇️ Скачать рилс", video_bytes, "reel.mp4", "video/mp4", key="dl_reel")
+
+        st.markdown("---")
+
+
 # ========== 5: КОНТЕНТ-ПЛАН ==========
 with tab5:
     st.header("Контент-план")
