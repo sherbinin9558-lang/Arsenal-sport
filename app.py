@@ -643,4 +643,46 @@ with tab6:
         for item in plan:
             s = item.get('status','Идея')
             sc[s] = sc.get(s,0) + 1
-        for
+        for s, n in sorted(sc.items(), key=lambda x: -x[1]):
+            st.write(f"**{s}:** {n}")
+
+# ========== 7: НАСТРОЙКИ ==========
+with tab7:
+    st.header("⚙️ Настройки")
+
+    st.subheader("🖼️ Логотип магазина")
+    st.caption("Загрузите PNG-файл с прозрачным фоном — он будет появляться на всех карточках.")
+    logo_up = st.file_uploader("Загрузить логотип", type=["png"], key="logo")
+    if logo_up:
+        save_logo(logo_up)
+        st.success("Логотип сохранён!")
+        st.image(LOGO_FILE, width=200)
+    elif LOGO_FILE.exists():
+        st.image(LOGO_FILE, width=200)
+        if st.button("🗑️ Удалить логотип"):
+            LOGO_FILE.unlink()
+            st.rerun()
+
+    st.markdown("---")
+
+    st.subheader("💾 Резервное копирование")
+    products = load_products()
+    plan = load_plan()
+    backup = {"products": products, "content_plan": plan, "date": str(datetime.date.today())}
+    st.download_button("⬇️ Скачать все данные (JSON)",
+        json.dumps(backup, ensure_ascii=False, indent=2),
+        file_name=f"arsenal_backup_{datetime.date.today()}.json", mime="application/json")
+
+    st.markdown("---")
+    st.subheader("⚠️ Опасная зона")
+    if st.button("🗑️ Очистить каталог товаров"):
+        save_products([])
+        st.success("Каталог очищен!")
+        st.rerun()
+    if st.button("🗑️ Очистить контент-план"):
+        save_plan([])
+        st.success("План очищен!")
+        st.rerun()
+
+st.markdown("---")
+st.caption("Arsenal Sport Content Manager v2.2 — MVP. Все данные хранятся в облаке.")
