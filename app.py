@@ -70,7 +70,8 @@ def generate_card(image, name, brand, article, sizes, color, description, specs)
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 st.title("Arsenal Sport Content Manager")
 
-tab1, tab2, tab3 = st.tabs(["Создать карточку", "Каталог товаров", "Тексты для соцсетей"])
+# ТЕПЕРЬ ЧЕТЫРЕ ВКЛАДКИ
+tab1, tab2, tab3, tab4 = st.tabs(["Создать карточку", "Каталог товаров", "Тексты для соцсетей", "Идеи для Reels/Stories"])
 
 with tab1:
     st.header("Создание новой карточки товара")
@@ -142,12 +143,11 @@ with tab3:
         st.info("Сначала создайте хотя бы один товар во вкладке 'Создать карточку'.")
     else:
         product_names = [f"{p.get('brand', '')} {p.get('name', '')} ({p.get('article', '')})" for p in products]
-        selected_idx = st.selectbox("Выберите товар", range(len(product_names)), format_func=lambda x: product_names[x])
+        selected_idx = st.selectbox("Выберите товар", range(len(product_names)), format_func=lambda x: product_names[x], key="sb_text")
         
         if st.button("Сгенерировать тексты"):
             p = products[selected_idx]
             
-            # Генерация текста для Instagram
             insta_text = f"""🔥 НОВИНКА В ARSENAL SPORT! 🔥
 
 Представляем вам {p.get('name', '')} от {p.get('brand', '')}!
@@ -162,7 +162,6 @@ with tab3:
 
 #arsenal_sport #спорт #экипировка #{p.get('brand', '').lower()} #новинка"""
             
-            # Генерация текста для Telegram
             tg_text = f"""🏆 **Новое поступление в Arsenal Sport!**
 
 **{p.get('name', '')}** от бренда **{p.get('brand', '')}**
@@ -179,7 +178,6 @@ with tab3:
             
             st.subheader("Текст для Instagram")
             st.text_area("Скопируйте текст", insta_text, height=200, key="insta")
-            # Кнопка скачивания для Instagram
             st.download_button(
                 label="Скачать текст для Instagram",
                 data=insta_text,
@@ -189,10 +187,72 @@ with tab3:
             
             st.subheader("Текст для Telegram")
             st.text_area("Скопируйте текст", tg_text, height=200, key="tg")
-            # Кнопка скачивания для Telegram
             st.download_button(
                 label="Скачать текст для Telegram",
                 data=tg_text,
                 file_name=f"{p.get('name', 'товар').replace(' ', '_')}_telegram.txt",
                 mime="text/plain"
             )
+
+with tab4:
+    st.header("Генератор идей и сценариев для Reels и Stories")
+    st.write("Выберите товар, и мы предложим вам варианты сценариев для коротких видео.")
+    
+    products = load_products()
+    if not products:
+        st.info("Сначала создайте хотя бы один товар во вкладке 'Создать карточку'.")
+    else:
+        product_names = [f"{p.get('brand', '')} {p.get('name', '')} ({p.get('article', '')})" for p in products]
+        selected_idx = st.selectbox("Выберите товар", range(len(product_names)), format_func=lambda x: product_names[x], key="sb_reels")
+        
+        if st.button("Сгенерировать идеи для Reels/Stories"):
+            p = products[selected_idx]
+            name = p.get('name', '')
+            brand = p.get('brand', '')
+            desc = p.get('description', '')
+            
+            # Генерация идей
+            ideas = f"""💡 ИДЕИ ДЛЯ REELS И STORIES:
+
+1. **Распаковка (Unboxing):** Крупным планом показать товар, рассказать о материалах и качестве. Текст на экране: "Новинка от {brand}!"
+2. **Обзор (Review):** Надеть/примерить товар, показать его в движении. Рассказать о посадке и комфорте. Текст: "Идеально для тренировок".
+3. **Стилизация (Styling):** Показать 3 разных образа с этим товаром. Текст: "С чем носить {name}?"
+4. **Сравнение (Before/After):** Показать старую вещь и новую, подчеркнуть преимущества. Текст: "Почувствуйте разницу".
+5. **Вопрос-Ответ (Q&A):** Ответить на частые вопросы о товаре (размеры, уход). Текст: "Отвечаем на ваши вопросы"."""
+
+            # Генерация сценария
+            script = f"""🎬 СЦЕНАРИЙ ДЛЯ REELS (30 секунд):
+
+**Кадр 1 (0-5 сек):** Общий план. Товар лежит на столе. 
+*Текст на экране:* "Смотрите, какая новинка!"
+*Голос/Текст:* "Встречайте {name} от {brand}!"
+
+**Кадр 2 (5-15 сек):** Крупный план. Показать детали, текстуру, логотип.
+*Текст на экране:* "Качество, которое видно"
+*Голос/Текст:* "{desc}"
+
+**Кадр 3 (15-25 сек):** Человек держит товар или примеряет его.
+*Текст на экране:* "Идеально подходит для..."
+*Голос/Текст:* "Доступные размеры: {p.get('sizes', 'уточняйте')}. Цвет: {p.get('color', 'уточняйте')}."
+
+**Кадр 4 (25-30 сек):** Призыв к действию (CTA).
+*Текст на экране:* "Заказывайте в Arsenal Sport!"
+*Голос/Текст:* "Ссылка в шапке профиля!"""" 
+            
+            st.subheader("Идеи для Reels и Stories")
+            st.text_area("Скопируйте идеи", ideas, height=250, key="ideas")
+            st.download_button(
+                label="Скачать идеи",
+                data=ideas,
+                file_name=f"{name.replace(' ', '_')}_reels_ideas.txt",
+                mime="text/plain"
+            )
+            
+            st.subheader("Готовый сценарий для Reels")
+            st.text_area("Скопируйте сценарий", script, height=300, key="script")
+            st.download_button(
+                label="Скачать сценарий",
+                data=script,
+                file_name=f"{name.replace(' ', '_')}_reels_script.txt",
+                mime="text/plain"
+            ) 
