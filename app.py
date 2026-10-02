@@ -1238,7 +1238,8 @@ with tab3:
                 )
 
             st.markdown("---")
-            st.subheader("🅥 ВКонтакте")            st.text_area(
+            st.subheader("🅥 ВКонтакте")
+            st.text_area(
                 "Текст поста",
                 vk,
                 height=200,
