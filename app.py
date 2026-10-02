@@ -1,7 +1,7 @@
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime, csv, requests, base64
+import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 
