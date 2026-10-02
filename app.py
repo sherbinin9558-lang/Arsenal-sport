@@ -448,11 +448,15 @@ with tab2:
                     nd = st.text_area("Описание", p.get('description',''), key=f"d_{real_i}")
                     nsp = st.text_input("Характеристики", p.get('specs',''), key=f"sp_{real_i}")
                     if st.button("💾 Сохранить", key=f"save_{real_i}"):
-                        update_product(real_i, {
+                        updated = {
                             "name": nn, "brand": nb, "article": na, "sizes": ns,
                             "color": nc, "description": nd, "specs": nsp,
                             "category": ncat, "date_added": p.get('date_added', str(datetime.date.today()))
-                        })
+                        }
+                        # Не теряем сохранённую карточку при редактировании товара.
+                        if p.get("card_image"):
+                            updated["card_image"] = p["card_image"]
+                        update_product(real_i, updated)
                         st.success("Обновлено!")
                         st.rerun()
                 else:
