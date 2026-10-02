@@ -482,6 +482,61 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 .section-subtitle {color:#8f97a6;margin-bottom:18px;}
 .pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#211f35;color:#c9c5ff;border:1px solid #34304f;font-size:.78rem;font-weight:650;}
 [data-testid="stAlert"], div[data-baseweb="notification"] {background:#151922 !important;border:1px solid #303747 !important;color:#f5f7fa !important;border-radius:14px !important;}
+/* ===== Responsive layout: desktop / tablet / phone ===== */
+html, body { overflow-x:hidden !important; }
+.block-container { width:100% !important; max-width:1500px !important; margin:0 auto !important; padding-left:clamp(0.75rem,2.5vw,2.5rem) !important; padding-right:clamp(0.75rem,2.5vw,2.5rem) !important; }
+[data-testid="stHorizontalBlock"] { width:100% !important; }
+[data-testid="stTextInput"], [data-testid="stTextArea"], [data-testid="stSelectbox"], [data-testid="stNumberInput"], [data-testid="stDateInput"], [data-testid="stFileUploader"] { width:100% !important; }
+.stButton > button, button[kind="primary"] { min-height:44px; }
+@media (min-width: 769px) and (max-width: 1100px) {
+    .block-container { padding-left:1rem !important; padding-right:1rem !important; }
+    [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        flex:1 1 46% !important; min-width:46% !important; max-width:100% !important;
+    }
+    .main-title { font-size:2.05rem !important; }
+    .section-title { font-size:1.45rem !important; }
+    div[data-baseweb="tab-list"] { overflow-x:auto !important; flex-wrap:nowrap !important; }
+    button[data-baseweb="tab"] { flex:0 0 auto !important; white-space:nowrap !important; }
+}
+@media (max-width: 768px) {
+    .block-container { padding:0.65rem 0.7rem 1.2rem !important; }
+    .main-title { font-size:1.45rem !important; line-height:1.15 !important; margin:12px 0 10px !important; letter-spacing:.01em !important; }
+    .subtitle { font-size:.78rem !important; margin-bottom:12px !important; }
+    .section-title { font-size:1.25rem !important; line-height:1.2 !important; }
+    .section-subtitle { font-size:.82rem !important; margin-bottom:12px !important; }
+    .section-kicker { font-size:.65rem !important; }
+    .stat-box { padding:12px 8px !important; margin:3px 0 !important; border-radius:12px !important; }
+    .stat-number { font-size:1.55rem !important; }
+    .stat-label { font-size:.72rem !important; }
+    .stButton > button, button[kind="primary"] { min-height:46px !important; width:100% !important; }
+    [data-testid="stHorizontalBlock"] { flex-direction:column !important; gap:.55rem !important; }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        width:100% !important; min-width:100% !important; max-width:100% !important; flex:1 1 100% !important;
+    }
+    div[data-baseweb="tab-list"] {
+        overflow-x:auto !important; overflow-y:hidden !important;
+        flex-wrap:nowrap !important; scrollbar-width:none !important;
+        -webkit-overflow-scrolling:touch !important;
+    }
+    div[data-baseweb="tab-list"]::-webkit-scrollbar { display:none !important; }
+    button[data-baseweb="tab"] {
+        flex:0 0 auto !important; min-width:max-content !important;
+        white-space:nowrap !important; padding:8px 10px !important;
+        font-size:.78rem !important;
+    }
+    section[data-testid="stSidebar"] { width:min(88vw,330px) !important; }
+    section[data-testid="stSidebar"] .stButton > button { width:100% !important; }
+    .sidebar-ai-agent { font-size:.95rem !important; }
+    .sidebar-max { padding:9px 10px 7px !important; }
+    .sidebar-max-title { font-size:1.05rem !important; }
+    .sidebar-max-text { font-size:.68rem !important; }
+    [data-testid="stFileUploader"] { padding:.25rem !important; }
+    [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
+    .stMarkdown, .stCaption { overflow-wrap:anywhere !important; }
+    [data-testid="stAlert"], div[data-baseweb="notification"] { font-size:.86rem !important; }
+}
+
 [data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#f5f7fa !important;}
 [data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
 </style>""",
