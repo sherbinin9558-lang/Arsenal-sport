@@ -661,7 +661,8 @@ div[role="dialog"] [data-testid="stExpander"] svg * {
     fill:none !important;
     opacity:1 !important;
     visibility:visible !important;
-    filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;
+    stroke-width:3px !important;
+    filter:drop-shadow(0 0 6px rgba(184,255,0,.9)) !important;
 }
 /* Keep the MAX launcher visually prominent. */
 button[key="sidebar_max"], button[key="dash_open_max"] {
