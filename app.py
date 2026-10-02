@@ -958,7 +958,7 @@ with tab4:
         reel_product_name = st.session_state.get("reel_product_name", "")
 
         if video_bytes:
-            st.video(video_bytes, width=360)
+            st.video(video_bytes, width=260)
 
             st.download_button(
                 "⬇️ Скачать рилс",
