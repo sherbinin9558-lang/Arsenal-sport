@@ -408,14 +408,18 @@ st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=Tr
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
 st.markdown("---")
 
-if st.session_state.get("open_max"):
-    st.session_state["open_max"] = False
-    st.markdown('<script>window.location.hash="max";</script>', unsafe_allow_html=True)
+if st.session_state.pop("open_max", False):
+    st.session_state["main_tabs"] = "⚡ MAX"
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
-    "📅 План", "📊 Статистика", "⚙️ Настройки", "⚡ MAX"
-])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    [
+        "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
+        "📅 План", "📊 Статистика", "⚙️ Настройки", "⚡ MAX"
+    ],
+    default=st.session_state.get("main_tabs", "📸 Создать"),
+    key="main_tabs",
+    on_change="rerun",
+)
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
 with tab1:
