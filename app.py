@@ -800,24 +800,26 @@ button[key="sidebar_max"], button[key="dash_open_max"] {
     box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
     font-weight:900 !important;
 }
-/* The mobile fallback is a real Streamlit button, not a fake HTML control. */
+/* Mobile/tablet MAX fallback.
+   Use normal document flow so Streamlit's mobile bottom bar cannot cover it. */
 button[key="mobile_max_launcher"] {
     display:none !important;
 }
 @media (max-width:1100px) {
     button[key="mobile_max_launcher"] {
         display:block !important;
-        position:fixed !important;
-        left:12px !important;
-        bottom:14px !important;
-        z-index:2147483000 !important;
-        width:92px !important;
+        position:relative !important;
+        left:auto !important;
+        bottom:auto !important;
+        z-index:50 !important;
+        width:100% !important;
         min-height:46px !important;
-        border-radius:999px !important;
+        margin:8px 0 12px !important;
+        border-radius:12px !important;
         background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
         color:#101500 !important;
         border:1px solid #d7ff72 !important;
-        box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.55) !important;
+        box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 14px rgba(184,255,0,.45) !important;
         font-weight:900 !important;
     }
 }
