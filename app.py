@@ -885,7 +885,6 @@ with tab4:
                 source_bytes = reel_file.getvalue()
             else:
                 if not stored_card:
-                    # Используем исходное фото, если оно сохранено у товара.
                     source_image = None
                     original_b64 = reel_product.get("original_image")
                     if original_b64:
@@ -919,7 +918,6 @@ with tab4:
                     auto_card.save(card_buf, format="PNG")
                     source_bytes = card_buf.getvalue()
 
-                    # Сохраняем автоматически созданную карточку в каталоге.
                     updated_product = dict(reel_product)
                     updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
                     update_product(st.session_state.get("r_sel", 0), updated_product)
@@ -944,6 +942,22 @@ with tab4:
                 with open(out, "rb") as f:
                     video_bytes = f.read()
 
+            # ВАЖНО: сохраняем MP4 в session_state. Streamlit перезапускает
+            # скрипт при нажатии кнопки публикации, поэтому локальная переменная
+            # video_bytes иначе теряется.
+            st.session_state["reel_video_bytes"] = video_bytes
+            st.session_state["reel_caption"] = gen_instagram(reel_product, "Продающий")
+            st.session_state["reel_product_name"] = (
+                f"{reel_product.get('brand','')} {reel_product.get('name','')}".strip()
+            )
+            st.success("✅ Reels создан и сохранён. Теперь можно публиковать.")
+
+        # После создания MP4 этот блок остаётся доступным на следующих rerun.
+        video_bytes = st.session_state.get("reel_video_bytes")
+        reel_caption = st.session_state.get("reel_caption", "")
+        reel_product_name = st.session_state.get("reel_product_name", "")
+
+        if video_bytes:
             st.video(video_bytes)
 
             st.download_button(
@@ -955,7 +969,8 @@ with tab4:
             )
 
             st.markdown("### 📤 Опубликовать Reels")
-            reel_caption = gen_instagram(reel_product, "Продающий")
+            if reel_product_name:
+                st.caption(f"Товар: {reel_product_name}")
 
             pub1, pub2, pub3 = st.columns(3)
 
