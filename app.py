@@ -483,7 +483,7 @@ with tab_dashboard:
     leads = load_leads()
     orders = load_orders()
     crm = crm_metrics(leads)
-    om = order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
+    om = order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"})
     cm = conversion_metrics(leads, orders)
     wm = workflow_metrics(plan)
     low = low_stock_products(products)
