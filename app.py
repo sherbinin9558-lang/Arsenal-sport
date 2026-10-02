@@ -1364,6 +1364,11 @@ DEFAULT_SETTINGS = {
     "card_template": "Dark Premium",
     "show_price_on_cards": "Нет",
     "main_sport": "Футбол",
+    "ai_tone": "Дружелюбный и профессиональный",
+    "ai_required_questions": "Товар, размер, город, способ получения",
+    "ai_no_stock_reply": "Если товара нет, предложи похожие варианты из каталога.",
+    "ai_escalation_reply": "Если вопрос нельзя решить по данным магазина, предложи связаться с менеджером.",
+    "faq": [],
 }
 
 def load_settings():
@@ -1420,8 +1425,21 @@ with tab7:
         show_price_on_cards = st.selectbox("Показывать цену на карточках", ["Нет", "Да"], index=0 if settings["show_price_on_cards"] == "Нет" else 1, key="settings_show_price")
 
     st.markdown("### 🤖 AI-продавец")
-    ai_seller_instructions = st.text_area("Инструкция для AI-продавца", value=settings["ai_seller_instructions"], height=110, key="settings_ai_seller")
-    notification_contact = st.text_input("Куда отправлять уведомления о заявках", value=settings["notification_contact"], key="settings_notification_contact")
+    a1, a2 = st.columns(2)
+    with a1:
+        ai_tone = st.selectbox("Стиль общения", ["Дружелюбный и профессиональный", "Коротко и по делу", "Более продающий"], index=["Дружелюбный и профессиональный", "Коротко и по делу", "Более продающий"].index(settings["ai_tone"]) if settings["ai_tone"] in ["Дружелюбный и профессиональный", "Коротко и по делу", "Более продающий"] else 0, key="settings_ai_tone")
+        ai_required_questions = st.text_input("Что обязательно уточнять", value=settings["ai_required_questions"], key="settings_ai_required")
+        ai_no_stock_reply = st.text_area("Если товара нет", value=settings["ai_no_stock_reply"], height=80, key="settings_ai_no_stock")
+    with a2:
+        ai_escalation_reply = st.text_area("Если нужен менеджер", value=settings["ai_escalation_reply"], height=80, key="settings_ai_escalation")
+        notification_contact = st.text_input("Куда отправлять уведомления о заявках", value=settings["notification_contact"], key="settings_notification_contact")
+    ai_seller_instructions = st.text_area("Главная инструкция для AI-продавца", value=settings["ai_seller_instructions"], height=110, key="settings_ai_seller")
+
+    st.markdown("### ❓ FAQ магазина")
+    faq = settings.get("faq", [])
+    faq_text = "\n".join(f"{item.get('question','')} | {item.get('answer','')}" for item in faq if isinstance(item, dict))
+    faq_input = st.text_area("Вопрос | Ответ — по одному на строку", value=faq_text, height=180, key="settings_faq")
+    st.caption("Пример: Как заказать? | Напишите название товара, размер и город.")
 
     if st.button("💾 Сохранить все настройки", type="primary", key="save_store_settings"):
         save_settings({
@@ -1447,6 +1465,11 @@ with tab7:
             "card_template": card_template,
             "show_price_on_cards": show_price_on_cards,
             "main_sport": main_sport,
+            "ai_tone": ai_tone,
+            "ai_required_questions": ai_required_questions,
+            "ai_no_stock_reply": ai_no_stock_reply,
+            "ai_escalation_reply": ai_escalation_reply,
+            "faq": [{"question": line.split("|",1)[0].strip(), "answer": line.split("|",1)[1].strip()} for line in faq_input.splitlines() if "|" in line and line.split("|",1)[0].strip() and line.split("|",1)[1].strip()],
         })
         st.success("Настройки сохранены.")
         st.rerun()
