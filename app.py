@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
-from crm_core import create_lead, crm_metrics, load_leads, update_lead, STATUSES as CRM_STATUSES
+from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1058,6 +1058,111 @@ def sales_followup(products, message, current):
         return ai_sales_reply(products, message)[0], found
     return "Уточните размер, бюджет, цвет или вид товара — я попробую подобрать подходящий вариант.", current
 
+
+# ==================== MAX SMART FUNCTIONS ====================
+ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]
+ACTIVE_ORDER_STATUSES = {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
+
+def max_stock(product):
+    by_size = product.get("stock_by_size") or {}
+    if isinstance(by_size, dict):
+        try:
+            return sum(max(0, int(v or 0)) for v in by_size.values())
+        except Exception:
+            return 0
+    try:
+        return max(0, int(product.get("total_stock", 0) or 0))
+    except Exception:
+        return 0
+
+def max_product_title(product):
+    return f"{product.get('brand','')} {product.get('name','')}".strip() or "Товар"
+
+def max_due_content(plan):
+    today = datetime.date.today()
+    due, overdue = [], []
+    for item in plan:
+        try:
+            d = datetime.date.fromisoformat(str(item.get("date","")))
+        except Exception:
+            continue
+        if item.get("status") == "Опубликовано":
+            continue
+        if d < today: overdue.append(item)
+        elif d == today: due.append(item)
+    return due, overdue
+
+def max_store_metrics(products, leads, orders, plan):
+    active = [o for o in orders if o.get("status","Новая") in ACTIVE_ORDER_STATUSES]
+    completed = [o for o in orders if o.get("status") == "Завершён"]
+    total_amount = 0.0
+    for o in orders:
+        for key in ("total","amount","sum","total_amount","price"):
+            try:
+                if o.get(key) not in (None, ""):
+                    total_amount += float(str(o.get(key)).replace(" ","").replace(",","."))
+                    break
+            except Exception:
+                pass
+    lead_to_order = sum(x.get("status") == "Заказ оформлен" for x in leads)
+    conversion = (lead_to_order / len(leads) * 100) if leads else 0
+    category_counts = {}
+    for p in products:
+        cat = p.get("category","Другое")
+        category_counts[cat] = category_counts.get(cat,0) + 1
+    return {"active_orders":len(active),"completed_orders":len(completed),"amount":total_amount,
+            "conversion":conversion,"categories":sorted(category_counts.items(), key=lambda x:(-x[1],x[0])),
+            "published":sum(1 for x in plan if x.get("status")=="Опубликовано"),"content_total":len(plan)}
+
+def max_advanced_search(products, query, category="Все", brand="Все", size="Все", color="Все"):
+    q=(query or "").strip().lower(); result=[]
+    for p in products:
+        if category!="Все" and p.get("category","Другое")!=category: continue
+        if brand!="Все" and p.get("brand","")!=brand: continue
+        if size!="Все" and size.lower() not in str(p.get("sizes","")).lower(): continue
+        if color!="Все" and color.lower() not in str(p.get("color","")).lower(): continue
+        hay=" ".join(str(p.get(k,"")) for k in ("name","brand","article","category","description","specs","sizes","color")).lower()
+        if q and q not in hay: continue
+        result.append(p)
+    return result
+
+def max_ideas(products, count=10):
+    ideas=[("Польза","Показать, какую задачу спортсмена решает товар."),
+           ("Сравнение","Сравнить товар с другим вариантом из каталога по назначению."),
+           ("Детали","Крупные планы материала, подошвы, посадки или конструкции."),
+           ("Подбор","Мини-гид: как выбрать этот тип товара под задачу клиента."),
+           ("FAQ","Ответить на частый вопрос покупателя о размере, использовании или уходе."),
+           ("Тест","Показать товар в реальном спортивном сценарии."),
+           ("Образ","Собрать комплект вокруг товара из ассортимента Arsenal Sport."),
+           ("История","Короткая история бренда или технологии без перегрузки рекламой."),
+           ("Отзывы","Формат для реальных отзывов и впечатлений покупателей."),
+           ("Новинка","Показать поступление: что изменилось и кому подходит.")]
+    if not products: return [{"title":x[0],"product":"Каталог пуст","idea":x[1]} for x in ideas[:count]]
+    return [{"title":ideas[i%len(ideas)][0],"product":max_product_title(products[i%len(products)]),"idea":ideas[i%len(ideas)][1]} for i in range(count)]
+
+def max_sales_reply(products, state, message):
+    text=(message or "").strip(); q=text.lower(); state=dict(state or {}); state["last_message"]=text
+    if any(x in q for x in ("стоп","отмена","сброс")): return "Диалог сброшен. Напишите, что ищете.", {}, []
+    m=re.search(r"(?<!\d)(\d{2})(?:\s*(?:размер|р\.?))?(?!\d)",q)
+    if m: state["size"]=m.group(1)
+    m=re.search(r"(?:до|бюджет|не дороже)\s*(\d[\d\s]*)",q)
+    if m: state["budget"]=m.group(1).replace(" ","")
+    for key,words in {"surface":["искусствен","зал","асфальт","стадион","грунт","улиц"],"purpose":["футбол","баскетбол","бег","трениров","теннис","волейбол"],"color":["черн","бел","син","красн","зелен","сер"]}.items():
+        for w in words:
+            if w in q: state[key]=w; break
+    missing=[]
+    if "purpose" not in state: missing.append("purpose")
+    elif "size" not in state: missing.append("size")
+    elif "surface" not in state and state.get("purpose") in ("футбол","бег","теннис"): missing.append("surface")
+    if missing:
+        prompts={"purpose":"Что ищете: футбол, бег, баскетбол, теннис, тренировки или другой вид спорта?",
+                 "size":"Какой нужен размер?","surface":"Где будете использовать: зал, искусственное поле, улица, стадион или другое покрытие?"}
+        return prompts[missing[0]],state,[]
+    query=" ".join(str(state.get(k,"")) for k in ("purpose","surface","size","color"))
+    found=product_search(products,query) or product_search(products,state.get("purpose",""))
+    if not found: return "Подходящий товар по этим параметрам не найден. Можно расширить поиск или передать запрос менеджеру.",state,[]
+    return f"Нашёл {min(3,len(found))} вариант(а). Показываю наиболее подходящие. Актуальное наличие подтвердит менеджер.",state,found[:3]
+
 # ========== MAX: ВСПЛЫВАЮЩЕЕ ОКНО ==========
 
 @st.dialog("⚡ ARSENAL SPORT MAX", width="large")
@@ -1067,6 +1172,144 @@ def max_dialog():
     manager_leads = load_leads()
     manager_orders = load_json(Path("orders.json"), [])
     manager_products = load_products()
+    manager_plan = load_plan()
+
+    # ---------- 1. Умный помощник менеджера ----------
+    due_today, overdue = max_due_content(manager_plan)
+    incomplete_cards = [p for p in manager_products if not p.get("description") or not (p.get("card_image") or p.get("original_image"))]
+    out_of_stock = [p for p in manager_products if max_stock(p) == 0]
+    assistant_tasks = []
+    if new_leads_count: assistant_tasks.append(("🔥","Обработать новые обращения",f"{new_leads_count} новых"))
+    if low_stock_products: assistant_tasks.append(("📦","Проверить остатки",f"{len(low_stock_products)} позиций"))
+    if out_of_stock: assistant_tasks.append(("⛔","Проверить товары без остатка",f"{len(out_of_stock)} позиций"))
+    if incomplete_cards: assistant_tasks.append(("📸","Доработать карточки",f"{len(incomplete_cards)} товаров"))
+    if due_today: assistant_tasks.append(("📅","Опубликовать контент сегодня",f"{len(due_today)} задач"))
+    if overdue: assistant_tasks.append(("⚠️","Закрыть просроченный контент",f"{len(overdue)} задач"))
+    st.markdown("### 🧠 Что сегодня нужно сделать")
+    if assistant_tasks:
+        for icon,title,count in assistant_tasks:
+            st.warning(f"{icon} **{title}** — {count}")
+    else:
+        st.success("Основные задачи на сегодня не найдены.")
+    with st.expander("Показать детали задач"):
+        if incomplete_cards: st.write("**Карточки без полного контента:**", ", ".join(max_product_title(p) for p in incomplete_cards[:20]))
+        if due_today: st.write("**Контент сегодня:**", ", ".join(str(x.get("product","")) for x in due_today))
+        if overdue: st.write("**Просрочено:**", ", ".join(str(x.get("product","")) for x in overdue))
+        if out_of_stock: st.write("**Нет в наличии:**", ", ".join(max_product_title(p) for p in out_of_stock[:20]))
+
+    # ---------- 2. Центр продаж ----------
+    store_stats = max_store_metrics(manager_products, manager_leads, manager_orders, manager_plan)
+    st.markdown("### 🔥 Центр продаж")
+    s1,s2,s3,s4,s5 = st.columns(5)
+    s1.metric("Новые лиды", new_leads_count)
+    s2.metric("В работе", in_work_count)
+    s3.metric("Активные заказы", store_stats["active_orders"])
+    s4.metric("Завершено", store_stats["completed_orders"])
+    s5.metric("Конверсия", f"{store_stats['conversion']:.1f}%")
+    if store_stats["amount"]:
+        st.caption(f"Сумма заказов с распознанной суммой: {store_stats['amount']:,.0f} ₽".replace(",", " "))
+    if store_stats["categories"]:
+        st.caption("Категории каталога: " + " · ".join(f"{k}: {v}" for k,v in store_stats["categories"]))
+
+    with st.expander("📊 Аналитика магазина"):
+        a1,a2,a3=st.columns(3)
+        a1.metric("Контента создано", store_stats["content_total"])
+        a2.metric("Опубликовано", store_stats["published"])
+        a3.metric("Всего обращений", len(manager_leads))
+        st.write("Популярность категорий в каталоге")
+        for cat,count in store_stats["categories"][:10]:
+            st.progress(min(1.0,count/max(1,len(manager_products))), text=f"{cat} · {count}")
+
+    # ---------- 3. Полный контроль склада ----------
+    with st.expander("📦 Умный склад", expanded=False):
+        w1,w2,w3,w4=st.columns(4)
+        low_sizes=sum(1 for p in manager_products if isinstance(p.get("stock_by_size"),dict) and any(int(v or 0)<=1 for v in p.get("stock_by_size",{}).values()))
+        no_photos=sum(1 for p in manager_products if not (p.get("card_image") or p.get("original_image")))
+        no_desc=sum(1 for p in manager_products if not p.get("description"))
+        w1.metric("Мало товара",len(low_stock_products)); w2.metric("Нет товара",len(out_of_stock)); w3.metric("Мало размеров",low_sizes); w4.metric("Без контента",no_photos+no_desc)
+        stock_filter=st.selectbox("Показать",["Все проблемные","Мало","Нет","Без фото","Без описания"],key="max_stock_filter")
+        problem=[]
+        for p in manager_products:
+            stck=max_stock(p)
+            bad=(stock_filter=="Все проблемные" and (stck<=3 or not p.get("description") or not (p.get("card_image") or p.get("original_image")))) or (stock_filter=="Мало" and 0<stck<=3) or (stock_filter=="Нет" and stck==0) or (stock_filter=="Без фото" and not (p.get("card_image") or p.get("original_image"))) or (stock_filter=="Без описания" and not p.get("description"))
+            if bad: problem.append(p)
+        for p in problem[:20]:
+            st.write(f"• **{max_product_title(p)}** · остаток: {max_stock(p)} · фото: {'да' if (p.get('card_image') or p.get('original_image')) else 'нет'} · описание: {'да' if p.get('description') else 'нет'}")
+        if len(problem)>20: st.caption(f"Показаны первые 20 из {len(problem)}.")
+
+    # ---------- 4. Расширенный поиск ----------
+    with st.expander("🔎 Расширенный поиск", expanded=False):
+        brands=sorted({str(p.get("brand","")) for p in manager_products if p.get("brand")})
+        sizes=sorted({str(p.get("sizes","")) for p in manager_products if p.get("sizes")})
+        colors=sorted({str(p.get("color","")) for p in manager_products if p.get("color")})
+        ec1,ec2=st.columns(2)
+        search_q=ec1.text_input("Название / артикул / описание / характеристики",key="max_adv_q")
+        category=ec2.selectbox("Категория",["Все"]+CATEGORIES,key="max_adv_cat")
+        ec3,ec4=st.columns(2)
+        brand=ec3.selectbox("Бренд",["Все"]+brands,key="max_adv_brand")
+        color=ec4.selectbox("Цвет",["Все"]+colors,key="max_adv_color")
+        size=st.text_input("Размер",key="max_adv_size",placeholder="Например: 42")
+        adv_found=max_advanced_search(manager_products,search_q,category,brand,size or "Все",color)
+        st.caption(f"Найдено: {len(adv_found)}")
+        for p in adv_found[:15]: st.write(f"• **{max_product_title(p)}** · {p.get('category','Другое')} · {p.get('sizes','уточняйте')}")
+
+    # ---------- 5. Генератор идей + автоплан ----------
+    with st.expander("💡 Генератор идей", expanded=False):
+        idea_count=st.slider("Количество идей",3,15,10,key="max_idea_count")
+        if st.button("✨ Сгенерировать идеи",key="max_ideas_btn"):
+            st.session_state["max_ideas"]=max_ideas(manager_products,idea_count)
+        for idea in st.session_state.get("max_ideas",[]):
+            st.write(f"**{idea['title']} · {idea['product']}** — {idea['idea']}")
+        if st.button("📅 Добавить идеи в план",key="max_ideas_plan"):
+            for i,idea in enumerate(st.session_state.get("max_ideas",[])):
+                add_plan({"date":str(datetime.date.today()+datetime.timedelta(days=i)),"platform":"Instagram","product":idea["product"],"type":"Reels" if i%3==0 else "Пост","idea":idea["idea"],"status":"Идея","priority":"Обычный"})
+            st.success("Идеи добавлены в контент-план.")
+            st.rerun()
+
+    # ---------- 6. Контент-автомат ----------
+    with st.expander("🎯 Контент-автомат «Сделать всё»", expanded=False):
+        if manager_products:
+            auto_names=[max_product_title(p) for p in manager_products]
+            ai=st.selectbox("Товар",range(len(auto_names)),format_func=lambda x:auto_names[x],key="max_auto_product")
+            if st.button("⚡ Сделать всё для товара",type="primary",key="max_make_all"):
+                p=manager_products[ai]
+                st.session_state["max_auto_bundle"]=auto_content_bundle(p)
+                st.session_state["max_auto_product_title"]=max_product_title(p)
+                st.session_state["max_auto_plan_item"]={"date":str(datetime.date.today()),"platform":"Instagram","product":max_product_title(p),"type":"Reels","idea":f"Reels + пост + Stories для {max_product_title(p)}","status":"Идея","priority":"Высокий"}
+            if "max_auto_bundle" in st.session_state:
+                st.success(f"Готов контент-пакет: {st.session_state.get('max_auto_product_title','')}")
+                ab=st.session_state["max_auto_bundle"]
+                for label,key in [("Instagram","instagram"),("Telegram","telegram"),("VK","vk"),("Reels","reels_hook"),("Stories","stories")]:
+                    st.text_area(label,ab[key],height=100,key=f"auto_{key}")
+                if st.button("📅 Добавить в план",key="max_auto_add_plan"):
+                    add_plan(st.session_state["max_auto_plan_item"]); st.success("Добавлено в план."); st.rerun()
+                st.caption("Дальше менеджер может отредактировать тексты и опубликовать их через существующие инструменты.")
+
+    # ---------- 7. AI-продавец 2.0 ----------
+    st.markdown("### 🤖 AI-продавец 2.0")
+    st.caption("Квалифицирует запрос по виду спорта, размеру и сценарию использования, затем ищет товар и передаёт клиента менеджеру.")
+    if "seller2_state" not in st.session_state: st.session_state["seller2_state"]={}
+    with st.form("seller2_form",clear_on_submit=True):
+        seller2_msg=st.text_input("Сообщение покупателя",placeholder="Ищу бутсы для искусственного поля, 42 размер")
+        seller2_send=st.form_submit_button("💬 Продолжить диалог",type="primary")
+    if seller2_send and seller2_msg:
+        reply,new_state,seller2_found=max_sales_reply(manager_products,st.session_state.get("seller2_state",{}),seller2_msg)
+        st.session_state["seller2_state"]=new_state
+        st.session_state["seller2_found"]=seller2_found
+        st.session_state.setdefault("seller2_chat",[]).extend([("Покупатель",seller2_msg),("Arsenal Sport",reply)])
+    for role,msg in st.session_state.get("seller2_chat",[])[-8:]:
+        st.caption(role); st.write(msg)
+    seller2_found=st.session_state.get("seller2_found",[])
+    if seller2_found:
+        st.markdown("**Подходящие варианты**")
+        for i,p in enumerate(seller2_found):
+            st.write(f"{i+1}. **{max_product_title(p)}** · {p.get('sizes','уточняйте')} · {p.get('color','уточняйте')}")
+        if st.button("📥 Передать квалифицированного клиента в CRM",key="seller2_crm",type="primary"):
+            if seller2_found:
+                lead=create_lead("Клиент","не указан","AI-продавец 2.0",st.session_state.get("seller2_state",{}).get("last_message",""),max_product_title(seller2_found[0]))
+                st.success(f"Обращение #{lead.get('id')} создано. Менеджеру останется уточнить контакт и наличие.")
+
+
 
     def _manager_stock(product):
         by_size = product.get("stock_by_size") or {}
@@ -1270,7 +1513,37 @@ def max_dialog():
         st.session_state["sales_chat"] = []
         st.session_state["sales_last_found"] = []
         st.rerun()
+    st.markdown("### 👤 Полный CRM")
+    crm_leads = load_leads()
+    if crm_leads:
+        crm_pick = st.selectbox("Карточка клиента", list(range(len(crm_leads))), format_func=lambda i: f"#{crm_leads[i].get('id')} · {crm_leads[i].get('name','Клиент')} · {crm_leads[i].get('contact','—')}", key="max_customer_pick")
+        customer = crm_leads[crm_pick]
+        cc1,cc2=st.columns(2)
+        with cc1:
+            st.write(f"**Статус:** {customer.get('status','Новый')}")
+            st.write(f"**Источник:** {customer.get('source','—')}")
+            st.write(f"**Товар:** {customer.get('product','—')}")
+            st.write(f"**Создано:** {customer.get('created_at','—')}")
+            notes=st.text_area("Заметки менеджера",value=customer.get("notes",""),key=f"cust_notes_{customer.get('id')}")
+            customer_status=st.selectbox("Статус клиента",["Новый","Потенциальный","Постоянный"],index=["Новый","Потенциальный","Постоянный"].index(customer.get("customer_status","Новый")) if customer.get("customer_status","Новый") in ["Новый","Потенциальный","Постоянный"] else 0,key=f"cust_type_{customer.get('id')}")
+            if st.button("💾 Сохранить карточку",key=f"save_customer_{customer.get('id')}"):
+                set_customer_profile(customer.get("id"),notes,customer.get("interested_products") or [customer.get("product","")],customer_status)
+                st.success("Карточка клиента сохранена.")
+                st.rerun()
+        with cc2:
+            st.markdown("**История взаимодействий**")
+            history=customer.get("history",[])
+            if history:
+                for h in reversed(history[-10:]): st.caption(f"{h.get('time','')} · {h.get('direction','')}"); st.write(h.get("message",""))
+            else: st.info("История появится после добавления взаимодействий.")
+            interaction=st.text_area("Добавить взаимодействие",key=f"interaction_{customer.get('id')}")
+            if st.button("➕ Записать",key=f"add_interaction_{customer.get('id')}"):
+                if interaction.strip(): add_lead_interaction(customer.get("id"),interaction.strip()); st.success("Взаимодействие записано."); st.rerun()
+    else:
+        st.info("CRM пока пуст.")
+    
     st.markdown("### 📊 CRM")
+
     st.caption("Воронка AI-продавца: новое обращение → работа менеджера → заказ → завершение.")
     crm_leads = load_leads()
     if crm_leads:
