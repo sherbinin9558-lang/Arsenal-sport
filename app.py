@@ -1587,9 +1587,11 @@ def render_max():
                             if idx is None:
                                 skipped.append(f.name)
                                 continue
-                            try:\n                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")\n                            except Exception as e:\n                                skipped.append(f"{f.name}: файл не удалось прочитать ({e})")\n                                continue\n                            path = save_uploaded_photo(f, products_now[idx], idx)
-                            products_now[idx]["original_image"] = path
-                            p_now = products_now[idx]
+                            try:
+                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
+                                path = save_uploaded_photo(f, products_now[idx], idx)
+                                products_now[idx]["original_image"] = path
+                                p_now = products_now[idx]
                                 card_img = generate_card(
                                     source_img,
                                     p_now.get("name",""),
@@ -1605,8 +1607,9 @@ def render_max():
                                 card_buf = io.BytesIO()
                                 card_img.save(card_buf, format="PNG")
                                 products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                skipped.append(f"{f.name}: ошибка обработки ({e})")
+                                continue
                             matched += 1
                         save_products(products_now)
                         st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
