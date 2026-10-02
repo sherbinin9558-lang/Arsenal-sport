@@ -1421,7 +1421,7 @@ def render_max():
         due, overdue = max_due_content(plan)
         crm = crm_metrics(leads)
         om = order_metrics(orders, ACTIVE_ORDER_STATUSES)
-        low = low_stock(products)
+        low = low_stock_products(products)
         cm = conversion_metrics(leads, orders)
 
         st.caption("Бесплатный центр управления магазином: каталог, контент, заявки, заказы и продажи.")
@@ -1753,9 +1753,10 @@ def render_max():
                         st.write(f"• {max_product_title(p)} — **{qty} шт.**")
                 else:
                     st.success("Товаров с остатком ≤ 2 нет.")
-                st.caption("Остатки читаются из stock_by_size или total_stock, если эти поля есть в товаре.")
+                st.caption("Товары без заданного остатка не считаются дефицитными.")
                 for p in products[:30]:
-                    st.write(f"{max_product_title(p)} — {max_stock(p)} шт.")
+                    qty, _, known = stock_info(p)
+                    st.write(f"{max_product_title(p)} — {qty if known and qty is not None else '—'} шт.")
 
         elif section == "Контент":
             st.subheader("Контент без платного AI")
