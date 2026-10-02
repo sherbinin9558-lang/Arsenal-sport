@@ -532,12 +532,11 @@ div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
 button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
 button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
-div[data-baseweb="tab-list"] {gap:5px;background:#ffffff!important;padding:5px;border-radius:14px;border:1px solid #e1e5eb;display:flex!important;visibility:visible!important;opacity:1!important;box-shadow:0 2px 10px rgba(20,25,40,.05);}
-button[data-baseweb="tab"] {border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:#f4f5f8!important;}
+div[data-baseweb="tab-list"] {gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;box-shadow:none!important;}
+button[data-baseweb="tab"] {border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;box-shadow:none!important;}
 button[data-baseweb="tab"] * {color:#252b3a!important;opacity:1!important;}
-button[data-baseweb="tab"][aria-selected="true"] {background:linear-gradient(135deg,#eee9ff,#e5deff)!important;color:#4c1d95!important;box-shadow:0 0 0 1px rgba(91,70,214,.18),0 0 12px rgba(91,70,214,.14);}
+button[data-baseweb="tab"][aria-selected="true"] {background:transparent!important;color:#4c1d95!important;border-color:transparent!important;box-shadow:none!important;}
 button[data-baseweb="tab"][aria-selected="true"] * {color:#4c1d95!important;opacity:1!important;}
-button[data-baseweb="tab"][aria-selected="true"] {background:#eef0ff;color:#4338ca!important;}
 [data-testid="stFileUploader"] {border:1px dashed #b9c1ce;border-radius:14px;background:#f5f7fa;}
 .stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
 .stat-number {font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}
