@@ -114,6 +114,50 @@ for col, (value, label) in zip(cols, kpis):
     col.markdown(f'<div class="kpi"><div class="n">{value}</div><div class="l">{label}</div></div>', unsafe_allow_html=True)
 
 st.divider()
+
+# Единое рабочее место менеджера
+st.subheader("Рабочее место менеджера")
+lead_data = load_leads()
+new_leads = [x for x in lead_data if x.get("status") == "Новый"]
+active_leads = [x for x in lead_data if x.get("status") in ("Новый", "В работе", "Ожидает ответа")]
+active_orders = [x for x in orders if x.get("status") not in ("Завершён", "Отменён")]
+low_stock_products = [p for p in products if 0 < p.total_stock <= 2]
+wm1, wm2, wm3, wm4 = st.columns(4)
+wm1.metric("Новые обращения", len(new_leads))
+wm2.metric("В работе", len(active_leads))
+wm3.metric("Активные заказы", len(active_orders))
+wm4.metric("Низкий остаток", len(low_stock_products))
+
+left, right = st.columns([1.15, 1])
+with left:
+    st.markdown("**Последние обращения**")
+    if not lead_data:
+        st.caption("Новых обращений пока нет.")
+    for lead in reversed(lead_data[-5:]):
+        with st.container(border=True):
+            a, b = st.columns([3, 1.5])
+            a.markdown(f"**#{lead.get('id')} · {lead.get('name','Клиент')}**")
+            a.caption(f"{lead.get('product','—')} · {lead.get('contact','—')}")
+            b.write(lead.get("status", "Новый"))
+            if lead.get("order_id"):
+                b.caption(f"Заказ: {lead['order_id']}")
+with right:
+    st.markdown("**Контроль заказов**")
+    if not active_orders:
+        st.caption("Активных заказов нет.")
+    for order in reversed(active_orders[-5:]):
+        with st.container(border=True):
+            st.markdown(f"**{order.get('id','—')} · {order.get('customer_name','—')}**")
+            st.caption(f"{order.get('customer_contact','—')} · {order.get('status','Новая')}")
+            st.write(f"{order.get('total', 0):,.0f} ₽")
+
+st.markdown("**Контроль остатков**")
+if low_stock_products:
+    st.warning(" · ".join(f"{p.name}: {p.total_stock} шт." for p in low_stock_products[:8]))
+else:
+    st.success("Критически низких подтверждённых остатков нет.")
+
+st.divider()
 tabs = st.tabs(["Каталог", "Умный поиск", "Корзина и заказ", "CRM"])
 
 with tabs[0]:
