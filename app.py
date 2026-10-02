@@ -581,7 +581,6 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 
 st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
-st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
