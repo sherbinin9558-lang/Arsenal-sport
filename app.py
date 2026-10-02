@@ -324,7 +324,7 @@ st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", pa
 
 with st.sidebar:
     st.title("🏆 Arsenal Sport")
-    st.caption("Content Manager v2.2")
+    st.caption("Content Manager v2.3")
     dark_mode = st.toggle("🌙 Тёмная тема", value=True)
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
@@ -414,6 +414,7 @@ with tab1:
 # ========== 2: КАТАЛОГ ==========
 with tab2:
     st.header("Каталог товаров")
+    st.info("➕ Для нового товара откройте вкладку «📸 Создать».")
     products = load_products()
     if not products:
         st.info("Каталог пуст.")
