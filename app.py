@@ -1339,6 +1339,61 @@ with tab6:
         for s, n in sorted(sc.items(), key=lambda x: -x[1]):
             st.write(f"**{s}:** {n}")
 
+# ==================== НАСТРОЙКИ МАГАЗИНА ====================
+SETTINGS_FILE = Path("settings.json")
+DEFAULT_SETTINGS = {
+    "store_name": "Arsenal Sport",
+    "city": "Краснодар",
+    "delivery": "По России",
+    "telegram": "",
+    "vk": "",
+    "instagram": "",
+    "order_contact": "",
+}
+
+def load_settings():
+    data = load_json(SETTINGS_FILE, {})
+    result = DEFAULT_SETTINGS.copy()
+    if isinstance(data, dict):
+        result.update({k: data.get(k, "") for k in DEFAULT_SETTINGS})
+    return result
+
+def save_settings(data):
+    save_json(SETTINGS_FILE, {k: str(data.get(k, "")).strip() for k in DEFAULT_SETTINGS})
+
+
+
+# ========== 7: НАСТРОЙКИ ==========
+with tab7:
+    st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация Arsenal Sport для контента и работы магазина.</div>', unsafe_allow_html=True)
+    settings = load_settings()
+
+    s1, s2 = st.columns(2)
+    with s1:
+        store_name = st.text_input("Название магазина", value=settings["store_name"], key="settings_store_name")
+        city = st.text_input("Город", value=settings["city"], key="settings_city")
+        delivery = st.text_input("Доставка", value=settings["delivery"], key="settings_delivery")
+        order_contact = st.text_input("Контакт для заказа", value=settings["order_contact"], key="settings_order_contact")
+    with s2:
+        telegram = st.text_input("Telegram", value=settings["telegram"], key="settings_telegram")
+        vk = st.text_input("VK", value=settings["vk"], key="settings_vk")
+        instagram = st.text_input("Instagram", value=settings["instagram"], key="settings_instagram")
+        st.info("Логотип уже используется из файла logo.png в проекте.")
+
+    if st.button("💾 Сохранить настройки", type="primary", key="save_store_settings"):
+        save_settings({
+            "store_name": store_name,
+            "city": city,
+            "delivery": delivery,
+            "telegram": telegram,
+            "vk": vk,
+            "instagram": instagram,
+            "order_contact": order_contact,
+        })
+        st.success("Настройки сохранены.")
+        st.rerun()
+
+
 def ai_sales_reply(products, message):
     q = (message or "").strip()
     if not q:
