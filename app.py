@@ -346,16 +346,16 @@ if dark_mode:
 else:
     bg_css = "body {background: #ffffff;}"
 
-st.markdown(f"""
-<style>
-{bg_css}
-.main-title {{font-size: 2.5rem; font-weight: 800; color: #cc0000; text-align: center; margin-bottom: 0;}}
-.subtitle {{text-align: center; color: #888; margin-top: 0; font-size: 0.9rem;}}
-.stat-box {{background: linear-gradient(135deg, #cc0000 0%, #8b0000 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin: 5px;}}
-.stat-number {{font-size: 2.5rem; font-weight: 900; margin: 0;}}
-.stat-label {{font-size: 0.9rem; opacity: 0.9; margin: 0;}}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    "<style>\n" + bg_css + """
+.main-title {font-size: 2.5rem; font-weight: 800; color: #cc0000; text-align: center; margin-bottom: 0;}
+.subtitle {text-align: center; color: #888; margin-top: 0; font-size: 0.9rem;}
+.stat-box {background: linear-gradient(135deg, #cc0000 0%, #8b0000 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin: 5px;}
+.stat-number {font-size: 2.5rem; font-weight: 900; margin: 0;}
+.stat-label {font-size: 0.9rem; opacity: 0.9; margin: 0;}
+</style>""",
+    unsafe_allow_html=True,
+)
 
 st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
@@ -871,4 +871,4 @@ with tab7:
         st.rerun()
 
 st.markdown("---")
-st.caption("Arsenal Sport Content Manager v2.2 — MVP. Все данные хранятся в облаке.")
+st.caption("Arsenal Sport Content Manager v2.3 — MVP. Все данные хранятся в облаке.")
