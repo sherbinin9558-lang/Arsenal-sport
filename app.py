@@ -256,25 +256,61 @@ def publish_to_telegram(image_bytes, caption):
         return False, f"Ошибка публикации: {e}"
 
 # ==================== ПУБЛИКАЦИЯ REELS ====================
+def _telegram_chat_id(raw_channel):
+    value = str(raw_channel or "").strip()
+    if value.startswith("https://t.me/"):
+        value = value.rstrip("/").split("/")[-1]
+    if value.startswith("t.me/"):
+        value = value.rstrip("/").split("/")[-1]
+    if value.startswith("-100") or value.lstrip("-").isdigit():
+        return value
+    return value if value.startswith("@") else "@" + value
+
+def _telegram_api(token, method):
+    return f"https://api.telegram.org/bot{token}/{method}"
+
 def publish_reel_to_telegram(video_bytes, caption):
     try:
-        token = st.secrets["TELEGRAM_TOKEN"]
-        channel = st.secrets["TELEGRAM_CHANNEL"]
-        if not str(channel).startswith("@"):
-            channel = "@" + str(channel)
-        api_url = f"https://api.telegram.org/bot{token}/sendVideo"
+        token = str(st.secrets["TELEGRAM_TOKEN"]).strip()
+        channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
+        if not token:
+            return False, "TELEGRAM_TOKEN пустой."
+        if not channel:
+            return False, "TELEGRAM_CHANNEL пустой."
+
+        size_mb = len(video_bytes) / (1024 * 1024)
+        if size_mb > 50:
+            return False, f"Видео весит {size_mb:.1f} МБ. Telegram Bot API не примет такой файл через sendVideo; нужно уменьшить Reels."
+
+        api_url = _telegram_api(token, "sendVideo")
         files = {"video": ("reel.mp4", video_bytes, "video/mp4")}
         data = {
             "chat_id": channel,
-            "caption": caption[:1024],
+            "caption": (caption or "")[:1024],
             "supports_streaming": "true",
         }
-        resp = requests.post(api_url, files=files, data=data, timeout=120)
-        if resp.status_code == 200:
-            return True, "Reels опубликован в Telegram!"
-        return False, f"Ошибка Telegram {resp.status_code}: {resp.text}"
+        resp = requests.post(api_url, files=files, data=data, timeout=180)
+
+        try:
+            result = resp.json()
+        except Exception:
+            result = {}
+
+        if resp.ok and result.get("ok") is True:
+            return True, f"Reels опубликован в Telegram ({channel})."
+
+        description = result.get("description") or resp.text
+        if "chat not found" in description.lower():
+            return False, "Telegram не нашёл канал. Проверь TELEGRAM_CHANNEL: можно указать @username канала или числовой ID вида -100xxxxxxxxxx."
+        if "not enough rights" in description.lower() or "forbidden" in description.lower():
+            return False, "Бот найден, но Telegram не разрешил публикацию. Добавь бота в канал администратором с правом публикации сообщений."
+        if "file is too big" in description.lower():
+            return False, f"Telegram отклонил видео как слишком большое ({size_mb:.1f} МБ)."
+        return False, f"Telegram API: {description} (HTTP {resp.status_code})"
     except KeyError as e:
-        return False, f"Не найден секрет: {e}."
+        return False, f"Не найден секрет: {e}. Нужны TELEGRAM_TOKEN и TELEGRAM_CHANNEL."
+    except requests.RequestException as e:
+        return False, f"Сеть/Telegram недоступны: {e}"
     except Exception as e:
         return False, f"Ошибка Telegram: {e}"
 
@@ -1617,6 +1653,28 @@ with tab7:
         if st.button("🗑️ Удалить логотип"):
             LOGO_FILE.unlink()
             st.rerun()
+
+    st.markdown("---")
+
+    st.subheader("📡 Проверка Telegram")
+    st.caption("Проверяет токен бота и доступ бота к каналу. Ничего не публикует.")
+    if st.button("🔎 Проверить подключение Telegram", key="check_telegram"):
+        try:
+            tg_token = str(st.secrets["TELEGRAM_TOKEN"]).strip()
+            tg_channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
+            me = requests.get(_telegram_api(tg_token, "getMe"), timeout=20)
+            chat = requests.get(_telegram_api(tg_token, "getChat"), params={"chat_id": tg_channel}, timeout=20)
+            if me.ok and me.json().get("ok") and chat.ok and chat.json().get("ok"):
+                bot_name = me.json()["result"].get("username","бот")
+                chat_title = chat.json()["result"].get("title",tg_channel)
+                st.success(f"Telegram подключён: @{bot_name} → {chat_title}")
+            else:
+                err = (chat.json().get("description") if chat.ok else chat.text) or (me.text if not me.ok else "неизвестная ошибка")
+                st.error(f"Telegram не подключён: {err}")
+        except KeyError:
+            st.error("В Secrets нужны TELEGRAM_TOKEN и TELEGRAM_CHANNEL.")
+        except Exception as e:
+            st.error(f"Ошибка проверки Telegram: {e}")
 
     st.markdown("---")
 
