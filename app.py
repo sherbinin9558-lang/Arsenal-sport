@@ -163,60 +163,76 @@ def make_hashtags(name, brand, category):
 
 def gen_instagram(p, tone):
     n, b = p.get('name',''), p.get('brand','')
-    tags = make_hashtags(n, b, p.get('category','Другое'))
-    emoji = CATEGORY_EMOJI.get(p.get('category','Другое'), '📦')
-    if tone == "Официальный":
-        head = f"Представляем новинку от {b}"
-    elif tone == "Дружеский":
-        head = "Друзья, у нас отличные новости! 🎉"
-    else:
-        head = "🔥 ТОЛЬКО СЕЙЧАС! Специальное предложение!"
-    return f"""{head}
+    category = p.get('category','Другое')
+    desc = p.get('description','').strip()
+    specs = p.get('specs','').strip()
+    sizes = p.get('sizes','уточняйте')
+    color = p.get('color','уточняйте')
+    tags = make_hashtags(n, b, category)
+    emoji = CATEGORY_EMOJI.get(category, '📦')
+    heads = {
+        "Официальный": "Новая позиция в Arsenal Sport — " + n,
+        "Дружеский": "🔥 Забирайте новинку: " + n,
+        "Продающий": "🔥 " + n + " — экипировка для тех, кто выбирает по делу!"
+    }
+    return heads.get(tone, heads["Официальный"]) + f"""
 
-{emoji} {n} от {b}
+{emoji} {n}
+🏷️ Бренд: {b}
+🎨 Цвет: {color}
+📏 Размеры: {sizes}
 
-📝 {p.get('description','')}
-📏 Размеры: {p.get('sizes','уточняйте')}
-🎨 Цвет: {p.get('color','уточняйте')}
-⚙️ {p.get('specs','')}
+{desc}
 
-🛒 Закажите прямо сейчас!
-📩 Пишите в личные сообщения.
+⚙️ {specs}
+
+📩 Напишите нам в сообщения Arsenal Sport — поможем подобрать размер и оформить заказ.
 
 {tags}"""
 
 def gen_telegram(p, tone):
     n, b = p.get('name',''), p.get('brand','')
-    emoji = CATEGORY_EMOJI.get(p.get('category','Другое'), '📦')
-    head = {"Официальный": "🏆 Новое поступление в Arsenal Sport",
-            "Дружеский": "🎉 Ребята, новинка уже в наличии!",
-            "Продающий": "🔥 СУПЕРПРЕДЛОЖЕНИЕ!"}.get(tone, "🏆 Новинка")
-    return f"""{head}
+    category = p.get('category','Другое')
+    desc = p.get('description','').strip()
+    specs = p.get('specs','').strip()
+    sizes = p.get('sizes','уточняйте')
+    color = p.get('color','уточняйте')
+    emoji = CATEGORY_EMOJI.get(category, '📦')
+    heads = {
+        "Официальный": "🏆 Новое поступление в Arsenal Sport",
+        "Дружеский": "🎉 Ребята, смотрите, что приехало!",
+        "Продающий": "🔥 НОВИНКА В ARSENAL SPORT"
+    }
+    return f"""{heads.get(tone, heads["Официальный"])}
 
-{emoji} {n} от бренда {b}
+{emoji} {n}
+Бренд: {b}
 
-{p.get('description','')}
+{desc}
 
 Характеристики:
-• Артикул: {p.get('article','нет')}
-• Размеры: {p.get('sizes','уточняйте')}
-• Цвет: {p.get('color','уточняйте')}
-• Особенности: {p.get('specs','')}
+• Размеры: {sizes}
+• Цвет: {color}
+• Особенности: {specs}
 
-📍 Заходите в магазин или пишите для заказа!"""
+📩 Для заказа напишите нам в сообщения. Подскажем наличие и поможем подобрать вариант."""
 
 def gen_vk(p, tone):
     n, b = p.get('name',''), p.get('brand','')
-    return f"""🏆 {n} от {b}
+    desc = p.get('description','').strip()
+    sizes = p.get('sizes','уточняйте')
+    color = p.get('color','уточняйте')
+    specs = p.get('specs','').strip()
+    return f"""🔥 {n} — {b}
 
-{p.get('description','')}
+{desc}
 
-📏 Размеры: {p.get('sizes','уточняйте')}
-🎨 Цвет: {p.get('color','уточняйте')}
-⚙️ {p.get('specs','')}
+📏 Размеры: {sizes}
+🎨 Цвет: {color}
+⚙️ Характеристики: {specs}
 
-📍 Заказать: напишите нам в сообщения сообщества.
-{make_hashtags(n, b, p.get('category','Другое'))}"""
+📩 Чтобы заказать товар или уточнить наличие, напишите нам в сообщения сообщества.
+{make_hashtags(n, b, p.get('category','Другое'))}
 
 # ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
 def publish_to_telegram(image_bytes, caption):
@@ -478,75 +494,61 @@ with tab3:
         st.info("Сначала создайте товар.")
     else:
         names = [f"{p.get('brand','')} {p.get('name','')} ({p.get('article','')})" for p in products]
-        idx = st.selectbox("Товар", range(len(names)), format_func=lambda x: names[x])
-        tone = st.radio("Тональность", TONES, horizontal=True)
+        with st.form("text_generator_form", clear_on_submit=False):
+            idx = st.selectbox("Товар", range(len(names)), format_func=lambda x: names[x], key="text_product")
+            tone = st.radio("Тональность", TONES, horizontal=True, key="text_tone")
+            submitted = st.form_submit_button("✨ Сгенерировать тексты", type="primary", use_container_width=True)
 
-        if st.button("✨ Сгенерировать", type="primary"):
+        if submitted:
             p = products[idx]
             st.session_state["tg_text"] = gen_telegram(p, tone)
             st.session_state["insta_text"] = gen_instagram(p, tone)
             st.session_state["vk_text"] = gen_vk(p, tone)
             st.session_state["current_product"] = p
+            st.session_state["current_tone"] = tone
+            st.success("✅ Тексты созданы: " + p.get('brand','') + " " + p.get('name','') + " · «" + tone + "»")
 
         if "tg_text" in st.session_state:
             p = st.session_state["current_product"]
             insta = st.session_state["insta_text"]
             tg = st.session_state["tg_text"]
             vk = st.session_state["vk_text"]
+            st.caption("Товар: " + p.get('brand','') + " " + p.get('name','') + " • Тональность: " + st.session_state.get("current_tone",""))
 
             st.markdown("---")
             st.subheader("📸 Instagram")
             st.text_area("Текст поста", insta, height=280, key="i_out")
-            st.download_button("⬇️ Скачать текст", insta,
-                file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
+            st.download_button("⬇️ Скачать текст", insta, file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
             st.caption("ℹ️ Скопируйте текст и загрузите карточку в Instagram вручную.")
 
             st.markdown("---")
             st.subheader("✈️ Telegram")
             st.text_area("Текст поста", tg, height=280, key="t_out")
 
-            st.markdown("### 📤 Опубликовать в Telegram")
-            try:
-                ch = st.secrets.get("TELEGRAM_CHANNEL", "не настроен")
-            except Exception:
-                ch = "не настроен"
-            st.caption(f"Публикация в канал: @{ch}")
-
             card_to_send = None
             if "last_card_bytes" in st.session_state:
-                st.info(f"📎 Используется карточка товара: **{st.session_state.get('last_card_name','')}**")
                 card_to_send = st.session_state["last_card_bytes"]
-
-            up_card = st.file_uploader(
-                "Или загрузите свою карточку для отправки (PNG/JPG)",
-                type=["png", "jpg", "jpeg"],
-                key="tg_card_upload"
-            )
-            if up_card:
-                card_to_send = up_card.getvalue()
+            elif p.get("card_image"):
+                try:
+                    card_to_send = base64.b64decode(p["card_image"])
+                except Exception:
+                    card_to_send = None
 
             col_a, col_b = st.columns(2)
             with col_a:
-                if st.button("🚀 Опубликовать в Telegram", type="primary"):
+                if st.button("🚀 Опубликовать в Telegram", type="primary", key="pub_tg_text"):
                     if not card_to_send:
-                        st.error("Нет карточки. Создайте её во вкладке «📸 Создать» или загрузите файл выше.")
+                        st.error("Нет карточки. Создайте её во вкладке «📸 Создать» или загрузите файл.")
                     else:
-                        with st.spinner("Публикация в Telegram..."):
-                            ok, msg = publish_to_telegram(card_to_send, tg)
-                        if ok:
-                            st.success(f"✅ {msg}")
-                            st.balloons()
-                        else:
-                            st.error(f"❌ {msg}")
+                        ok, msg = publish_to_telegram(card_to_send, tg)
+                        (st.success if ok else st.error)(msg)
             with col_b:
-                st.download_button("⬇️ Скачать текст", tg,
-                    file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
+                st.download_button("⬇️ Скачать текст", tg, file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
 
             st.markdown("---")
             st.subheader("🅥 ВКонтакте")
             st.text_area("Текст поста", vk, height=200, key="v_out")
-            st.download_button("⬇️ Скачать текст", vk,
-                file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
+            st.download_button("⬇️ Скачать текст", vk, file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
