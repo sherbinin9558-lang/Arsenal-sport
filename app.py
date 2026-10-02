@@ -404,7 +404,7 @@ def publish_reel_to_vk(video_bytes, caption):
         return False, f"Ошибка VK: {e}"
 
 # ==================== ИНТЕРФЕЙС ====================
-st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
@@ -469,7 +469,21 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* Hide Streamlit platform controls from the customer-facing UI. */
-#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n/* Remove mobile bottom platform chrome; keep only app controls. */\n[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n#MainMenu a[href*="github.com"], [data-testid="stToolbar"] a[href*="github.com"] {display:none !important;visibility:hidden !important;}
+#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n/* Remove mobile bottom platform chrome; keep only app controls. */\n[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n# Hide repository / platform navigation links and icons from the customer UI.
+# This affects only Streamlit chrome; MAX, sidebar and app controls remain intact.
+a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
+a[aria-label*="GitHub" i], a[title*="GitHub" i],
+a[aria-label*="Settings" i], a[title*="Settings" i],
+[data-testid="stToolbar"] *, [data-testid="stDecoration"] *,
+[data-testid="stStatusWidget"] *, [data-testid="stAppDeployButton"] * {
+    display:none !important; visibility:hidden !important; pointer-events:none !important;
+}
+[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer,
+[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {
+    display:none !important; visibility:hidden !important; height:0 !important; min-height:0 !important;
+    pointer-events:none !important;
+}
+section[data-testid="stSidebar"] {display:block !important; visibility:visible !important; opacity:1 !important;}
 /* MAX popup controls: keep the launcher, dialog and chevrons visible. */
 [data-testid="stDialog"] {z-index:9999 !important;}
 [data-testid="stDialog"] [data-testid="stExpander"] {background:#11151d !important;border:1px solid #3b3f4d !important;}
