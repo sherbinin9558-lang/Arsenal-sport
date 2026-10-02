@@ -443,21 +443,21 @@ if dark_mode:
 else:
     bg_css = "body {background:#eef1f5;}"
     theme_css = """
-    .stApp {background:#eef1f5!important;color:#202633!important;}
-    section[data-testid="stSidebar"] {background:#e5e9ef!important;border-right:1px solid #d5dbe4!important;}
-    div[data-baseweb="tab-list"] {background:#e3e7ed!important;border-color:#d5dbe4!important;}
+    .stApp {background:#f6f7fb!important;color:#171a21!important;}
+    section[data-testid="stSidebar"] {background:#ffffff!important;border-right:1px solid #e4e7ec!important;}
+    div[data-baseweb="tab-list"] {background:#ffffff!important;border-color:#e1e5eb!important;}
     [data-testid="stFileUploader"] {background:#f5f7fa!important;border-color:#b9c1ce!important;}
-    .sidebar-max {background:linear-gradient(135deg,#f8f9fb,#ece8ff);border-color:#d8d1ff;}
-    .sidebar-max-kicker {color:#655bd0;}
-    .sidebar-max-title {color:#202633;}
-    .sidebar-max-text {color:#687080;}
+    .sidebar-max {background:linear-gradient(135deg,#f5f2ff,#e9e5ff);border-color:#c9c1ff;}
+    .sidebar-max-kicker {color:#5b4bd6;}
+    .sidebar-max-title {color:#21164d;}
+    .sidebar-max-text {color:#5f6472;}
     """
 
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 :root {--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#ffffff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}
-.block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:850;color:#171a21;text-align:left;margin:18px 0 12px;letter-spacing:.01em;}
-.subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}\n 
+.block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
+.subtitle {text-align:center;color:#687182;margin:3px 0 18px;font-size:.92rem;}\n 
 .stApp {background:#f6f7fb;}
 section[data-testid="stSidebar"] {background:#ffffff;border-right:1px solid #e4e7ec;}
 section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
@@ -502,7 +502,7 @@ html, body { overflow-x:hidden !important; }
 }
 @media (max-width: 768px) {
     .mobile-nav-hint {display:block;}
-    .main-title {display:none !important;}
+    .main-title {display:block !important; font-size:1.12rem !important; line-height:1.1 !important; margin:8px 0 7px !important; text-align:left !important; color:#24124f !important; text-shadow:0 0 9px rgba(91,70,214,.18) !important;}
     .block-container { padding:0.65rem 0.7rem 1.2rem !important; }
     .main-title { font-size:1.45rem !important; line-height:1.15 !important; margin:12px 0 10px !important; letter-spacing:.01em !important; }
     .subtitle { font-size:.78rem !important; margin-bottom:12px !important; }
@@ -536,7 +536,10 @@ html, body { overflow-x:hidden !important; }
     .sidebar-max-title { font-size:1.05rem !important; }
     .sidebar-max-text { font-size:.68rem !important; }
     [data-testid="stFileUploader"] { padding:.25rem !important; }
-    [data-testid="stMetric"] {padding:10px 8px !important; background:#fff !important; border:1px solid #e4e7ec !important; border-radius:12px !important;}
+    [data-testid="stMetric"] {padding:11px 9px !important; background:#ffffff !important; border:1px solid #ddd8f5 !important; border-radius:12px !important; box-shadow:0 4px 14px rgba(91,70,214,.08) !important;}
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important; font-weight:900 !important;}
+    [data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important; font-weight:700 !important;}
+    [data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;}
     [data-testid="stExpander"] {border-radius:12px !important;}
     [data-baseweb="select"], [data-baseweb="input"], [data-testid="stTextArea"] {font-size:16px !important;}
     [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
@@ -545,6 +548,16 @@ html, body { overflow-x:hidden !important; }
 }
 
 [data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#f5f7fa !important;}
+/* ===== Readable light theme + controlled violet neon accents ===== */
+[data-testid="stMetric"] {background:#ffffff !important;border:1px solid #ddd8f5 !important;border-radius:14px !important;box-shadow:0 4px 14px rgba(91,70,214,.08) !important;}
+[data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important;font-weight:900 !important;opacity:1 !important;}
+[data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important;font-weight:700 !important;opacity:1 !important;}
+[data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;opacity:1 !important;}
+.section-kicker {color:#6d4aff !important;text-shadow:0 0 7px rgba(109,74,255,.20);}
+.section-title {color:#21164d !important;}
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {color:#21164d !important;}
+[data-testid="stText"], [data-testid="stCaptionContainer"] {color:#596174 !important;}
+
 [data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
 </style>""",
     unsafe_allow_html=True,
