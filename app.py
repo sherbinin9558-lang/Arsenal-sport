@@ -1657,7 +1657,7 @@ with tab7:
     st.markdown("---")
 
     st.subheader("📡 Проверка Telegram")
-    st.caption("Сначала проверяем канал, затем отдельно отправляем тестовое сообщение. Это покажет, проблема в Telegram или именно в видео.")
+    st.caption("Проверяет токен бота и доступ бота к каналу. Ничего не публикует.")
     if st.button("🔎 Проверить подключение Telegram", key="check_telegram"):
         try:
             tg_token = str(st.secrets["TELEGRAM_TOKEN"]).strip()
@@ -1665,17 +1665,9 @@ with tab7:
             me = requests.get(_telegram_api(tg_token, "getMe"), timeout=20)
             chat = requests.get(_telegram_api(tg_token, "getChat"), params={"chat_id": tg_channel}, timeout=20)
             if me.ok and me.json().get("ok") and chat.ok and chat.json().get("ok"):
-                bot = me.json()["result"]
-                bot_name = bot.get("username","бот")
-                chat_data = chat.json()["result"]
-                chat_title = chat_data.get("title",tg_channel)
+                bot_name = me.json()["result"].get("username","бот")
+                chat_title = chat.json()["result"].get("title",tg_channel)
                 st.success(f"Telegram подключён: @{bot_name} → {chat_title}")
-                member = requests.get(_telegram_api(tg_token, "getChatMember"), params={"chat_id": tg_channel, "user_id": bot.get("id")}, timeout=20)
-                if member.ok and member.json().get("ok"):
-                    status = member.json()["result"].get("status","unknown")
-                    st.info(f"Статус бота в канале: {status}")
-                    if status not in ("administrator", "creator"):
-                        st.warning("Бот не является администратором канала. Для публикации Reels нужен администратор с правом публикации сообщений.")
             else:
                 err = (chat.json().get("description") if chat.ok else chat.text) or (me.text if not me.ok else "неизвестная ошибка")
                 st.error(f"Telegram не подключён: {err}")
@@ -1683,23 +1675,6 @@ with tab7:
             st.error("В Secrets нужны TELEGRAM_TOKEN и TELEGRAM_CHANNEL.")
         except Exception as e:
             st.error(f"Ошибка проверки Telegram: {e}")
-
-    if st.button("📨 Отправить тестовое сообщение в Telegram", key="test_telegram_send"):
-        try:
-            tg_token = str(st.secrets["TELEGRAM_TOKEN"]).strip()
-            tg_channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
-            resp = requests.post(
-                _telegram_api(tg_token, "sendMessage"),
-                data={"chat_id": tg_channel, "text": "🔧 Arsenal Sport: тестовая публикация Telegram из Content Manager."},
-                timeout=30,
-            )
-            result = resp.json()
-            if resp.ok and result.get("ok"):
-                st.success("Тестовое сообщение отправлено. Если оно появилось в канале — Telegram работает, и будем чинить именно отправку видео.")
-            else:
-                st.error(f"Telegram не отправил сообщение: {result.get('description', resp.text)}")
-        except Exception as e:
-            st.error(f"Ошибка тестовой отправки: {e}")
 
     st.markdown("---")
 
