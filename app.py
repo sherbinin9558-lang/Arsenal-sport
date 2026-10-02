@@ -127,7 +127,7 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
 
 
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
-    # Единая профессиональная система Arsenal Sport с четырьмя визуальными направлениями.
+    # Единая профессиональная система AI Agent Content Manager с четырьмя визуальными направлениями.
     t = TEMPLATES.get(template, TEMPLATES["Dark Premium"])
     W, H = CARD_SIZE
     accent = t["accent"]
@@ -178,7 +178,7 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
         lr = logo_img.resize((logo_w, int(logo_img.height * ratio)), Image.Resampling.LANCZOS)
         canvas.paste(lr, (60, 48), lr)
     else:
-        draw.text((60, 55), "ARSENAL SPORT", font=get_font(36, True), fill=t["text"])
+        draw.text((60, 55), "AI AGENT CONTENT MANAGER", font=get_font(36, True), fill=t["text"])
 
     # Категория.
     cat = category.upper()
@@ -222,7 +222,7 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
     draw.rounded_rectangle((44, panel_y, W-44, H-44), radius=34, fill=panel_fill, outline=panel_outline, width=2)
     draw.line([(76, panel_y+38), (235, panel_y+38)], fill=accent, width=5)
 
-    brand_text = (brand or "ARSENAL SPORT").upper()
+    brand_text = (brand or "AI AGENT CONTENT MANAGER").upper()
     draw.text((76, panel_y+62), brand_text[:28], font=get_font(25, True), fill=t["sec"])
 
     title_font = fit_font(draw, (name or "ТОВАР").upper(), 860, max_size=58, min_size=34)
@@ -240,12 +240,12 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
     if meta_text:
         draw.text((76, H-108), meta_text[:70], font=get_font(22), fill=t["sec"])
 
-    draw.text((W-310, H-108), "ARSENAL SPORT", font=get_font(21, True), fill=accent)
+    draw.text((W-310, H-108), "AI AGENT CONTENT MANAGER", font=get_font(21, True), fill=accent)
     return canvas
 
 # ==================== ТЕКСТЫ ====================
 def make_hashtags(name, brand, category):
-    base = ["#arsenal_sport", "#спорт", "#экипировка", "#новинка"]
+    base = ["#ai_agent_content_manager", "#спорт", "#экипировка", "#новинка"]
     extra = {
         "Футболка": ["#футболка", "#tshirt"],
         "Кроссовки": ["#кроссовки", "#sneakers"],
@@ -269,7 +269,7 @@ def gen_instagram(p, tone):
     tags = make_hashtags(n, b, category)
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "Новая позиция в Arsenal Sport — " + n,
+        "Официальный": "Новая позиция в AI Agent Content Manager — " + n,
         "Дружеский": "🔥 Забирайте новинку: " + n,
         "Продающий": "🔥 " + n + " — экипировка для тех, кто выбирает по делу!"
     }
@@ -284,7 +284,7 @@ def gen_instagram(p, tone):
 
 ⚙️ {specs}
 
-📩 Напишите нам в сообщения Arsenal Sport — поможем подобрать размер и оформить заказ.
+📩 Напишите нам в сообщения AI Agent Content Manager — поможем подобрать размер и оформить заказ.
 
 {tags}"""
 
@@ -297,9 +297,9 @@ def gen_telegram(p, tone):
     color = p.get('color','уточняйте')
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "🏆 Новое поступление в Arsenal Sport",
+        "Официальный": "🏆 Новое поступление в AI Agent Content Manager",
         "Дружеский": "🎉 Ребята, смотрите, что приехало!",
-        "Продающий": "🔥 НОВИНКА В ARSENAL SPORT"
+        "Продающий": "🔥 НОВИНКА В AI AGENT CONTENT MANAGER"
     }
     return f"""{heads.get(tone, heads["Официальный"])}
 
@@ -383,7 +383,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         api_url = _telegram_api(token, "sendVideo")
 
         files = {
-            "video": ("arsenal_sport_reel.mp4", video_bytes, "video/mp4")
+            "video": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")
         }
         data = {
             "chat_id": channel,
@@ -424,7 +424,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         try:
             doc_resp = requests.post(
                 _telegram_api(token, "sendDocument"),
-                files={"document": ("arsenal_sport_reel.mp4", video_bytes, "video/mp4")},
+                files={"document": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")},
                 data={
                     "chat_id": channel,
                     "caption": caption,
@@ -463,7 +463,7 @@ def publish_reel_to_vk(video_bytes, caption):
         params = {
             "access_token": token,
             "v": api_version,
-            "name": "Arsenal Sport Reels",
+            "name": "AI Agent Content Manager Reels",
             "description": caption[:4096],
             "is_private": 0,
             "wallpost": 1,
@@ -496,16 +496,16 @@ def publish_reel_to_vk(video_bytes, caption):
         return False, f"Ошибка VK: {e}"
 
 # ==================== ИНТЕРФЕЙС ====================
-st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
+st.set_page_config(page_title="AI Agent Content Manager Content Manager", layout="wide")
 
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
-    st.title("Arsenal Sport")
+    st.title("AI Agent Content Manager")
     st.caption("Content Studio · v2.6 MAX")
     dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
     st.markdown("---")
     st.markdown(
-        '<div class="sidebar-max"><div class="sidebar-max-kicker">ARSENAL SPORT</div>'
+        '<div class="sidebar-max"><div class="sidebar-max-kicker">AI AGENT CONTENT MANAGER</div>'
         '<div class="sidebar-max-title">⚡ MAX</div>'
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
@@ -580,7 +580,7 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
     unsafe_allow_html=True,
 )
 
-st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p>', unsafe_allow_html=True)
 
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
@@ -759,7 +759,7 @@ with tab2:
     st.download_button(
         "⬇️ Скачать шаблон CSV",
         template_csv.getvalue().encode("utf-8-sig"),
-        file_name="arsenal_sport_products_template.csv",
+        file_name="ai_agent_content_manager_products_template.csv",
         mime="text/csv",
         key="bulk_template_csv",
     )
@@ -1039,7 +1039,7 @@ with tab4:
 🎙️ "Размеры: {p.get('sizes','уточняйте')}. Цвет: {p.get('color','уточняйте')}"
 
 [25-30 сек] CTA
-📹 Логотип Arsenal Sport
+📹 Логотип AI Agent Content Manager
 💬 "Заказывайте!"
 🎙️ "Ссылка в шапке профиля!"
 
@@ -1342,7 +1342,7 @@ with tab6:
 # ==================== НАСТРОЙКИ МАГАЗИНА ====================
 SETTINGS_FILE = Path("settings.json")
 DEFAULT_SETTINGS = {
-    "store_name": "Arsenal Sport",
+    "store_name": "AI Agent Content Manager",
     "city": "Краснодар",
     "delivery": "По России",
     "telegram": "",
@@ -1356,9 +1356,9 @@ DEFAULT_SETTINGS = {
     "return_policy": "Возврат и обмен — по действующим правилам магазина.",
     "delivery_methods": "Самовывоз, доставка по Краснодару, отправка по России",
     "delivery_terms": "",
-    "content_signature": "Arsenal Sport — спортивная одежда, обувь и экипировка",
+    "content_signature": "AI Agent Content Manager — спортивная одежда, обувь и экипировка",
     "cta": "Напишите нам — поможем выбрать товар и оформить заказ.",
-    "hashtags": "#arsenal_sport #спорт #экипировка",
+    "hashtags": "#ai_agent_content_manager #спорт #экипировка",
     "ai_seller_instructions": "Отвечай дружелюбно и по делу. Уточняй товар, размер и город. Не придумывай наличие, цену или характеристики.",
     "notification_contact": "",
     "card_template": "Dark Premium",
@@ -1385,7 +1385,7 @@ def save_settings(data):
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
-    st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация Arsenal Sport для контента и работы магазина.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация AI Agent Content Manager для контента и работы магазина.</div>', unsafe_allow_html=True)
     settings = load_settings()
 
     st.markdown("### 🏪 Магазин")
@@ -1548,7 +1548,7 @@ def max_due_content(plan):
     return due, overdue
 
 def render_max():
-    @st.dialog("⚡ Arsenal Sport MAX", width="large")
+    @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
     def dialog():
         products = load_products()
         plan = load_plan()
@@ -1689,7 +1689,7 @@ def render_max():
                         st.rerun()
 
         elif section == "Автоматизация":
-            st.subheader("🚀 Центр автоматизации Arsenal Sport")
+            st.subheader("🚀 Центр автоматизации AI Agent Content Manager")
             st.caption("Бесплатный локальный контур: массовые фото, контент, склад, план на 30 дней, массовое редактирование и аналитика.")
 
             auto_tab1, auto_tab2, auto_tab3, auto_tab4 = st.tabs(["📸 Фото", "✍️ Контент", "📦 Каталог", "📊 Аналитика"])
