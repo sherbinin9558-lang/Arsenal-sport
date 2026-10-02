@@ -1020,6 +1020,27 @@ def ai_sales_reply(products, message):
         return "\n".join(lines), top
     return "Пока не нашёл точного совпадения. Напишите категорию, размер, цвет или бюджет — попробую подобрать из каталога.", []
 
+def sales_followup(products, message, current):
+    q = (message or "").strip().lower()
+    if not q:
+        return "Напишите, что хотите уточнить.", current
+    if current:
+        nums = [int(x) for x in re.findall(r"\b([1-5])\b", q)]
+        if nums:
+            idx = nums[0] - 1
+            if idx < len(current):
+                p = current[idx]
+                title = f"{p.get('brand','')} {p.get('name','')}".strip()
+                return (f"{title}. {p.get('description','Описание пока не заполнено.') or 'Описание пока не заполнено.'} "
+                        f"Размеры: {p.get('sizes','уточняйте')}. Цвет: {p.get('color','уточняйте')}. "
+                        f"Артикул: {p.get('article','уточняйте')}. Наличие подтверждается перед заказом."), [p]
+    if any(k in q for k in ("достав", "оплат", "возврат", "налич", "размер")):
+        return knowledge_answer(q), current
+    found = product_search(products, q)
+    if found:
+        return ai_sales_reply(products, message)[0], found
+    return "Уточните размер, бюджет, цвет или вид товара — я попробую подобрать подходящий вариант.", current
+
 # ========== 8: MAX ==========
 with tab8:
     st.markdown('<div class="section-kicker">ARSENAL SPORT MAX</div><div class="section-title">Центр управления</div><div class="section-subtitle">Бесплатное ядро: каталог, умный поиск, контент-пакет, база знаний и автоплан.</div>', unsafe_allow_html=True)
@@ -1078,7 +1099,8 @@ with tab8:
         customer_msg = st.text_input("Сообщение покупателя", placeholder="Нужны бутсы для искусственного поля, 42 размер, до 10000")
         send = st.form_submit_button("💬 Ответить", type="primary")
     if send and customer_msg:
-        reply, chat_found = ai_sales_reply(products_max, customer_msg)
+        current = st.session_state.get("sales_last_found", [])
+        reply, chat_found = sales_followup(products_max, customer_msg, current)
         st.session_state["sales_chat"].append(("Покупатель", customer_msg))
         st.session_state["sales_chat"].append(("Arsenal Sport", reply))
         st.session_state["sales_last_found"] = chat_found
