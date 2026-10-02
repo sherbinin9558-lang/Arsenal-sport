@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
-from crm_core import create_lead, crm_metrics, load_leads, update_lead, STATUSES
+from crm_core import create_lead, crm_metrics, load_leads, update_lead, STATUSES as CRM_STATUSES
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1044,6 +1044,62 @@ def sales_followup(products, message, current):
 
 # ========== 8: MAX ==========
 with tab8:
+    st.markdown('<div class="section-kicker">MANAGER WORKSPACE</div><div class="section-title">Рабочее место менеджера</div><div class="section-subtitle">Единая панель продаж: обращения, заказы и остатки — без изменения структуры Arsenal Sport.</div>', unsafe_allow_html=True)
+
+    manager_leads = load_leads()
+    manager_orders = load_json(Path("orders.json"), [])
+    manager_products = load_products()
+
+    def _manager_stock(product):
+        by_size = product.get("stock_by_size") or {}
+        if isinstance(by_size, dict):
+            return sum(max(0, int(v or 0)) for v in by_size.values())
+        try:
+            return max(0, int(product.get("total_stock", 0) or 0))
+        except Exception:
+            return 0
+
+    new_leads_count = sum(1 for x in manager_leads if x.get("status") == "Новый")
+    in_work_count = sum(1 for x in manager_leads if x.get("status") == "В работе")
+    active_order_statuses = {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
+    active_orders_count = sum(1 for x in manager_orders if x.get("status", "Новая") in active_order_statuses)
+    low_stock_products = [p for p in manager_products if 0 < _manager_stock(p) <= 3]
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Новые обращения", new_leads_count)
+    k2.metric("В работе", in_work_count)
+    k3.metric("Активные заказы", active_orders_count)
+    k4.metric("Мало товара", len(low_stock_products))
+
+    d1, d2 = st.columns(2)
+    with d1:
+        st.markdown("#### Последние обращения")
+        if manager_leads:
+            for lead in reversed(manager_leads[-5:]):
+                st.write(f"**#{lead.get('id', '—')} · {lead.get('name', 'Клиент')}** · {lead.get('status', 'Новый')}")
+                st.caption(f"{lead.get('contact', '—')} · {lead.get('product', 'Товар не указан')}")
+        else:
+            st.info("Новых обращений пока нет.")
+
+    with d2:
+        st.markdown("#### Последние заказы")
+        if manager_orders:
+            for order in reversed(manager_orders[-5:]):
+                customer = order.get("customer_name", "Клиент")
+                status = order.get("status", "Новая")
+                order_id = order.get("id", "—")
+                st.write(f"**{order_id} · {customer}** · {status}")
+                st.caption(f"Контакт: {order.get('customer_contact', '—')}")
+        else:
+            st.info("Заказов пока нет.")
+
+    if low_stock_products:
+        st.markdown("#### Контроль остатков")
+        for product in sorted(low_stock_products, key=_manager_stock):
+            title = f"{product.get('brand', '')} {product.get('name', '')}".strip()
+            st.warning(f"{title or 'Товар'} — осталось {_manager_stock(product)} шт.")
+
+    st.markdown("---")
     st.markdown('<div class="section-kicker">ARSENAL SPORT MAX</div><div class="section-title">Центр управления</div><div class="section-subtitle">Бесплатное ядро: каталог, умный поиск, контент-пакет, база знаний и автоплан.</div>', unsafe_allow_html=True)
 
     products_max = load_products()
@@ -1171,7 +1227,7 @@ with tab8:
     st.caption("Воронка AI-продавца: новое обращение → работа менеджера → заказ → завершение.")
     crm_leads = load_leads()
     if crm_leads:
-        lead_status = st.selectbox("Фильтр обращений", ["Все"] + STATUSES, key="crm_lead_filter")
+        lead_status = st.selectbox("Фильтр обращений", ["Все"] + CRM_STATUSES, key="crm_lead_filter")
         visible_leads = crm_leads if lead_status == "Все" else [x for x in crm_leads if x.get("status") == lead_status]
         for lead in reversed(visible_leads[-30:]):
             with st.container(border=True):
@@ -1181,7 +1237,7 @@ with tab8:
                 c2.write(f"Контакт: {lead.get('contact','—')}")
                 c2.caption(f"Товар: {lead.get('product','—')}")
                 current = lead.get("status", "Новый")
-                new_status = c3.selectbox("Статус", STATUSES, index=STATUSES.index(current) if current in STATUSES else 0, key=f"crm_status_{lead.get('id')}")
+                new_status = c3.selectbox("Статус", CRM_STATUSES, index=CRM_STATUSES.index(current) if current in CRM_STATUSES else 0, key=f"crm_status_{lead.get('id')}")
                 if new_status != current:
                     update_lead(lead.get("id"), status=new_status)
                     st.rerun()
