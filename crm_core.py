@@ -18,13 +18,13 @@ def load_leads():
 def save_leads(leads):
     LEADS_FILE.write_text(json.dumps(leads, ensure_ascii=False, indent=2), encoding="utf-8")
 
-def create_lead(name="", contact="", source="Website", message="", product="", product_id=""):
+def create_lead(name="", contact="", source="Website", message="", product="", product_id="", content_id="", order_id=""):
     leads = load_leads()
     next_id = max([int(x.get("id", 0)) for x in leads if str(x.get("id", "")).isdigit()] or [0]) + 1
     lead = {
         "id": next_id, "name": name, "contact": contact, "source": source,
         "message": message, "product": product, "product_id": product_id,
-        "status": "Новый", "created_at": datetime.now().isoformat(timespec="minutes")
+        "status": "Новый", "content_id": str(content_id or ""), "order_id": str(order_id or ""), "created_at": datetime.now().isoformat(timespec="minutes")
     }
     leads.append(lead)
     save_leads(leads)

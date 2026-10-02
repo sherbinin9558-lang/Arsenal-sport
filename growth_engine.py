@@ -190,6 +190,33 @@ def next_content(products, leads, orders, plan, limit=7):
                 break
     return result
 
+
+def attribution_performance(plan, leads, orders):
+    """Measure only explicit publication-to-lead/order links; never guess causality."""
+    by_id = {str(x.get("content_id")): x for x in plan if x.get("content_id")}
+    rows = []
+    lead_by_content = Counter(str(x.get("content_id")) for x in leads if x.get("content_id"))
+    order_by_content = Counter(str(x.get("content_id")) for x in orders if x.get("content_id"))
+    revenue_by_content = defaultdict(float)
+    for order in orders:
+        cid = str(order.get("content_id") or "")
+        if cid and order.get("status") != "Отменён":
+            revenue_by_content[cid] += _amount(order.get("amount"))
+    for cid, item in by_id.items():
+        rows.append({
+            "content_id": cid,
+            "publication_id": str(item.get("publication_id") or cid),
+            "date": item.get("date", ""),
+            "product": item.get("product", ""),
+            "channel": item.get("platform", ""),
+            "format": item.get("type", ""),
+            "status": item.get("status", "Идея"),
+            "leads": lead_by_content.get(cid, 0),
+            "orders": order_by_content.get(cid, 0),
+            "revenue": revenue_by_content.get(cid, 0.0),
+        })
+    return sorted(rows, key=lambda x: (-x["orders"], -x["revenue"], -x["leads"], x["date"]))
+
 def ai_summary(products, leads, orders, plan):
     matrix = recommendation_matrix(products, leads, orders, plan)
     return {
@@ -201,5 +228,6 @@ def ai_summary(products, leads, orders, plan):
         "channels": matrix["channels"],
         "formats": matrix["formats"],
         "content": content_performance(plan),
+        "attribution": attribution_performance(plan, leads, orders),
         "ai_mode": "local_explainable",
     }

@@ -17,14 +17,14 @@ def load_orders():
 def save_orders(orders):
     ORDERS_FILE.write_text(json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
 
-def create_order(customer="", contact="", product="", product_id="", amount="", status="Новая", source="Manual"):
+def create_order(customer="", contact="", product="", product_id="", amount="", status="Новая", source="Manual", content_id="", lead_id=""):
     orders = load_orders()
     nums = [int(o.get("id", 0)) for o in orders if str(o.get("id", "")).isdigit()]
     order = {
         "id": max(nums or [0]) + 1,
         "customer": customer.strip(), "contact": contact.strip(),
         "product": product.strip(), "product_id": str(product_id or ""),
-        "amount": str(amount or "").strip(), "status": status, "source": source,
+        "amount": str(amount or "").strip(), "status": status, "source": source, "content_id": str(content_id or ""), "lead_id": str(lead_id or ""),
         "created_at": datetime.now().isoformat(timespec="minutes"),
         "updated_at": datetime.now().isoformat(timespec="minutes"),
     }
