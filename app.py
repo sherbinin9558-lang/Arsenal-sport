@@ -769,6 +769,13 @@ with tab4:
                         except Exception:
                             source_image = None
 
+                    if source_image is None:
+                        st.error(
+                            "❌ Нельзя создать Reels: у товара нет исходного фото. "
+                            "Открой «📦 Каталог → ✏️ Редактировать», загрузи фото товара и сохрани."
+                        )
+                        st.stop()
+
                     auto_card = generate_card(
                         source_image,
                         reel_product.get("name", ""),
@@ -792,15 +799,9 @@ with tab4:
                     reel_product = updated_product
                     stored_card = updated_product["card_image"]
 
-                    if source_image:
-                        st.success(
-                            "✅ Карточка автоматически создана с исходным фото товара и сохранена."
-                        )
-                    else:
-                        st.warning(
-                            "Карточка создана без фото: у старого товара исходное фото не сохранено. "
-                            "Добавь его в «Каталог → Редактировать»."
-                        )
+                    st.success(
+                        "✅ Карточка автоматически создана с исходным фото товара и сохранена."
+                    )
                 else:
                     source_bytes = base64.b64decode(stored_card)
 
