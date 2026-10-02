@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from core_models import Product, OrderItem, ORDER_STATUSES, new_id
-from commerce_core import product_search, filter_products, inventory_summary, create_order
+from commerce_core import product_search, filter_products, inventory_summary, create_order, stock_label
 
 PRODUCTS_FILE = Path("products.json")
 ORDERS_FILE = Path("orders.json")
@@ -143,6 +143,13 @@ with tabs[0]:
         only_available=only_available,
     )
     st.caption(f"Показано: {len(filtered)} товаров")
+    if filtered:
+        available_count = sum(p.total_stock > 0 for p in filtered)
+        low_count = sum(0 < p.total_stock <= 2 for p in filtered)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("С подтверждённым остатком", available_count)
+        m2.metric("Низкий остаток", low_count)
+        m3.metric("Без остатка", len(filtered) - available_count)
 
     if not filtered:
         st.info("По выбранным фильтрам товары не найдены.")
@@ -166,6 +173,9 @@ with tabs[0]:
                 if p.sizes:
                     stock_line = " · ".join(f"{s}: {p.stock_by_size.get(s, 0)}" for s in p.sizes)
                     st.caption(stock_line)
+                    in_sizes = [s for s in p.sizes if p.stock_by_size.get(s, 0) > 0]
+                    st.caption("Доступные размеры: " + (", ".join(in_sizes) if in_sizes else "нет подтверждённых"))
+                st.write(stock_label(p))
                 st.write(f"Цена: **{p.price:,.0f} ₽**" if p.price else "Цена пока не задана")
 
 with tabs[1]:
@@ -230,6 +240,13 @@ with tabs[2]:
 
 with tabs[3]:
     st.subheader("CRM заказов")
+    status_counts = {status: 0 for status in ORDER_STATUSES}
+    for order in orders:
+        status_counts[order.get("status", "Новая")] = status_counts.get(order.get("status", "Новая"), 0) + 1
+    sm = st.columns(4)
+    for col, status in zip(sm, ORDER_STATUSES[:4]):
+        col.metric(status, status_counts.get(status, 0))
+    st.caption("Статус меняется вручную менеджером и сохраняется в orders.json. Остаток товара не списывается при создании заявки — это защищает от ложного списания до подтверждения заказа.")
     if not orders:
         st.info("Заказов пока нет. Первый заказ автоматически появится здесь.")
     else:
