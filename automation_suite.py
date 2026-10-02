@@ -1,7 +1,11 @@
 """Arsenal Sport free automation suite: bulk content, stock, photos and analytics."""
 import re
+from io import BytesIO
 from datetime import date, timedelta
 from pathlib import Path
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 IMAGE_DIR = Path("product_images")
 CARD_DIR = Path("generated_cards")
@@ -104,8 +108,23 @@ def analytics(products, leads, orders, plan):
     }
 
 def save_uploaded_photo(uploaded_file, product, index=0):
+    """Validate an uploaded image before writing it to disk."""
     ensure_dirs()
-    ext = Path(uploaded_file.name or "").suffix.lower() or ".jpg"
+    filename = Path(uploaded_file.name or "").name
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValueError("Разрешены только JPG, JPEG, PNG и WEBP.")
+    payload = uploaded_file.getvalue()
+    if not payload:
+        raise ValueError("Файл пустой.")
+    if len(payload) > MAX_IMAGE_BYTES:
+        raise ValueError("Изображение слишком большое: максимум 10 МБ.")
+    try:
+        from PIL import Image
+        with Image.open(BytesIO(payload)) as image:
+            image.verify()
+    except Exception as exc:
+        raise ValueError("Файл не является корректным изображением.") from exc
     path = IMAGE_DIR / f"{safe_slug(product_key(product,index))}{ext}"
-    path.write_bytes(uploaded_file.getvalue())
+    path.write_bytes(payload)
     return str(path)
