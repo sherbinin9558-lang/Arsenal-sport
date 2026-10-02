@@ -470,6 +470,21 @@ st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* Hide Streamlit platform controls from the customer-facing UI. */
 #MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
+/* MAX popup controls: keep the launcher, dialog and chevrons visible. */
+[data-testid="stDialog"] {z-index:9999 !important;}
+[data-testid="stDialog"] [data-testid="stExpander"] {background:#11151d !important;border:1px solid #3b3f4d !important;}
+[data-testid="stDialog"] [data-testid="stExpander"] summary,
+[data-testid="stDialog"] [data-testid="stExpander"] button {color:#f5f7fa !important;}
+[data-testid="stDialog"] [data-testid="stExpander"] svg,
+[data-testid="stDialog"] [data-testid="stExpander"] svg path,
+[data-testid="stDialog"] [data-testid="stExpander"] svg line,
+[data-testid="stDialog"] [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.75)) !important;}
+[data-testid="stDialog"] button[aria-label="Close"] {color:#b8ff00 !important;opacity:1 !important;visibility:visible !important;}
+[data-testid="stDialog"] button[aria-label="Close"] svg,
+[data-testid="stDialog"] button[aria-label="Close"] svg path,
+[data-testid="stDialog"] button[aria-label="Close"] svg line {color:#b8ff00 !important;stroke:#b8ff00 !important;opacity:1 !important;visibility:visible !important;}
+button[key="sidebar_max"], button[key="dash_open_max"] {box-shadow:0 0 0 1px rgba(184,255,0,.45),0 0 14px rgba(184,255,0,.45) !important;}
+[data-testid="stSidebar"] [data-testid="stToggle"] label {color:#b8ff00 !important;text-shadow:0 0 6px rgba(184,255,0,.55) !important;}
 /* MAX popup: bright lime chevrons on dark controls. */
 [data-testid="stExpander"] svg {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 4px rgba(184,255,0,.65)) !important;}
 [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
