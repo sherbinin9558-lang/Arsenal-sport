@@ -324,8 +324,8 @@ st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", pa
 
 with st.sidebar:
     st.title("Arsenal Sport")
-    st.caption("Content Studio · v2.5")
-    dark_mode = st.toggle("🌙 Тёмная тема", value=True)
+    st.caption("Content Studio · v2.6 MAX")
+    dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
     st.metric("📅 В плане", len(load_plan()))
@@ -342,12 +342,24 @@ with st.sidebar:
     st.caption(f"Сегодня · {datetime.date.today().strftime('%d.%m.%Y')}")
 
 if dark_mode:
-    bg_css = "body {background: #eef1f5;}"
+    bg_css = "body {background:#0b0e13;}"
+    theme_css = """
+    .stApp {background:#0b0e13!important;color:#f5f7fa!important;}
+    section[data-testid="stSidebar"] {background:#10131a!important;border-right:1px solid #252b38!important;}
+    div[data-baseweb="tab-list"] {background:#11151d!important;border-color:#252b38!important;}
+    [data-testid="stFileUploader"] {background:#11151d!important;border-color:#394152!important;}
+    """
 else:
-    bg_css = "body {background: #eef1f5;}"
+    bg_css = "body {background:#eef1f5;}"
+    theme_css = """
+    .stApp {background:#eef1f5!important;color:#202633!important;}
+    section[data-testid="stSidebar"] {background:#e5e9ef!important;border-right:1px solid #d5dbe4!important;}
+    div[data-baseweb="tab-list"] {background:#e3e7ed!important;border-color:#d5dbe4!important;}
+    [data-testid="stFileUploader"] {background:#f5f7fa!important;border-color:#b9c1ce!important;}
+    """
 
 st.markdown(
-    "<style>\n" + bg_css + """
+    "<style>\n" + bg_css + theme_css + """
 :root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
 .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:8px 0 0;letter-spacing:.02em;}
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
