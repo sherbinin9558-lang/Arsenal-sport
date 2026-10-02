@@ -232,26 +232,9 @@ def gen_vk(p, tone):
 ⚙️ Характеристики: {specs}
 
 📩 Чтобы заказать товар или уточнить наличие, напишите нам в сообщения сообщества.
-{make_hashtags(n, b, p.get('category','Другое'))}
+{make_hashtags(n, b, p.get('category','Другое'))}"""
 
-def gen_vk(p, tone):
-    n, b = p.get('name',''), p.get('brand','')
-    desc = p.get('description','').strip()
-    sizes = p.get('sizes','уточняйте')
-    color = p.get('color','уточняйте')
-    specs = p.get('specs','').strip()
-    return f"""🔥 {n} — {b}
-
-{desc}
-
-📏 Размеры: {sizes}
-🎨 Цвет: {color}
-⚙️ Характеристики: {specs}
-
-📩 Чтобы заказать товар или уточнить наличие, напишите нам в сообщения сообщества.
-{make_hashtags(n, b, p.get('category','Другое'))}
-
-"""\n\n# ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
+# ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
 def publish_to_telegram(image_bytes, caption):
     try:
         token = st.secrets["TELEGRAM_TOKEN"]
