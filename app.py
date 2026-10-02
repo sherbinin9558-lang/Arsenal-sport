@@ -998,6 +998,28 @@ with tab6:
         for s, n in sorted(sc.items(), key=lambda x: -x[1]):
             st.write(f"**{s}:** {n}")
 
+def ai_sales_reply(products, message):
+    q = (message or "").strip()
+    if not q:
+        return "Напишите, что ищете — например: «бутсы 42 размера до 10000».", []
+    found = product_search(products, q)
+    lower = q.lower()
+    if any(k in lower for k in ("достав", "оплат", "возврат", "налич", "размер")) and not found:
+        return knowledge_answer(q), []
+    if found:
+        top = found[:5]
+        lines = ["Нашёл подходящие варианты:"]
+        for i, p in enumerate(top, 1):
+            title = f"{p.get('brand','')} {p.get('name','')}".strip()
+            details = []
+            if p.get("sizes"): details.append(f"размеры: {p.get('sizes')}")
+            if p.get("color"): details.append(f"цвет: {p.get('color')}")
+            if p.get("article"): details.append(f"арт.: {p.get('article')}")
+            lines.append(f"{i}. {title}" + (f" — {', '.join(details)}" if details else ""))
+        lines.append("Выберите номер товара — помогу с деталями и следующим шагом.")
+        return "\n".join(lines), top
+    return "Пока не нашёл точного совпадения. Напишите категорию, размер, цвет или бюджет — попробую подобрать из каталога.", []
+
 # ========== 8: MAX ==========
 with tab8:
     st.markdown('<div class="section-kicker">ARSENAL SPORT MAX</div><div class="section-title">Центр управления</div><div class="section-subtitle">Бесплатное ядро: каталог, умный поиск, контент-пакет, база знаний и автоплан.</div>', unsafe_allow_html=True)
@@ -1048,10 +1070,31 @@ with tab8:
             st.rerun()
 
     st.markdown("---")
-    st.subheader("🤖 Бесплатный AI-продавец — база знаний")
-    question = st.text_input("Вопрос клиента", placeholder="Есть ли доставка? Поможете подобрать размер?")
-    if question:
-        st.info(knowledge_answer(question))
+    st.subheader("🤖 Бесплатный AI-продавец — живой диалог")
+    st.caption("Пишите обычным языком. Продавец ищет товары в каталоге и ведёт диалог без платного AI API.")
+    if "sales_chat" not in st.session_state:
+        st.session_state["sales_chat"] = []
+    with st.form("sales_chat_form", clear_on_submit=True):
+        customer_msg = st.text_input("Сообщение покупателя", placeholder="Нужны бутсы для искусственного поля, 42 размер, до 10000")
+        send = st.form_submit_button("💬 Ответить", type="primary")
+    if send and customer_msg:
+        reply, chat_found = ai_sales_reply(products_max, customer_msg)
+        st.session_state["sales_chat"].append(("Покупатель", customer_msg))
+        st.session_state["sales_chat"].append(("Arsenal Sport", reply))
+        st.session_state["sales_last_found"] = chat_found
+    for role, msg in st.session_state["sales_chat"][-10:]:
+        st.markdown(f"**{role}:**")
+        st.info(msg) if role == "Arsenal Sport" else st.write(msg)
+    last_found = st.session_state.get("sales_last_found", [])
+    if last_found:
+        st.markdown("**Карточки найденных товаров**")
+        for p in last_found:
+            title = f"{p.get('brand','')} {p.get('name','')}".strip()
+            st.write(f"• **{title}** · {p.get('category','Другое')} · размеры: {p.get('sizes','уточняйте')}")
+    if st.session_state["sales_chat"] and st.button("🗑️ Очистить диалог", key="clear_sales_chat"):
+        st.session_state["sales_chat"] = []
+        st.session_state["sales_last_found"] = []
+        st.rerun()
     st.caption("Ядро работает без платного AI API. Внешний AI можно подключить позже как дополнительный слой.")
 
 # ========== 7: НАСТРОЙКИ ==========
