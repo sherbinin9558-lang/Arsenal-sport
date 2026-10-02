@@ -67,6 +67,27 @@ def delete_product(i):
 
 def load_plan(): return load_json(CONTENT_PLAN_FILE, [])
 def save_plan(pl): save_json(CONTENT_PLAN_FILE, pl)
+
+ATTRIBUTION_FILE = Path("content_attribution.json")
+
+def load_attribution():
+    return load_json(ATTRIBUTION_FILE, [])
+
+def save_attribution(items):
+    save_json(ATTRIBUTION_FILE, items)
+
+def attribution_metrics(attribution, leads, orders):
+    by_product = {}
+    for item in attribution:
+        key = str(item.get("product_id") or item.get("product") or "")
+        if not key:
+            continue
+        row = by_product.setdefault(key, {"content": 0, "leads": 0, "orders": 0})
+        row["content"] += 1
+        row["leads"] += int(item.get("leads", 0) or 0)
+        row["orders"] += int(item.get("orders", 0) or 0)
+    return by_product
+
 def add_plan(item):
     p = load_plan(); p.append(item); save_plan(p)
 def update_plan(i, item):
