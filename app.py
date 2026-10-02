@@ -715,9 +715,10 @@ with tab4:
                 f"**{reel_product.get('brand','')} {reel_product.get('name','')}**"
             )
         elif not stored_card and not replace_reel_photo:
-            st.warning(
-                "У этого старого товара нет сохранённой карточки. "
-                "Создай карточку заново или включи «Заменить фото»."
+            st.info(
+                "ℹ️ У этого товара нет сохранённой карточки. "
+                "При создании Reels карточка будет создана автоматически "
+                "из данных товара и сохранена в каталоге."
             )
 
         if st.button("🎬 Создать видео", key="make_reel_btn"):
@@ -731,9 +732,37 @@ with tab4:
                 source_bytes = reel_file.getvalue()
             else:
                 if not stored_card:
-                    st.error("Для этого товара нет сохранённой карточки.")
-                    st.stop()
-                source_bytes = base64.b64decode(stored_card)
+                    # Автоматически создаём карточку для старого товара,
+                    # у которого card_image ещё не сохранена.
+                    auto_card = generate_card(
+                        None,
+                        reel_product.get("name", ""),
+                        reel_product.get("brand", ""),
+                        reel_product.get("article", ""),
+                        reel_product.get("sizes", ""),
+                        reel_product.get("color", ""),
+                        reel_product.get("description", ""),
+                        reel_product.get("specs", ""),
+                        reel_product.get("category", "Другое"),
+                        "Спортивный",
+                    )
+                    card_buf = io.BytesIO()
+                    auto_card.save(card_buf, format="PNG")
+                    source_bytes = card_buf.getvalue()
+
+                    # Сохраняем автоматически созданную карточку в каталоге.
+                    updated_product = dict(reel_product)
+                    updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
+                    update_product(st.session_state.get("r_sel", 0), updated_product)
+                    reel_product = updated_product
+                    stored_card = updated_product["card_image"]
+
+                    st.success(
+                        "✅ Карточка этого товара автоматически создана и сохранена. "
+                        "Теперь Reels будет использовать её и в следующий раз."
+                    )
+                else:
+                    source_bytes = base64.b64decode(stored_card)
 
             with tempfile.TemporaryDirectory() as tmp:
                 src = os.path.join(tmp, "card.png")
