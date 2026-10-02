@@ -22,10 +22,14 @@ STATUSES = ["Идея", "В работе", "Готово", "Опубликова
 PRIORITIES = ["Обычный", "Высокий", "Срочно"]
 
 TEMPLATES = {
-    "Dark Premium":       {"bg": (9,12,18),   "text": (248,249,252), "sec": (148,157,175), "accent": (105,120,255)},
-    "Sport Performance": {"bg": (8,16,27),   "text": (248,250,255), "sec": (160,181,207), "accent": (65,160,255)},
-    "Editorial Sport":   {"bg": (244,246,249), "text": (20,24,32), "sec": (91,99,113), "accent": (35,71,150)},
-    "Black & Electric":  {"bg": (4,5,8),     "text": (250,250,252), "sec": (135,140,151), "accent": (168,92,255)},
+    # Новые варианты.
+    "Dark Premium":       {"bg": (9,12,18), "text": (248,249,252), "sec": (148,157,175), "accent": (105,120,255)},
+    "Sport Performance":  {"bg": (8,16,27), "text": (248,250,255), "sec": (160,181,207), "accent": (65,160,255)},
+    "Editorial Sport":    {"bg": (244,246,249), "text": (20,24,32), "sec": (91,99,113), "accent": (35,71,150)},
+    "Black & Electric":   {"bg": (4,5,8), "text": (250,250,252), "sec": (135,140,151), "accent": (168,92,255)},
+    # Совместимость со старыми сохранёнными товарами и Reels.
+    "Спортивный":         {"bg": (18,25,36), "text": (245,247,250), "sec": (166,181,201), "accent": (105,164,235)},
+    "Премиум":            {"bg": (18,20,27), "text": (239,242,247), "sec": (177,184,198), "accent": (137,125,255)},
 }
 
 CATEGORY_EMOJI = {
@@ -118,24 +122,6 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
         lines.append(cur)
     return lines
 
-
-def _fit_text_lines(draw, text, font, max_w, max_lines=2):
-    words = (text or "").split()
-    lines = []
-    cur = ""
-    for word in words:
-        test = f"{cur} {word}".strip()
-        if draw.textbbox((0, 0), test, font=font)[2] <= max_w:
-            cur = test
-        else:
-            if cur:
-                lines.append(cur)
-            cur = word
-            if len(lines) >= max_lines:
-                break
-    if cur and len(lines) < max_lines:
-        lines.append(cur)
-    return lines
 
 
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
