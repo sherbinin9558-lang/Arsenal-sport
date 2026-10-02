@@ -47,11 +47,11 @@ def filter_products(products: List[Product], sport="", category="", brand="", si
 def cart_total(cart: List[OrderItem]) -> float:
     return sum(x.price * x.quantity for x in cart)
 
-def create_order(customer_name, customer_contact, cart, source="Сайт", comment="") -> Order:
+def create_order(customer_name, customer_contact, cart, source="Сайт", comment="", lead_id="") -> Order:
     if not cart: raise ValueError("Корзина пуста")
     if not customer_name.strip(): raise ValueError("Не указано имя клиента")
     if not customer_contact.strip(): raise ValueError("Не указан контакт клиента")
-    return Order(id=new_id("ORD"), customer_name=customer_name.strip(), customer_contact=customer_contact.strip(), items=cart, source=source, comment=comment.strip())
+    return Order(id=new_id("ORD"), customer_name=customer_name.strip(), customer_contact=customer_contact.strip(), items=cart, source=source, comment=comment.strip(), lead_id=str(lead_id or ""))
 
 def update_order_status(order: Order, status: str) -> Order:
     if status not in ORDER_STATUSES: raise ValueError("Недопустимый статус заказа")
