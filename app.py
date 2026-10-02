@@ -499,6 +499,7 @@ def publish_reel_to_vk(video_bytes, caption):
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 
 with st.sidebar:
+    st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
     st.title("Arsenal Sport")
     st.caption("Content Studio · v2.6 MAX")
     dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
@@ -552,7 +553,7 @@ st.markdown(
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
 section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
-.sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
+.sidebar-ai-agent {font-size:.78rem;font-weight:800;letter-spacing:.03em;color:#655bd0;margin:0 0 5px 2px;}\n .sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
 .sidebar-max-kicker {font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}
 .sidebar-max-title {font-size:1.18rem;font-weight:850;color:#fff;margin-top:2px;}
 .sidebar-max-text {font-size:.72rem;color:#aeb5c2;margin-top:2px;}
