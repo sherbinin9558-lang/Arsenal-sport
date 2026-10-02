@@ -468,6 +468,8 @@ else:
 
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
+/* Hide Streamlit platform controls from the customer-facing UI. */
+[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
 :root {--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#ffffff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}
 .block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
 .subtitle {text-align:center;color:#687182;margin:3px 0 18px;font-size:.92rem;}\n 
