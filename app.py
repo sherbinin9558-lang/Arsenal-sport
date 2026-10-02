@@ -464,6 +464,20 @@ else:
     button[data-baseweb="tab"][aria-selected="true"] * {color:#32165f !important;}
     .section-kicker {color:#4b247c !important;text-shadow:0 0 7px rgba(75,36,124,.22) !important;}
     .pill {color:#32165f !important;}
+    /* Light theme: transparent controls/cards so black text stays readable. */
+    .stApp .stButton > button:not([kind="primary"]) {background:transparent !important;color:#17151c !important;border-color:#cfd4dd !important;box-shadow:none !important;}
+    .stApp .stButton > button:not([kind="primary"]):hover {background:rgba(91,70,214,.05) !important;color:#17151c !important;border-color:#8b7bc7 !important;box-shadow:0 0 0 1px rgba(75,36,124,.12) !important;}
+    div[data-baseweb="tab-list"] {background:transparent !important;box-shadow:none !important;border-color:#dfe3ea !important;}
+    button[data-baseweb="tab"] {background:transparent !important;color:#17151c !important;border-color:transparent !important;box-shadow:none !important;}
+    button[data-baseweb="tab"] * {color:#17151c !important;}
+    button[data-baseweb="tab"][aria-selected="true"] {background:rgba(232,221,255,.55) !important;color:#32165f !important;border-color:#bda6e8 !important;box-shadow:0 0 0 1px rgba(72,35,125,.12),0 0 10px rgba(83,43,145,.12) !important;}
+    button[data-baseweb="tab"][aria-selected="true"] * {color:#32165f !important;}
+    .stat-box {background:transparent !important;color:#17151c !important;border:1px solid #dfe3ea !important;box-shadow:none !important;}
+    .stat-number {color:#17151c !important;}
+    .stat-label {color:#596174 !important;}
+    [data-testid="stAlert"], div[data-baseweb="notification"] {background:transparent !important;color:#17151c !important;border-color:#dfe3ea !important;}
+    [data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#17151c !important;}
+
     """
 
 st.markdown(
