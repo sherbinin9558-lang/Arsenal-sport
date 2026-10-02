@@ -561,6 +561,17 @@ with tab_dashboard:
         st.write(f'Завершённых заказов: **{om["completed"]}**')
         st.write(f'Отменённых заказов: **{om["cancelled"]}**')
         st.write(f'Сумма неотменённых заказов: **{om["amount"]:,.0f} ₽**'.replace(",", " "))
+    with st.expander("🔗 Контент → продажи", expanded=True):
+        attribution = load_attribution()
+        st.caption("Новый слой атрибуции не меняет существующие заказы и CRM. Он готовит связь публикация → товар → лид → заказ.")
+        if not attribution:
+            st.info("Пока нет событий атрибуции. Существующий контент и продажи продолжают работать без изменений.")
+        else:
+            stats = attribution_metrics(attribution, leads, orders)
+            if stats:
+                for product_key, row in list(stats.items())[:8]:
+                    st.write(f"• {product_key}: контента {row['content']}, заявок {row['leads']}, заказов {row['orders']}")
+
     with b:
         st.markdown("### Быстрые действия")
         if st.button("➕ Добавить товар", key="dash_add_product", use_container_width=True):
