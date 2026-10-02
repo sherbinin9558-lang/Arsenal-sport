@@ -1510,7 +1510,8 @@ with tab5:
                         wk = d.isocalendar()[1]
                     except Exception:
                         wk = 0
-                    weeks.setdefault(wk, []).append((i, item))                for wk in sorted(weeks.keys()):
+                    weeks.setdefault(wk, []).append((i, item))
+                for wk in sorted(weeks.keys()):
                     with st.expander(f"Неделя {wk} · {len(weeks[wk])} материалов"):
                         for i, item in weeks[wk]:
                             st.write(f"**{item.get('date','')}** · {item.get('platform','')} · {item.get('type','')} · **{item.get('status','Идея')}**")
