@@ -1838,7 +1838,8 @@ def ai_sales_reply(products, message):
     if any(k in lower for k in ("достав", "оплат", "возврат", "налич", "размер")) and not found:
         return knowledge_answer(q), []
     if found:
-        top = found[:5]        lines = ["Нашёл подходящие варианты:"]
+        top = found[:5]
+        lines = ["Нашёл подходящие варианты:"]
         for i, p in enumerate(top, 1):
             title = f"{p.get('brand','')} {p.get('name','')}".strip()
             details = []
