@@ -5,6 +5,7 @@ import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
+from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1276,27 +1277,11 @@ def max_due_content(plan):
             continue
         if item.get("status") == "Опубликовано":
             continue
-        if d < today: overdue.append(item)
-        elif d == today: due.append(item)
+        if d < today:
+            overdue.append(item)
+        elif d == today:
+            due.append(item)
     return due, overdue
-
-def max_store_metrics(products, leads, orders, plan):
-    active = [o for o in orders if o.get("status","Новая") in ACTIVE_ORDER_STATUSES]
-    completed = [o for o in orders if o.get("status") == "Завершён"]
-    total_amount = 0.0
-    for o in orders:
-        for key in ("total","amount","sum","total_amount","price"):
-            try:
-                if o.get(key) not in (None, ""):
-                    total_amount += float(str(o.get(key)).replace(" ","").replace(",","."))
-                    break
-            except Exception:
-                pass
-    lead_to_order = sum(x.get("status") == "Заказ оформлен" for x in leads)
-
-# ==================== MAX UI ====================
-def load_orders():
-    return load_json(Path("orders.json"), [])
 
 def render_max():
     @st.dialog("⚡ Arsenal Sport MAX", width="large")
@@ -1307,25 +1292,33 @@ def render_max():
         orders = load_orders()
         due, overdue = max_due_content(plan)
         crm = crm_metrics(leads)
+        om = order_metrics(orders, ACTIVE_ORDER_STATUSES)
+        low = low_stock(products)
+        cm = conversion_metrics(leads, orders)
 
-        st.caption("Центр управления магазином: каталог, контент, заявки и продажи.")
+        st.caption("Бесплатный центр управления магазином: каталог, контент, заявки, заказы и продажи.")
 
-        a, b, c, d = st.columns(4)
+        a, b, c, d, e = st.columns(5)
         a.metric("Товары", len(products))
         b.metric("Заявки", crm.get("total", 0))
-        c.metric("Активные заказы", len([o for o in orders if o.get("status", "Новая") in ACTIVE_ORDER_STATUSES]))
+        c.metric("Активные заказы", om["active"])
         d.metric("Контент сегодня", len(due))
+        e.metric("Конверсия", f"{cm['conversion']:.1f}%")
 
         st.markdown("---")
         section = st.radio(
             "Раздел MAX",
-            ["Обзор", "AI-продавец", "CRM", "Контент"],
+            ["Обзор", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Аналитика"],
             horizontal=True,
             key="max_section",
         )
 
         if section == "Обзор":
             st.subheader("Состояние магазина")
+            x, y, z = st.columns(3)
+            x.metric("Всего заказов", om["total"])
+            y.metric("Завершено", om["completed"])
+            z.metric("Сумма заказов", f"{om['amount']:,.0f}".replace(",", " ") + " ₽")
             st.write(
                 f"Товаров: {len(products)} · карточек: "
                 f"{sum(bool(p.get('card_image')) for p in products)} · "
@@ -1337,6 +1330,8 @@ def render_max():
                 st.info(f"На сегодня: {len(due)} публикаций")
             else:
                 st.success("На сегодня срочных публикаций нет.")
+            if low:
+                st.warning(f"Низкий остаток: {len(low)} товаров (порог ≤ 2).")
 
         elif section == "AI-продавец":
             st.subheader("AI-продавец по каталогу")
@@ -1350,15 +1345,18 @@ def render_max():
                 st.session_state["max_sales_answer"] = ans
                 st.session_state["max_sales_found"] = found
             if st.session_state.get("max_sales_answer"):
-                st.text_area(
-                    "Готовый ответ",
-                    st.session_state["max_sales_answer"],
-                    height=180,
-                    key="max_sales_answer_box",
-                )
+                st.text_area("Готовый ответ", st.session_state["max_sales_answer"], height=180, key="max_sales_answer_box")
+            found = st.session_state.get("max_sales_found", [])
+            if found:
+                follow = st.text_input("Уточнение клиента", placeholder="Например: покажи второй вариант", key="max_followup")
+                if st.button("↩️ Ответить клиенту", key="max_followup_btn"):
+                    ans, new_found = sales_followup(products, follow, found)
+                    st.session_state["max_sales_answer"] = ans
+                    st.session_state["max_sales_found"] = new_found
+                    st.rerun()
 
         elif section == "CRM":
-            st.subheader("CRM — заявки")
+            st.subheader("CRM — заявки и история")
             if not leads:
                 st.info("Заявок пока нет.")
             for lead in reversed(leads[-20:]):
@@ -1366,37 +1364,129 @@ def render_max():
                 with st.expander(f"{title} · {lead.get('status', 'Новый')}"):
                     st.write(f"Контакт: {lead.get('contact', '—')}")
                     st.write(f"Товар: {lead.get('product', '—')}")
+                    st.write(f"Источник: {lead.get('source', '—')}")
                     st.write(f"Сообщение: {lead.get('message', '—')}")
+                    if lead.get("history"):
+                        st.caption("История контакта")
+                        for h in lead.get("history", [])[-10:]:
+                            st.write(f"{h.get('time','')} · {h.get('direction','')} · {h.get('message','')}")
                     current_status = lead.get("status", "Новый")
                     ns = st.selectbox(
-                        "Статус",
-                        CRM_STATUSES,
+                        "Статус", CRM_STATUSES,
                         index=CRM_STATUSES.index(current_status) if current_status in CRM_STATUSES else 0,
                         key=f"max_lead_status_{lead.get('id')}",
                     )
                     if ns != current_status:
                         update_lead(lead.get("id"), status=ns)
                         st.rerun()
+                    note = st.text_input("Добавить заметку/контакт", key=f"max_note_{lead.get('id')}")
+                    if st.button("💾 Сохранить заметку", key=f"max_note_btn_{lead.get('id')}"):
+                        if note.strip():
+                            add_lead_interaction(lead.get("id"), note.strip(), "manager")
+                            st.rerun()
+            st.markdown("---")
+            history_q = st.text_input("Найти историю клиента по имени/контакту", key="max_history_q")
+            if history_q:
+                history = customer_history(leads, orders, history_q)
+                if not history:
+                    st.info("Совпадений не найдено.")
+                for kind, item in history:
+                    st.write(f"**{'Заявка' if kind == 'lead' else 'Заказ'} #{item.get('id','')}** · {item.get('created_at','')} · {item.get('product','')}")
 
-        else:
-            st.subheader("Контент")
+        elif section == "Заказы":
+            st.subheader("Заказы — бесплатно, локально")
+            with st.form("max_new_order", clear_on_submit=True):
+                o1, o2 = st.columns(2)
+                with o1:
+                    customer = st.text_input("Клиент")
+                    contact = st.text_input("Контакт")
+                    product_name = st.text_input("Товар")
+                with o2:
+                    amount = st.text_input("Сумма, ₽")
+                    status = st.selectbox("Статус", ORDER_STATUSES)
+                    source = st.selectbox("Источник", ["Manual", "Telegram", "Instagram", "VK", "Другое"])
+                if st.form_submit_button("➕ Создать заказ"):
+                    create_order(customer, contact, product_name, amount=amount, status=status, source=source)
+                    st.success("Заказ создан.")
+                    st.rerun()
+
+            if not orders:
+                st.info("Заказов пока нет.")
+            for order in reversed(orders[-30:]):
+                title = f"#{order.get('id','')} · {order.get('customer') or order.get('contact') or 'Клиент'} · {order.get('product') or 'Товар'}"
+                with st.expander(title):
+                    st.write(f"Контакт: {order.get('contact','—')} · Сумма: {order.get('amount','—')} ₽")
+                    current = order.get("status", "Новая")
+                    ns = st.selectbox("Статус заказа", ORDER_STATUSES,
+                                      index=ORDER_STATUSES.index(current) if current in ORDER_STATUSES else 0,
+                                      key=f"max_order_status_{order.get('id')}")
+                    if ns != current:
+                        update_order(order.get("id"), status=ns)
+                        st.rerun()
+
+        elif section == "Склад":
+            st.subheader("Склад и контроль остатков")
+            if not products:
+                st.info("Каталог пуст.")
+            else:
+                if low:
+                    st.warning("Товары с остатком 0–2:")
+                    for p, qty in low:
+                        st.write(f"• {max_product_title(p)} — **{qty} шт.**")
+                else:
+                    st.success("Товаров с остатком ≤ 2 нет.")
+                st.caption("Остатки читаются из stock_by_size или total_stock, если эти поля есть в товаре.")
+                for p in products[:30]:
+                    st.write(f"{max_product_title(p)} — {max_stock(p)} шт.")
+
+        elif section == "Контент":
+            st.subheader("Контент без платного AI")
             if not products:
                 st.info("Сначала добавьте товар в каталог.")
-            elif st.button("✨ Создать идеи на 7 дней", type="primary", key="max_plan_suggest"):
-                st.session_state["max_suggestions"] = planner_suggestions(products)
+            else:
+                names = [max_product_title(p) for p in products]
+                sel = st.selectbox("Товар", names, key="max_content_product")
+                p = products[names.index(sel)]
+                bundle = content_bundle(p)
+                for channel, text_value in bundle.items():
+                    st.markdown(f"**{channel}**")
+                    st.text_area(channel, text_value, height=110, key=f"max_bundle_{channel}")
+                if st.button("✨ Создать 7 идей и добавить в план", type="primary", key="max_plan_suggest"):
+                    suggestions = seven_day_plan(products)
+                    existing = load_plan()
+                    for item in suggestions:
+                        if not any(x.get("date") == item["date"] and x.get("product") == item["product"] for x in existing):
+                            existing.append(item)
+                    save_plan(existing)
+                    st.success("План на 7 дней добавлен без дублей.")
+                    st.rerun()
 
-            for item in st.session_state.get("max_suggestions", []):
-                st.write(
-                    f"**{item.get('date', '')} · {item.get('platform', '')} · "
-                    f"{item.get('type', '')}** — {item.get('product', '')}"
-                )
+        else:
+            st.subheader("Аналитика")
+            x, y, z = st.columns(3)
+            x.metric("Заявки", cm["leads"])
+            y.metric("Заказов из CRM", cm["lead_orders"])
+            z.metric("Конверсия заявка → заказ", f"{cm['conversion']:.1f}%")
+            st.markdown("---")
+            st.write(f"Всего заказов: **{om['total']}**")
+            st.write(f"Активных: **{om['active']}**")
+            st.write(f"Завершённых: **{om['completed']}**")
+            st.write(f"Отменённых: **{om['cancelled']}**")
+            st.write(f"Сумма неотменённых заказов: **{om['amount']:,.0f} ₽**".replace(",", " "))
+            st.markdown("---")
+            st.write("Категории каталога:")
+            counts = {}
+            for p in products:
+                cat = p.get("category", "Другое")
+                counts[cat] = counts.get(cat, 0) + 1
+            for cat, count in sorted(counts.items(), key=lambda x: -x[1]):
+                st.write(f"• {cat}: {count}")
 
         if st.button("Закрыть MAX", key="close_max"):
             st.session_state["open_max"] = False
             st.rerun()
 
     dialog()
-
 
 if st.session_state.get("open_max", False):
     render_max()
