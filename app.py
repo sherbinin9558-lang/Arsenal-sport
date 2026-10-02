@@ -469,6 +469,53 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* Hide Streamlit platform controls from the customer-facing UI. */
+/* Customer UI chrome: hide repository/settings/deploy affordances, including mobile variants. */
+[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+[data-testid="stBottom"],
+[data-testid="stBottomBlockContainer"],
+[data-testid="stBottomBlock"],
+[data-testid="stHeader"] [data-testid="stToolbar"],
+[data-testid="stHeader"] a[href*="github.com"],
+[data-testid="stHeader"] a[href*="gitlab.com"],
+[data-testid="stHeader"] a[href*="bitbucket.org"],
+a[href*="github.com"],
+a[href*="gitlab.com"],
+a[href*="bitbucket.org"],
+a[aria-label*="GitHub" i],
+a[title*="GitHub" i],
+a[aria-label*="Settings" i],
+a[title*="Settings" i] {
+    display:none !important;
+    visibility:hidden !important;
+    opacity:0 !important;
+    pointer-events:none !important;
+    width:0 !important;
+    height:0 !important;
+    min-width:0 !important;
+    min-height:0 !important;
+}
+[data-testid="stHeader"] {height:0 !important; min-height:0 !important; background:transparent !important;}
+/* MAX: lime-neon chevrons stay visible on dark expanders. */
+[data-testid="stDialog"] [data-testid="stExpander"] svg,
+[data-testid="stDialog"] [data-testid="stExpander"] svg path,
+[data-testid="stDialog"] [data-testid="stExpander"] svg line,
+[data-testid="stDialog"] [data-testid="stExpander"] svg polyline,
+[data-testid="stExpander"] svg,
+[data-testid="stExpander"] svg path,
+[data-testid="stExpander"] svg line,
+[data-testid="stExpander"] svg polyline {
+    color:#b8ff00 !important;
+    stroke:#b8ff00 !important;
+    fill:none !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;
+}
+
 #MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n/* Remove mobile bottom platform chrome; keep only app controls. */\n[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n# Hide repository / platform navigation links and icons from the customer UI.
 # This affects only Streamlit chrome; MAX, sidebar and app controls remain intact.
 a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
