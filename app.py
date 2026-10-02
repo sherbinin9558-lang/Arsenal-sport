@@ -659,11 +659,44 @@ div[data-testid="stBottom"] * , div[data-testid="stBottomBlockContainer"] * {
     min-height:0 !important;
     pointer-events:none !important;
 }
-/* MAX dialog: restore visibility and make navigation arrows lime/neon. */
-[data-testid="stDialog"], div[role="dialog"] {
-    z-index:99999 !important;
+/* MAX dialog: force the real Streamlit dialog above all app chrome. */
+div[data-testid="stDialog"] {
+    display:flex !important;
     visibility:visible !important;
     opacity:1 !important;
+    position:fixed !important;
+    inset:0 !important;
+    z-index:2147483647 !important;
+    pointer-events:auto !important;
+}
+div[data-testid="stDialog"] > div {
+    visibility:visible !important;
+    opacity:1 !important;
+    pointer-events:auto !important;
+}
+div[data-testid="stDialog"] [role="dialog"] {
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    position:relative !important;
+    z-index:2147483647 !important;
+    background:#ffffff !important;
+    color:#17151c !important;
+    border:1px solid #d9ddea !important;
+    border-radius:20px !important;
+    box-shadow:0 24px 80px rgba(0,0,0,.30) !important;
+    max-height:90vh !important;
+    overflow:auto !important;
+}
+div[role="dialog"] {
+    visibility:visible !important;
+    opacity:1 !important;
+    z-index:2147483647 !important;
+    pointer-events:auto !important;
+}
+div[data-testid="stDialog"] [role="dialog"] *,
+div[role="dialog"] * {
+    visibility:visible !important;
 }
 [data-testid="stDialog"] [data-testid="stExpander"] button,
 div[role="dialog"] [data-testid="stExpander"] button {
