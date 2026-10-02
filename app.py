@@ -408,17 +408,11 @@ st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=Tr
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
 st.markdown("---")
 
-if st.session_state.pop("open_max", False):
-    st.session_state["main_tabs"] = "⚡ MAX"
-
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
-        "📅 План", "📊 Статистика", "⚙️ Настройки", "⚡ MAX"
-    ],
-    default=st.session_state.get("main_tabs", "📸 Создать"),
-    key="main_tabs",
-    on_change="rerun",
+        "📅 План", "📊 Статистика", "⚙️ Настройки"
+    ]
 )
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
@@ -1064,8 +1058,10 @@ def sales_followup(products, message, current):
         return ai_sales_reply(products, message)[0], found
     return "Уточните размер, бюджет, цвет или вид товара — я попробую подобрать подходящий вариант.", current
 
-# ========== 8: MAX ==========
-with tab8:
+# ========== MAX: ВСПЛЫВАЮЩЕЕ ОКНО ==========
+
+@st.dialog("⚡ ARSENAL SPORT MAX", width="large")
+def max_dialog():
     st.markdown('<div class="section-kicker">MANAGER WORKSPACE</div><div class="section-title">Рабочее место менеджера</div><div class="section-subtitle">Единая панель продаж: обращения, заказы и остатки — без изменения структуры Arsenal Sport.</div>', unsafe_allow_html=True)
 
     manager_leads = load_leads()
@@ -1301,6 +1297,11 @@ with tab8:
     lc3.metric("Заказов из CRM", lead_stats.get("orders", 0))
     st.caption("Ядро работает без платного AI API. Внешний AI можно подключить позже как дополнительный слой.")
 
+
+
+if st.session_state.pop("open_max", False):
+    max_dialog()
+
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
     st.markdown('<div class="section-kicker">WORKSPACE</div><div class="section-title">Настройки</div><div class="section-subtitle">Логотип, резервные копии и управление данными.</div>', unsafe_allow_html=True)
@@ -1340,4 +1341,4 @@ with tab7:
         st.rerun()
 
 st.markdown("---")
-st.caption("Arsenal Sport Content Studio v2.5 · рабочее пространство магазина")
+st.caption("Arsenal Sport Content Studio v2.6 MAX · рабочее пространство магазина")
