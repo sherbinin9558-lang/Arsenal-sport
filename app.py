@@ -1,7 +1,7 @@
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime, csv, requests
+import json, io, datetime, csv, requests, base64
 from pathlib import Path
 
 # ==================== КОНФИГУРАЦИЯ ====================
@@ -310,10 +310,15 @@ with tab1:
             with st.spinner("Генерация..."):
                 img = Image.open(up).convert("RGB") if up else None
                 card = generate_card(img, name, brand, article, sizes, color, description, specs, category, template)
+                card_buf = io.BytesIO()
+                card.save(card_buf, format="PNG")
+                card_b64 = base64.b64encode(card_buf.getvalue()).decode("ascii")
+
                 add_product({
                     "name": name, "brand": brand, "article": article,
                     "sizes": sizes, "color": color, "description": description,
                     "specs": specs, "category": category,
+                    "card_image": card_b64,
                     "date_added": str(datetime.date.today())
                 })
                 st.success("✅ Карточка создана!")
@@ -544,31 +549,77 @@ with tab4:
 
         st.subheader("🎞️ Видео-рилс из карточки")
 
-        reel_file = st.file_uploader("Карточка товара (фото)", type=["jpg", "jpeg", "png", "webp"], key="reel_card")
+        # По умолчанию Reels использует готовую карточку выбранного товара.
+        reel_product = products[st.session_state.get("r_sel", 0)]
+        stored_card = reel_product.get("card_image")
 
-        if reel_file and st.button("🎬 Создать видео", key="make_reel_btn"):
+        # Совместимость со старыми товарами.
+        if not stored_card and st.session_state.get("last_card_name") == reel_product.get("name"):
+            stored_card = base64.b64encode(
+                st.session_state.get("last_card_bytes", b"")
+            ).decode("ascii")
 
+        replace_reel_photo = st.checkbox(
+            "🔄 Заменить фото для этого Reels",
+            value=False,
+            key="replace_reel_photo"
+        )
+
+        reel_file = None
+        if replace_reel_photo:
+            reel_file = st.file_uploader(
+                "Выберите другое изображение",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="reel_card_replace"
+            )
+
+        if stored_card and not replace_reel_photo:
+            st.info(
+                f"📎 Используется карточка товара: "
+                f"**{reel_product.get('brand','')} {reel_product.get('name','')}**"
+            )
+        elif not stored_card and not replace_reel_photo:
+            st.warning(
+                "У этого старого товара нет сохранённой карточки. "
+                "Создай карточку заново или включи «Заменить фото»."
+            )
+
+        if st.button("🎬 Создать видео", key="make_reel_btn"):
             import tempfile, os
-
             from reels import make_reel
 
+            if replace_reel_photo:
+                if not reel_file:
+                    st.error("Выбери изображение для замены.")
+                    st.stop()
+                source_bytes = reel_file.getvalue()
+            else:
+                if not stored_card:
+                    st.error("Для этого товара нет сохранённой карточки.")
+                    st.stop()
+                source_bytes = base64.b64decode(stored_card)
+
             with tempfile.TemporaryDirectory() as tmp:
-
                 src = os.path.join(tmp, "card.png")
-
-                Image.open(reel_file).convert("RGB").save(src)
+                with open(src, "wb") as f:
+                    f.write(source_bytes)
 
                 out = os.path.join(tmp, "reel.mp4")
-
                 with st.spinner("Рендерю видео, подожди..."):
-
                     make_reel(src, out, duration=8)
 
-                video_bytes = open(out, "rb").read()
+                with open(out, "rb") as f:
+                    video_bytes = f.read()
 
             st.video(video_bytes)
 
-            st.download_button("⬇️ Скачать рилс", video_bytes, "reel.mp4", "video/mp4", key="dl_reel")
+            st.download_button(
+                "⬇️ Скачать рилс",
+                video_bytes,
+                "reel.mp4",
+                "video/mp4",
+                key="dl_reel"
+            )
 
         st.markdown("---")
 
