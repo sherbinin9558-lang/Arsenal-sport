@@ -20,12 +20,11 @@ STATUSES = ["Идея", "В работе", "Готово", "Опубликова
 PRIORITIES = ["Обычный", "Высокий", "Срочно"]
 
 TEMPLATES = {
-    "Тёмный":     {"bg": (18,18,18),    "text": (255,255,255), "sec": (180,180,180), "accent": (204,0,0)},
-    "Светлый":    {"bg": (245,245,245), "text": (30,30,30),    "sec": (100,100,100), "accent": (204,0,0)},
-    "Красный":    {"bg": (204,0,0),     "text": (255,255,255), "sec": (255,220,220), "accent": (255,255,255)},
-    "Минимализм": {"bg": (255,255,255), "text": (20,20,20),    "sec": (130,130,130), "accent": (0,0,0)},
-    "Спортивный": {"bg": (25,40,60),    "text": (255,255,255), "sec": (180,200,220), "accent": (0,180,255)},
-    "Премиум":    {"bg": (15,15,15),    "text": (212,175,55),  "sec": (200,200,200), "accent": (212,175,55)},
+    "Графит":      {"bg": (15,18,24),  "text": (245,247,250), "sec": (165,172,184), "accent": (137,125,255)},
+    "Светлый":     {"bg": (245,247,250), "text": (25,29,38), "sec": (105,112,125), "accent": (111,104,214)},
+    "Минимализм":  {"bg": (250,251,253), "text": (25,29,38), "sec": (110,116,128), "accent": (111,104,214)},
+    "Спортивный":  {"bg": (18,25,36),  "text": (245,247,250), "sec": (166,181,201), "accent": (105,164,235)},
+    "Премиум":     {"bg": (18,20,27),  "text": (239,242,247), "sec": (177,184,198), "accent": (137,125,255)},
 }
 
 CATEGORY_EMOJI = {
@@ -323,39 +322,65 @@ def publish_reel_to_vk(video_bytes, caption):
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", page_icon="🏆")
 
 with st.sidebar:
-    st.title("🏆 Arsenal Sport")
-    st.caption("Content Manager v2.3")
+    st.title("Arsenal Sport")
+    st.caption("Content Studio · v2.4")
     dark_mode = st.toggle("🌙 Тёмная тема", value=True)
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
-    st.metric("📅 Записей в плане", len(load_plan()))
+    st.metric("📅 В плане", len(load_plan()))
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
         if tg_ch:
             st.success(f"📡 Telegram: @{tg_ch}")
         else:
-            st.warning("📡 Telegram не настроен")
+            st.info("📡 Telegram не настроен")
     except Exception:
-        st.warning("📡 Telegram не настроен")
+        st.info("📡 Telegram не настроен")
     st.markdown("---")
-    st.caption(f"Сегодня: {datetime.date.today().strftime('%d.%m.%Y')}")
+    st.caption(f"Сегодня · {datetime.date.today().strftime('%d.%m.%Y')}")
 
 if dark_mode:
-    bg_css = "body {background: #0e1117;}"
+    bg_css = "body {background: #0b0e13;}"
 else:
-    bg_css = "body {background: #ffffff;}"
+    bg_css = "body {background: #f6f7fb;}"
 
 st.markdown(
     "<style>\n" + bg_css + """
-.main-title {font-size: 2.5rem; font-weight: 800; color: #cc0000; text-align: center; margin-bottom: 0;}
-.subtitle {text-align: center; color: #888; margin-top: 0; font-size: 0.9rem;}
-.stat-box {background: linear-gradient(135deg, #cc0000 0%, #8b0000 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin: 5px;}
-.stat-number {font-size: 2.5rem; font-weight: 900; margin: 0;}
-.stat-label {font-size: 0.9rem; opacity: 0.9; margin: 0;}
+:root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
+.main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:8px 0 0;letter-spacing:.02em;}
+.subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
+.stApp {background:var(--bg);}
+section[data-testid="stSidebar"] {background:#10131a;border-right:1px solid var(--border);}
+section[data-testid="stSidebar"] .stMetric {background:#151922;border:1px solid var(--border);border-radius:14px;padding:8px 12px;}
+div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
+.stButton > button {border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}
+.stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
+button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
+button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
+div[data-baseweb="tab-list"] {gap:6px;background:#11151d;padding:6px;border-radius:14px;border:1px solid var(--border);}
+button[data-baseweb="tab"] {border-radius:10px;color:#9da5b3;font-weight:650;}
+button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5ff;}
+[data-testid="stFileUploader"] {border:1px dashed #394152;border-radius:14px;background:#11151d;}
+.stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
+.stat-number {font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}
+.stat-label {font-size:.9rem;color:#aeb5c2;margin:0;}
+.section-kicker {font-size:.76rem;text-transform:uppercase;letter-spacing:.12em;color:#8f86f5;font-weight:800;margin-bottom:4px;}
+.section-title {font-size:1.7rem;font-weight:800;margin-bottom:2px;}
+.section-subtitle {color:#8f97a6;margin-bottom:18px;}
+.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#211f35;color:#c9c5ff;border:1px solid #34304f;font-size:.78rem;font-weight:650;}
 </style>""",
     unsafe_allow_html=True,
 )
+
+st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Content Studio · товары, карточки, тексты и Reels в одном месте</p>', unsafe_allow_html=True)
+st.markdown("---")
+
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "📸 Создать", "📦 Каталог", "✍️ Тексты", "🎬 Reels",
+    "📅 План", "📊 Статистика", "⚙️ Настройки"
+])
 
 st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
@@ -368,7 +393,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
 with tab1:
-    st.header("Создание карточки товара")
+    st.markdown('<div class="section-kicker">CONTENT STUDIO</div><div class="section-title">Создать товар</div><div class="section-subtitle">Загрузите фото, заполните данные и сразу получите готовую карточку.</div>', unsafe_allow_html=True)
     up = st.file_uploader("📷 Фото товара", type=["jpg","jpeg","png","webp"])
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -423,7 +448,7 @@ with tab1:
 
 # ========== 2: КАТАЛОГ ==========
 with tab2:
-    st.header("Каталог товаров")
+    st.markdown('<div class="section-kicker">PRODUCT LIBRARY</div><div class="section-title">Каталог</div><div class="section-subtitle">Все товары и готовые материалы — в одном рабочем пространстве.</div>', unsafe_allow_html=True)
     st.info("➕ Для нового товара откройте вкладку «📸 Создать».")
     products = load_products()
     if not products:
@@ -643,7 +668,7 @@ with tab3:
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
-    st.header("Reels & Stories")
+    st.markdown('<div class="section-kicker">SHORT VIDEO</div><div class="section-title">Reels & Stories</div><div class="section-subtitle">Идея → сценарий → видео → публикация.</div>', unsafe_allow_html=True)
     products = load_products()
     if not products:
         st.info("Сначала создайте товар.")
@@ -862,7 +887,7 @@ with tab4:
 
 # ========== 5: КОНТЕНТ-ПЛАН ==========
 with tab5:
-    st.header("Контент-план")
+    st.markdown('<div class="section-kicker">CONTENT PLANNER</div><div class="section-title">Контент-план</div><div class="section-subtitle">Планируйте публикации по датам, платформам и статусам.</div>', unsafe_allow_html=True)
     products = load_products()
     if not products:
         st.info("Сначала создайте товар.")
@@ -904,7 +929,7 @@ with tab5:
             for wk in sorted(weeks.keys()):
                 with st.expander(f"Неделя {wk} ({len(weeks[wk])} записей)"):
                     for i, item in weeks[wk]:
-                        pr_icon = {"Обычный":"⚪","Высокий":"🟡","Срочно":"🔴"}.get(item.get('priority','Обычный'),'⚪')
+                        pr_icon = {"Обычный":"○","Высокий":"◐","Срочно":"●"}.get(item.get('priority','Обычный'),'○')
                         st.write(f"{pr_icon} **{item.get('date','')}** | {item.get('platform','')} | {item.get('type','')} | _{item.get('status','')}_")
                         st.write(f"   {item.get('product','')}: {item.get('idea','')}")
 
@@ -936,7 +961,7 @@ with tab5:
 
 # ========== 6: СТАТИСТИКА ==========
 with tab6:
-    st.header("📊 Статистика")
+    st.markdown('<div class="section-kicker">ANALYTICS</div><div class="section-title">Статистика</div><div class="section-subtitle">Ключевые показатели контентной работы.</div>', unsafe_allow_html=True)
     products = load_products()
     plan = load_plan()
 
@@ -968,9 +993,9 @@ with tab6:
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
-    st.header("⚙️ Настройки")
+    st.markdown('<div class="section-kicker">WORKSPACE</div><div class="section-title">Настройки</div><div class="section-subtitle">Логотип, резервные копии и управление данными.</div>', unsafe_allow_html=True)
 
-    st.subheader("🖼️ Логотип магазина")
+    st.subheader("Логотип магазина")
     st.caption("Загрузите PNG-файл с прозрачным фоном — он будет появляться на всех карточках.")
     logo_up = st.file_uploader("Загрузить логотип", type=["png"], key="logo")
     if logo_up:
@@ -985,7 +1010,7 @@ with tab7:
 
     st.markdown("---")
 
-    st.subheader("💾 Резервное копирование")
+    st.subheader("Резервное копирование")
     products = load_products()
     plan = load_plan()
     backup = {"products": products, "content_plan": plan, "date": str(datetime.date.today())}
@@ -994,7 +1019,7 @@ with tab7:
         file_name=f"arsenal_backup_{datetime.date.today()}.json", mime="application/json")
 
     st.markdown("---")
-    st.subheader("⚠️ Опасная зона")
+    st.subheader("Управление данными")
     if st.button("🗑️ Очистить каталог товаров"):
         save_products([])
         st.success("Каталог очищен!")
@@ -1005,4 +1030,4 @@ with tab7:
         st.rerun()
 
 st.markdown("---")
-st.caption("Arsenal Sport Content Manager v2.3 — MVP. Все данные хранятся в облаке.")
+st.caption("Arsenal Sport Content Studio v2.4 · рабочее пространство магазина")
