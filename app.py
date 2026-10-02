@@ -127,7 +127,8 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
 
 
 from card_generator import generate_card
-\n# ==================== ТЕКСТЫ ====================
+
+# ==================== ТЕКСТЫ ====================
 def make_hashtags(name, brand, category):
     base = ["#ai_agent_content_manager", "#спорт", "#экипировка", "#новинка"]
     extra = {
