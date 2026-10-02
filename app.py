@@ -548,7 +548,7 @@ st.markdown(
     "<style>\n" + bg_css + theme_css + """
 :root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
 .block-container {padding-top:0!important;}\n .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:-28px 0 -6px;letter-spacing:.02em;}
-.subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
+.subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}\n .ai-manager-title {text-align:center;color:#202633;font-size:1.15rem;font-weight:800;letter-spacing:.01em;margin:-2px 0 10px;}
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
 section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
@@ -580,7 +580,7 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 )
 
 st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">AI контент менеджер</p>', unsafe_allow_html=True)
+st.markdown('<div class="ai-manager-title">AI контент менеджер</div>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
