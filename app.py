@@ -651,7 +651,9 @@ a[aria-label*="Settings" i], a[title*="Settings" i] {
 }
 [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
 [data-testid="stAppDeployButton"], footer,
-[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {
+[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"],
+div[data-testid="stBottom"] * , div[data-testid="stBottomBlockContainer"] * {
+
     display:none !important;
     visibility:hidden !important;
     height:0 !important;
@@ -664,8 +666,18 @@ a[aria-label*="Settings" i], a[title*="Settings" i] {
     visibility:visible !important;
     opacity:1 !important;
 }
+[data-testid="stDialog"] [data-testid="stExpander"] button,
+div[role="dialog"] [data-testid="stExpander"] button {
+    color:#b8ff00 !important;
+    opacity:1 !important;
+    visibility:visible !important;
+}
+[data-testid="stDialog"] [data-testid="stExpander"] button svg,
+[data-testid="stDialog"] [data-testid="stExpander"] button svg *,
 [data-testid="stDialog"] [data-testid="stExpander"] svg,
-[data-testid="stDialog"] [data-testid="stExpander"] svg * ,
+[data-testid="stDialog"] [data-testid="stExpander"] svg *,
+div[role="dialog"] [data-testid="stExpander"] button svg,
+div[role="dialog"] [data-testid="stExpander"] button svg *,
 div[role="dialog"] [data-testid="stExpander"] svg,
 div[role="dialog"] [data-testid="stExpander"] svg * {
     color:#b8ff00 !important;
@@ -675,6 +687,10 @@ div[role="dialog"] [data-testid="stExpander"] svg * {
     visibility:visible !important;
     stroke-width:3px !important;
     filter:drop-shadow(0 0 6px rgba(184,255,0,.9)) !important;
+}
+[data-testid="stDialog"] [data-testid="stExpander"] button:hover,
+div[role="dialog"] [data-testid="stExpander"] button:hover {
+    color:#d6ff66 !important;
 }
 /* Keep the MAX launcher visually prominent. */
 button[key="sidebar_max"], button[key="dash_open_max"] {
