@@ -5,5 +5,20 @@
     "telegram": "",
     "vk": "",
     "instagram": "",
-    "order_contact": ""
+    "order_contact": "",
+    "phone": "",
+    "manager_name": "",
+    "pickup_address": "",
+    "payment_methods": "Наличные, перевод, карта",
+    "return_policy": "Возврат и обмен — по действующим правилам магазина.",
+    "delivery_methods": "Самовывоз, доставка по Краснодару, отправка по России",
+    "delivery_terms": "",
+    "content_signature": "Arsenal Sport — спортивная одежда, обувь и экипировка",
+    "cta": "Напишите нам — поможем выбрать товар и оформить заказ.",
+    "hashtags": "#arsenal_sport #спорт #экипировка",
+    "ai_seller_instructions": "Отвечай дружелюбно и по делу. Уточняй товар, размер и город. Не придумывай наличие, цену или характеристики.",
+    "notification_contact": "",
+    "card_template": "Dark Premium",
+    "show_price_on_cards": "Нет",
+    "main_sport": "Футбол"
 }
