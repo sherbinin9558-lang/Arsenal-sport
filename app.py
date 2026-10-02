@@ -756,7 +756,8 @@ div[role="dialog"] [data-testid="stExpander"] svg * {
 div[role="dialog"] [data-testid="stExpander"] button:hover {
     color:#d6ff66 !important;
 }
-/* Always-visible MAX launcher for narrow/mobile layouts. */
+/* Remove the temporary top MAX launcher; MAX lives in the sidebar. */
+button[key="top_max_launcher"] { display:none !important; visibility:hidden !important; pointer-events:none !important; }
 button[key="top_max_launcher"] {
     background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
     color:#101500 !important;
@@ -785,23 +786,7 @@ button[key="sidebar_max"], button[key="dash_open_max"] {
     unsafe_allow_html=True,
 )
 
-st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p>', unsafe_allow_html=True)
-top_max_col, top_status_col = st.columns([1, 2])
-with top_max_col:
-    if st.button("⚡ MAX", key="top_max_launcher", type="primary", use_container_width=True):
-        st.session_state["open_max"] = True
-        st.rerun()
-with top_status_col:
-    try:
-        tg_ch_top = st.secrets.get("TELEGRAM_CHANNEL", None)
-        if tg_ch_top:
-            st.success(f"📡 Telegram подключён · @{tg_ch_top}")
-        else:
-            st.info("📡 Telegram не настроен")
-    except Exception:
-        st.info("📡 Telegram не настроен")
-
-st.markdown('<div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
 tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
