@@ -8,7 +8,7 @@ from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
-from growth_engine import ai_summary
+from growth_engine import ai_summary, attribution_performance
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1405,6 +1405,16 @@ with tab6:
             st.write(f"• {rec}")
 
     st.markdown("---")
+    st.subheader("🔗 Реальная атрибуция: публикация → заявка → заказ → выручка")
+    attribution_rows = attribution_performance(plan, leads, orders)
+    explicit = [x for x in attribution_rows if x["leads"] or x["orders"] or x["revenue"]]
+    if explicit:
+        st.caption("Показываются только явные связи по content_id. Это фактическая атрибуция события, а не вывод по совпадению названий.")
+        for row in explicit[:20]:
+            st.write(f"**{row["date"]} · {row["channel"]} · {row["format"]}** · {row["product"]} — заявки {row["leads"]} · заказы {row["orders"]} · {row["revenue"]:,.0f} ₽".replace(",", " "))
+    else:
+        st.info("Явных связей пока нет. При создании заказа можно выбрать опубликованный материал — связь сохранится автоматически.")
+
     st.subheader("📦 Товары: связь контента и продаж")
     st.caption("Связь определяется по названию/артикулу товара в заявке, заказе и контент-плане; это атрибуция по совпадению, а не доказательство причинности.")
     for row in growth["products"][:20]:
@@ -1764,8 +1774,15 @@ def render_max():
                     amount = st.text_input("Сумма, ₽")
                     status = st.selectbox("Статус", ORDER_STATUSES)
                     source = st.selectbox("Источник", ["Manual", "Telegram", "Instagram", "VK", "Другое"])
+                    attribution_items = [x for x in load_plan() if x.get("status") == "Опубликовано" and x.get("content_id")]
+                    content_choices = ["Не привязывать"] + [f"{x.get("date","")} · {x.get("platform","")} · {x.get("type","")} · {x.get("product","")}" for x in attribution_items[-50:]]
+                    selected_content = st.selectbox("Контент / публикация", content_choices, key="max_order_content")
                 if st.form_submit_button("➕ Создать заказ"):
-                    create_order(customer, contact, product_name, amount=amount, status=status, source=source)
+                    content_id = ""
+                    if selected_content != "Не привязывать":
+                        idx = content_choices.index(selected_content) - 1
+                        content_id = attribution_items[idx].get("content_id", "")
+                    create_order(customer, contact, product_name, amount=amount, status=status, source=source, content_id=content_id)
                     st.success("Заказ создан.")
                     st.rerun()
 
