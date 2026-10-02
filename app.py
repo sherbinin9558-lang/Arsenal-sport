@@ -602,7 +602,8 @@ html, body { overflow-x:hidden !important; }
         box-shadow:0 0 10px rgba(91,70,214,.16) !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] * {color:#4c1d95 !important; opacity:1 !important;}
-    section[data-testid="stSidebar"] { width:min(88vw,330px) !important; }
+    section[data-testid="stSidebar"] { width:min(78vw,280px) !important; }
+    section[data-testid="stSidebar"] > div:first-child { width:min(78vw,280px) !important; }
     section[data-testid="stSidebar"] .stButton > button { width:100% !important; }
     .sidebar-ai-agent { font-size:.95rem !important; }
     .sidebar-max { padding:9px 10px 7px !important; }
@@ -634,11 +635,15 @@ html, body { overflow-x:hidden !important; }
 [data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
 
 /* UI chrome cleanup + MAX/sidebar recovery v7 */
-/* Keep the real app sidebar available on desktop and mobile. */
+/* Keep the real app sidebar available, but make the main menu compact. */
 aside[data-testid="stSidebar"], section[data-testid="stSidebar"], div[data-testid="stSidebar"] {
     display:block !important;
     visibility:visible !important;
     opacity:1 !important;
+}
+@media (min-width: 769px) {
+    section[data-testid="stSidebar"] { width:280px !important; min-width:280px !important; max-width:280px !important; }
+    section[data-testid="stSidebar"] > div:first-child { width:280px !important; }
 }
 /* Hide only Streamlit/GitHub/platform chrome; do not hide app controls. */
 a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
