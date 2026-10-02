@@ -469,6 +469,11 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* Hide Streamlit platform controls from the customer-facing UI. */
+#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
+/* MAX popup: bright lime chevrons on dark controls. */
+[data-testid="stExpander"] svg {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 4px rgba(184,255,0,.65)) !important;}
+[data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
+
 [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
 :root {--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#ffffff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}
 .block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
@@ -568,7 +573,7 @@ html, body { overflow-x:hidden !important; }
     [data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important; font-weight:900 !important;}
     [data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important; font-weight:700 !important;}
     [data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;}
-    [data-testid="stExpander"] {border-radius:12px !important;}
+    [data-testid="stExpander"] {border-radius:12px !important;}\n    [data-testid="stExpander"] svg {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 4px rgba(184,255,0,.65)) !important;}\n    [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
     [data-baseweb="select"], [data-baseweb="input"], [data-testid="stTextArea"] {font-size:16px !important;}
     [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
     .stMarkdown, .stCaption { overflow-wrap:anywhere !important; }
