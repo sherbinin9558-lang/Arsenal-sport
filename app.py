@@ -1411,7 +1411,7 @@ with tab6:
     if explicit:
         st.caption("Показываются только явные связи по content_id. Это фактическая атрибуция события, а не вывод по совпадению названий.")
         for row in explicit[:20]:
-            st.write(f"**{row["date"]} · {row["channel"]} · {row["format"]}** · {row["product"]} — заявки {row["leads"]} · заказы {row["orders"]} · {row["revenue"]:,.0f} ₽".replace(",", " "))
+            st.write(f"**{row['date']} · {row['channel']} · {row['format']}** · {row['product']} — заявки {row['leads']} · заказы {row['orders']} · {row['revenue']:,.0f} ₽".replace(",", " "))
     else:
         st.info("Явных связей пока нет. При создании заказа можно выбрать опубликованный материал — связь сохранится автоматически.")
 
