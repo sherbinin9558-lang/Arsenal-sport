@@ -15,6 +15,66 @@ TEMPLATES = {
     "Премиум":            {"bg": (18,20,27), "text": (239,242,247), "sec": (177,184,198), "accent": (137,125,255)},
 }
 
+
+def get_logo():
+    if LOGO_FILE.exists():
+        try:
+            return Image.open(LOGO_FILE).convert("RGBA")
+        except Exception:
+            return None
+    return None
+
+def save_logo(f):
+    img = Image.open(f).convert("RGBA")
+    img.save(LOGO_FILE)
+
+def get_font(size, bold=False):
+    try:
+        return ImageFont.truetype(FONT_BOLD if bold else FONT_REGULAR, size)
+    except Exception:
+        return ImageFont.load_default()
+
+def fit_font(draw, text, max_w, max_size=80, min_size=38):
+    for size in range(max_size, min_size - 1, -2):
+        font = get_font(size, True)
+        if draw.textbbox((0, 0), text, font=font)[2] <= max_w:
+            return font
+    return get_font(min_size, True)
+
+def draw_centered(draw, text, font, fill, y, w):
+    bbox = draw.textbbox((0, 0), text, font=font)
+    x = (w - (bbox[2] - bbox[0])) // 2
+    draw.text((x, y), text, font=font, fill=fill)
+
+def _fit_text_lines(draw, text, font, max_w, max_lines=2):
+    words = str(text or "").split()
+    if not words:
+        return []
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = current + " " + word
+        if draw.textbbox((0, 0), candidate, font=font)[2] <= max_w:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    if len(lines) <= max_lines:
+        return lines
+    lines = lines[:max_lines]
+    remainder = " ".join(words[len(" ".join(lines)).split():])
+    if remainder:
+        last = lines[-1]
+        while remainder and draw.textbbox((0, 0), last + " …", font=font)[2] > max_w:
+            parts = last.split()
+            if len(parts) <= 1:
+                break
+            remainder = parts[-1] + " " + remainder
+            last = " ".join(parts[:-1])
+        lines[-1] = (last + " …").strip()
+    return lines
+
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
     # Единая профессиональная система AI Agent Content Manager с четырьмя визуальными направлениями.
     t = TEMPLATES.get(template, TEMPLATES["Dark Premium"])
