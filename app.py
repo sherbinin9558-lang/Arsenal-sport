@@ -238,6 +238,71 @@ def publish_to_telegram(image_bytes, caption):
     except Exception as e:
         return False, f"Ошибка публикации: {e}"
 
+# ==================== ПУБЛИКАЦИЯ REELS ====================
+def publish_reel_to_telegram(video_bytes, caption):
+    try:
+        token = st.secrets["TELEGRAM_TOKEN"]
+        channel = st.secrets["TELEGRAM_CHANNEL"]
+        if not str(channel).startswith("@"):
+            channel = "@" + str(channel)
+        api_url = f"https://api.telegram.org/bot{token}/sendVideo"
+        files = {"video": ("reel.mp4", video_bytes, "video/mp4")}
+        data = {
+            "chat_id": channel,
+            "caption": caption[:1024],
+            "supports_streaming": "true",
+        }
+        resp = requests.post(api_url, files=files, data=data, timeout=120)
+        if resp.status_code == 200:
+            return True, "Reels опубликован в Telegram!"
+        return False, f"Ошибка Telegram {resp.status_code}: {resp.text}"
+    except KeyError as e:
+        return False, f"Не найден секрет: {e}."
+    except Exception as e:
+        return False, f"Ошибка Telegram: {e}"
+
+def publish_reel_to_vk(video_bytes, caption):
+    try:
+        token = st.secrets["VK_ACCESS_TOKEN"]
+        owner_id = int(st.secrets["VK_OWNER_ID"])
+        api_version = str(st.secrets.get("VK_API_VERSION", "5.199"))
+
+        save_url = "https://api.vk.com/method/video.save"
+        params = {
+            "access_token": token,
+            "v": api_version,
+            "name": "Arsenal Sport Reels",
+            "description": caption[:4096],
+            "is_private": 0,
+            "wallpost": 1,
+            "owner_id": owner_id,
+        }
+        resp = requests.post(save_url, data=params, timeout=60)
+        data = resp.json()
+
+        if "error" in data:
+            return False, f"Ошибка VK: {data['error'].get('error_msg', data['error'])}"
+
+        video = data.get("response", {})
+        upload_url = video.get("upload_url")
+        if not upload_url:
+            return False, "VK не вернул upload_url."
+
+        upload = requests.post(
+            upload_url,
+            files={"video_file": ("reel.mp4", video_bytes, "video/mp4")},
+            timeout=180,
+        )
+        upload_data = upload.json()
+        if "error" in upload_data:
+            return False, f"Ошибка загрузки VK: {upload_data['error']}"
+
+        return True, "Reels отправлен в VK!"
+    except KeyError as e:
+        return False, f"Не найден секрет: {e}."
+    except Exception as e:
+        return False, f"Ошибка VK: {e}"
+
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", page_icon="🏆")
 
@@ -619,6 +684,36 @@ with tab4:
                 "reel.mp4",
                 "video/mp4",
                 key="dl_reel"
+            )
+
+            st.markdown("### 📤 Опубликовать Reels")
+            reel_caption = gen_instagram(reel_product, "Продающий")
+
+            pub1, pub2, pub3 = st.columns(3)
+
+            with pub1:
+                if st.button("✈️ В Telegram", key="publish_reel_tg"):
+                    with st.spinner("Отправляю Reels в Telegram..."):
+                        ok, msg = publish_reel_to_telegram(video_bytes, reel_caption)
+                    (st.success if ok else st.error)(msg)
+
+            with pub2:
+                if st.button("🅥 В VK", key="publish_reel_vk"):
+                    with st.spinner("Отправляю Reels в VK..."):
+                        ok, msg = publish_reel_to_vk(video_bytes, reel_caption)
+                    (st.success if ok else st.error)(msg)
+
+            with pub3:
+                st.button(
+                    "📸 В Instagram",
+                    key="publish_reel_instagram",
+                    disabled=True,
+                    help="Для автоматической публикации Instagram требует публичный URL видео и подключение Meta API."
+                )
+
+            st.caption(
+                "Telegram и VK публикуются непосредственно из приложения. "
+                "Instagram подключим после добавления публичного хранилища для MP4 и Meta API."
             )
 
         st.markdown("---")
