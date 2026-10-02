@@ -7,6 +7,7 @@ from max_features import product_search, catalog_metrics, auto_content_bundle, p
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
+from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -20,7 +21,7 @@ CATEGORIES = ["Футболка", "Кроссовки", "Спортивный к
 TONES = ["Официальный", "Дружеский", "Продающий"]
 PLATFORMS = ["Instagram", "Telegram", "VK", "Другое"]
 CONTENT_TYPES = ["Пост", "Reels", "Stories", "Карусель"]
-STATUSES = ["Идея", "В работе", "Готово", "Опубликовано"]
+STATUSES = WORKFLOW_STATUSES
 PRIORITIES = ["Обычный", "Высокий", "Срочно"]
 
 TEMPLATES = {
@@ -1120,77 +1121,137 @@ with tab4:
 
 # ========== 5: КОНТЕНТ-ПЛАН ==========
 with tab5:
-    st.markdown('<div class="section-kicker">CONTENT PLANNER</div><div class="section-title">Контент-план</div><div class="section-subtitle">Планируйте публикации по датам, платформам и статусам.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">CONTENT WORKFLOW</div><div class="section-title">Контент-центр</div><div class="section-subtitle">Единый процесс: идея → работа → проверка → готово → публикация.</div>', unsafe_allow_html=True)
     products = load_products()
-    if not products:
-        st.info("Сначала создайте товар.")
-    else:
-        with st.form("plan_f", clear_on_submit=True):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                pd = st.date_input("Дата")
-                pl = st.selectbox("Платформа", PLATFORMS)
-            with c2:
-                pn = [f"{p.get('brand','')} {p.get('name','')}" for p in products]
-                sp = st.selectbox("Товар", pn)
-                ct = st.selectbox("Тип", CONTENT_TYPES)
-            with c3:
-                sts = st.selectbox("Статус", STATUSES)
-                pr = st.selectbox("Приоритет", PRIORITIES)
-            idea = st.text_area("Идея / текст")
-            if st.form_submit_button("📌 Добавить"):
-                add_plan({"date": str(pd), "platform": pl, "product": sp,
-                          "type": ct, "idea": idea, "status": sts, "priority": pr})
-                st.success("Добавлено!")
-                st.rerun()
+    plan = load_plan()
 
-        st.markdown("---")
-        plan = load_plan()
-        if not plan:
-            st.info("План пуст.")
+    wm = workflow_metrics(plan)
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Всего", wm["total"])
+    m2.metric("В работе", wm["counts"].get("В работе", 0))
+    m3.metric("На проверке", wm["counts"].get("На проверке", 0))
+    m4.metric("Готово", wm["counts"].get("Готово", 0))
+    m5.metric("Опубликовано", wm["counts"].get("Опубликовано", 0))
+    if wm["overdue"]:
+        st.warning(f"Просрочено: {wm['overdue']}")
+
+    planner_tab, workflow_tab, adapt_tab, report_tab = st.tabs(["📅 План", "🔄 Workflow", "📣 Адаптация", "📊 Отчёт"])
+
+    with planner_tab:
+        if not products:
+            st.info("Сначала создайте товар.")
         else:
-            st.subheader("📅 По неделям")
-            weeks = {}
-            for i, item in enumerate(plan):
-                try:
-                    d = datetime.datetime.strptime(item.get('date',''), '%Y-%m-%d').date()
-                    wk = d.isocalendar()[1]
-                    weeks.setdefault(wk, []).append((i, item))
-                except Exception:
-                    weeks.setdefault(0, []).append((i, item))
+            with st.form("plan_f", clear_on_submit=True):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    pd = st.date_input("Дата")
+                    pl = st.selectbox("Платформа", PLATFORMS)
+                with c2:
+                    pn = [f"{p.get('brand','')} {p.get('name','')}".strip() for p in products]
+                    sp = st.selectbox("Товар", pn)
+                    ct = st.selectbox("Тип", CONTENT_TYPES)
+                with c3:
+                    sts = st.selectbox("Статус", STATUSES)
+                    pr = st.selectbox("Приоритет", PRIORITIES)
+                idea = st.text_area("Идея / текст")
+                if st.form_submit_button("📌 Добавить в workflow"):
+                    add_plan(ensure_workflow({"date": str(pd), "platform": pl, "product": sp,
+                                              "type": ct, "idea": idea, "status": sts, "priority": pr}))
+                    st.success("Материал добавлен.")
+                    st.rerun()
 
-            for wk in sorted(weeks.keys()):
-                with st.expander(f"Неделя {wk} ({len(weeks[wk])} записей)"):
-                    for i, item in weeks[wk]:
-                        pr_icon = {"Обычный":"○","Высокий":"◐","Срочно":"●"}.get(item.get('priority','Обычный'),'○')
-                        st.write(f"{pr_icon} **{item.get('date','')}** | {item.get('platform','')} | {item.get('type','')} | _{item.get('status','')}_")
-                        st.write(f"   {item.get('product','')}: {item.get('idea','')}")
+            if plan:
+                st.subheader("📅 Календарь по неделям")
+                weeks = {}
+                for i, raw_item in enumerate(plan):
+                    item = ensure_workflow(raw_item)
+                    try:
+                        d = datetime.date.fromisoformat(str(item.get("date", "")))
+                        wk = d.isocalendar()[1]
+                    except Exception:
+                        wk = 0
+                    weeks.setdefault(wk, []).append((i, item))
+                for wk in sorted(weeks.keys()):
+                    with st.expander(f"Неделя {wk} · {len(weeks[wk])} материалов"):
+                        for i, item in weeks[wk]:
+                            st.write(f"**{item.get('date','')}** · {item.get('platform','')} · {item.get('type','')} · **{item.get('status','Идея')}**")
+                            st.caption(f"{item.get('product','')} — {item.get('idea','')}")
 
             st.markdown("---")
-            csv_buf = io.StringIO()
-            writer = csv.writer(csv_buf)
-            writer.writerow(["Дата","Платформа","Товар","Тип","Статус","Приоритет","Идея"])
-            for item in plan:
-                writer.writerow([item.get('date',''), item.get('platform',''),
-                    item.get('product',''), item.get('type',''), item.get('status',''),
-                    item.get('priority','Обычный'), item.get('idea','')])
-            st.download_button("⬇️ Экспорт в Excel (CSV)", csv_buf.getvalue(),
-                file_name=f"content_plan_{datetime.date.today()}.csv", mime="text/csv")
-
-            st.subheader("Управление записями")
-            for i, item in enumerate(reversed(plan)):
+            st.subheader("Управление материалами")
+            for i, raw_item in enumerate(reversed(plan)):
                 ri = len(plan) - 1 - i
-                with st.expander(f"{item.get('date','')} | {item.get('product','')}"):
+                item = ensure_workflow(raw_item)
+                with st.expander(f"{item.get('date','')} · {item.get('product','')} · {item.get('platform','')}"):
                     st.write(f"**Идея:** {item.get('idea','')}")
-                    cs = item.get('status','Идея')
-                    ns = st.selectbox("Статус", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
+                    cs = item.get("status", "Идея")
+                    ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
                     if ns != cs:
-                        item['status'] = ns
-                        update_plan(ri, item)
+                        updated = change_status(item, ns)
+                        update_plan(ri, updated)
                         st.rerun()
+                    st.caption(f"Приоритет: {item.get('priority','Обычный')}")
+                    if item.get("history"):
+                        st.caption("История изменений")
+                        for h in item["history"][-5:]:
+                            st.write(f"{h.get('time','')} · {h.get('from','')} → {h.get('to','')} · {h.get('actor','manager')}")
                     if st.button("🗑️ Удалить", key=f"dp_{ri}"):
                         delete_plan(ri)
                         st.rerun()
+
+    with workflow_tab:
+        st.subheader("🔄 Очередь на проверку")
+        review_items = [(i, ensure_workflow(x)) for i, x in enumerate(plan) if ensure_workflow(x).get("status") == "На проверке"]
+        if not review_items:
+            st.info("Материалов на проверке пока нет.")
+        else:
+            for i, item in review_items:
+                st.markdown(f"**{item.get('product','')} · {item.get('platform','')} · {item.get('type','')}**")
+                st.write(item.get("idea", ""))
+                a, b = st.columns(2)
+                with a:
+                    if st.button("✅ Утвердить", key=f"approve_{i}"):
+                        update_plan(i, change_status(item, "Готово"))
+                        st.rerun()
+                with b:
+                    if st.button("↩️ Вернуть в работу", key=f"return_{i}"):
+                        update_plan(i, change_status(item, "В работе"))
+                        st.rerun()
+        st.markdown("---")
+        st.subheader("🤖 AI-рекомендации")
+        for rec in recommendations(products, plan):
+            st.write(f"• {rec}")
+
+    with adapt_tab:
+        st.subheader("📣 Один материал → три канала")
+        if not products:
+            st.info("Сначала добавьте товары.")
+        else:
+            names = [f"{p.get('brand','')} {p.get('name','')}".strip() for p in products]
+            sel = st.selectbox("Товар", names, key="content_adapt_product")
+            p = products[names.index(sel)]
+            base_item = {"product": sel, "type": "Пост", "status": "Идея"}
+            adapted = adapt_content(base_item, p, {"Instagram": gen_instagram, "Telegram": gen_telegram, "VK": gen_vk})
+            for channel in ["Instagram", "Telegram", "VK"]:
+                st.markdown(f"**{channel}**")
+                st.text_area(channel, adapted.get(channel, ""), height=150, key=f"adapt_{channel}")
+            st.caption("Цены в карточки и тексты автоматически не добавляются.")
+
+    with report_tab:
+        st.subheader("📊 Отчёт и история")
+        for line in report_lines(products, plan, load_leads(), load_orders()):
+            st.write(line)
+        report_text = "\n".join(report_lines(products, plan, load_leads(), load_orders()))
+        st.download_button("⬇️ Скачать отчёт TXT", report_text, file_name=f"arsenal_content_report_{datetime.date.today()}.txt")
+        csv_buf = io.StringIO()
+        writer = csv.writer(csv_buf)
+        writer.writerow(["Дата","Платформа","Товар","Тип","Статус","Приоритет","Идея","История"])
+        for item in plan:
+            writer.writerow([item.get("date",""), item.get("platform",""), item.get("product",""),
+                             item.get("type",""), item.get("status","Идея"), item.get("priority","Обычный"),
+                             item.get("idea",""), json.dumps(item.get("history", []), ensure_ascii=False)])
+        st.download_button("⬇️ Экспорт истории CSV", csv_buf.getvalue(),
+                           file_name=f"arsenal_content_history_{datetime.date.today()}.csv", mime="text/csv")
 
 # ========== 6: СТАТИСТИКА ==========
 with tab6:
