@@ -495,36 +495,79 @@ with tab3:
         st.info("Сначала создайте товар.")
     else:
         names = [f"{p.get('brand','')} {p.get('name','')} ({p.get('article','')})" for p in products]
-        with st.form("text_generator_form", clear_on_submit=False):
-            idx = st.selectbox("Товар", range(len(names)), format_func=lambda x: names[x], key="text_product")
-            tone = st.radio("Тональность", TONES, horizontal=True, key="text_tone")
-            submitted = st.form_submit_button("✨ Сгенерировать тексты", type="primary", use_container_width=True)
 
-        if submitted:
+        idx = st.selectbox(
+            "Товар",
+            range(len(names)),
+            format_func=lambda x: names[x],
+            key="text_product"
+        )
+
+        tone = st.radio(
+            "Тональность",
+            TONES,
+            horizontal=True,
+            key="text_tone"
+        )
+
+        st.caption(f"Выбрано: **{names[idx]}** · Тональность: **{tone}**")
+
+        if st.button(
+            "✨ Сгенерировать тексты",
+            type="primary",
+            use_container_width=True,
+            key="generate_texts_btn"
+        ):
             p = products[idx]
+
+            # Каждый запуск заново создаёт тексты именно для выбранной тональности.
             st.session_state["tg_text"] = gen_telegram(p, tone)
             st.session_state["insta_text"] = gen_instagram(p, tone)
             st.session_state["vk_text"] = gen_vk(p, tone)
             st.session_state["current_product"] = p
             st.session_state["current_tone"] = tone
-            st.success("✅ Тексты созданы: " + p.get('brand','') + " " + p.get('name','') + " · «" + tone + "»")
+            st.session_state["text_generation_id"] = st.session_state.get("text_generation_id", 0) + 1
 
         if "tg_text" in st.session_state:
             p = st.session_state["current_product"]
             insta = st.session_state["insta_text"]
             tg = st.session_state["tg_text"]
             vk = st.session_state["vk_text"]
-            st.caption("Товар: " + p.get('brand','') + " " + p.get('name','') + " • Тональность: " + st.session_state.get("current_tone",""))
+            generated_tone = st.session_state.get("current_tone", "")
+
+            st.success(
+                f"Тексты созданы: {p.get('brand','')} {p.get('name','')} · «{generated_tone}»"
+            )
+
+            st.caption(
+                "Показаны тексты для последней нажатой кнопки «Сгенерировать тексты»."
+            )
 
             st.markdown("---")
             st.subheader("📸 Instagram")
-            st.text_area("Текст поста", insta, height=280, key="i_out")
-            st.download_button("⬇️ Скачать текст", insta, file_name=f"{p.get('name','item')}_insta.txt", mime="text/plain")
+            st.text_area(
+                "Текст поста",
+                insta,
+                height=280,
+                key=f"i_out_{st.session_state.get('text_generation_id', 0)}"
+            )
+            st.download_button(
+                "⬇️ Скачать текст",
+                insta,
+                file_name=f"{p.get('name','item')}_insta.txt",
+                mime="text/plain",
+                key=f"dl_i_{st.session_state.get('text_generation_id', 0)}"
+            )
             st.caption("ℹ️ Скопируйте текст и загрузите карточку в Instagram вручную.")
 
             st.markdown("---")
             st.subheader("✈️ Telegram")
-            st.text_area("Текст поста", tg, height=280, key="t_out")
+            st.text_area(
+                "Текст поста",
+                tg,
+                height=280,
+                key=f"t_out_{st.session_state.get('text_generation_id', 0)}"
+            )
 
             card_to_send = None
             if "last_card_bytes" in st.session_state:
@@ -537,19 +580,40 @@ with tab3:
 
             col_a, col_b = st.columns(2)
             with col_a:
-                if st.button("🚀 Опубликовать в Telegram", type="primary", key="pub_tg_text"):
+                if st.button(
+                    "🚀 Опубликовать в Telegram",
+                    type="primary",
+                    key=f"pub_tg_text_{st.session_state.get('text_generation_id', 0)}"
+                ):
                     if not card_to_send:
                         st.error("Нет карточки. Создайте её во вкладке «📸 Создать» или загрузите файл.")
                     else:
                         ok, msg = publish_to_telegram(card_to_send, tg)
                         (st.success if ok else st.error)(msg)
             with col_b:
-                st.download_button("⬇️ Скачать текст", tg, file_name=f"{p.get('name','item')}_tg.txt", mime="text/plain")
+                st.download_button(
+                    "⬇️ Скачать текст",
+                    tg,
+                    file_name=f"{p.get('name','item')}_tg.txt",
+                    mime="text/plain",
+                    key=f"dl_tg_{st.session_state.get('text_generation_id', 0)}"
+                )
 
             st.markdown("---")
             st.subheader("🅥 ВКонтакте")
-            st.text_area("Текст поста", vk, height=200, key="v_out")
-            st.download_button("⬇️ Скачать текст", vk, file_name=f"{p.get('name','item')}_vk.txt", mime="text/plain")
+            st.text_area(
+                "Текст поста",
+                vk,
+                height=200,
+                key=f"v_out_{st.session_state.get('text_generation_id', 0)}"
+            )
+            st.download_button(
+                "⬇️ Скачать текст",
+                vk,
+                file_name=f"{p.get('name','item')}_vk.txt",
+                mime="text/plain",
+                key=f"dl_vk_{st.session_state.get('text_generation_id', 0)}"
+            )
 
 # ========== 4: REELS & STORIES ==========
 with tab4:
