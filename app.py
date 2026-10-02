@@ -457,6 +457,11 @@ else:
     .stApp input, .stApp textarea, .stApp [data-baseweb="select"] * {color:#17151c !important;}
     .stApp input::placeholder, .stApp textarea::placeholder {color:#667080 !important;opacity:1 !important;}
     .stApp button:not([data-baseweb="tab"]) {color:#17151c !important;}
+/* Переключатель темы — заметный неоновый акцент в обеих темах. */
+div[data-testid="stToggle"] label {font-weight:800 !important;}
+div[data-testid="stToggle"] [role="switch"] {background:linear-gradient(135deg,#4c1d95,#7c3aed)!important;border:1px solid #a78bfa!important;box-shadow:0 0 7px rgba(124,58,237,.5),0 0 16px rgba(168,85,247,.22)!important;}
+div[data-testid="stToggle"] [role="switch"][aria-checked="true"] {background:linear-gradient(135deg,#5b21b6,#9333ea)!important;box-shadow:0 0 9px rgba(124,58,237,.65),0 0 20px rgba(168,85,247,.3)!important;}
+
     .stApp button[kind="primary"] {color:#ffffff !important;}
     button[data-baseweb="tab"] {color:#17151c !important;background:#ffffff !important;border-color:#dfe3ea !important;}
     button[data-baseweb="tab"] * {color:#17151c !important;}
@@ -481,7 +486,11 @@ section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;bord
 div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button {border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
-button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
+button[kind="primary"] {background:linear-gradient(135deg,#5b21b6,#7c3aed,#a855f7)!important;border:1px solid #a78bfa!important;color:#fff!important;box-shadow:0 0 8px rgba(124,58,237,.45),0 0 18px rgba(168,85,247,.22)!important;}
+button[kind="primary"]:hover {filter:brightness(1.08);box-shadow:0 0 10px rgba(124,58,237,.65),0 0 24px rgba(168,85,247,.35)!important;}
+[data-testid="stDialog"] button[kind="primary"] {background:linear-gradient(135deg,#4c1d95,#7c3aed,#a855f7)!important;color:#fff!important;border:1px solid #c4b5fd!important;box-shadow:0 0 10px rgba(124,58,237,.55),0 0 24px rgba(168,85,247,.28)!important;}
+[data-testid="stDialog"] button[kind="primary"]:hover {box-shadow:0 0 12px rgba(124,58,237,.75),0 0 28px rgba(168,85,247,.4)!important;}
+
 button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
 div[data-baseweb="tab-list"] {gap:5px;background:#ffffff!important;padding:5px;border-radius:14px;border:1px solid #e1e5eb;display:flex!important;visibility:visible!important;opacity:1!important;box-shadow:0 2px 10px rgba(20,25,40,.05);}
 button[data-baseweb="tab"] {border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:#f4f5f8!important;}
