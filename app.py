@@ -1173,6 +1173,11 @@ def max_dialog():
     manager_orders = load_json(Path("orders.json"), [])
     manager_products = load_products()
     manager_plan = load_plan()
+    new_leads_count = sum(1 for x in manager_leads if x.get("status") == "Новый")
+    in_work_count = sum(1 for x in manager_leads if x.get("status") == "В работе")
+    low_stock_products = [p for p in manager_products if 0 < max_stock(p) <= 3]
+    active_order_statuses = ACTIVE_ORDER_STATUSES
+    active_orders_count = sum(1 for x in manager_orders if x.get("status","Новая") in active_order_statuses)
 
     # ---------- 1. Умный помощник менеджера ----------
     due_today, overdue = max_due_content(manager_plan)
@@ -1279,8 +1284,23 @@ def max_dialog():
             if "max_auto_bundle" in st.session_state:
                 st.success(f"Готов контент-пакет: {st.session_state.get('max_auto_product_title','')}")
                 ab=st.session_state["max_auto_bundle"]
-                for label,key in [("Instagram","instagram"),("Telegram","telegram"),("VK","vk"),("Reels","reels_hook"),("Stories","stories")]:
+                auto_p=manager_products[ai]
+                auto_desc=auto_p.get("description","").strip()
+                auto_headline=f"🔥 {max_product_title(auto_p)} — новинка Arsenal Sport"
+                auto_cta="📩 Напишите нам — подберём размер, подтвердим наличие и поможем оформить заказ."
+                auto_tags=make_hashtags(auto_p.get("name",""),auto_p.get("brand",""),auto_p.get("category","Другое"))
+                st.text_input("Заголовок",auto_headline,key="auto_headline")
+                st.text_area("Описание / улучшение карточки",auto_desc or f"{max_product_title(auto_p)} — спортивный товар для тренировок и активного использования.",height=90,key="auto_description")
+                for label,key in [("Instagram","instagram"),("Telegram","telegram"),("VK","vk"),("Reels — сценарий/хук","reels_hook"),("Stories","stories")]:
                     st.text_area(label,ab[key],height=100,key=f"auto_{key}")
+                st.text_area("CTA",auto_cta,height=70,key="auto_cta")
+                st.text_area("Хэштеги",auto_tags,height=70,key="auto_tags")
+                if st.button("📝 Улучшить описание в карточке",key="max_improve_desc"):
+                    if not auto_desc:
+                        auto_p["description"]=f"{max_product_title(auto_p)} — спортивный товар Arsenal Sport. Поможем подобрать размер и вариант под вашу задачу."
+                        update_product(ai,auto_p)
+                        st.success("Описание добавлено.")
+                        st.rerun()
                 if st.button("📅 Добавить в план",key="max_auto_add_plan"):
                     add_plan(st.session_state["max_auto_plan_item"]); st.success("Добавлено в план."); st.rerun()
                 st.caption("Дальше менеджер может отредактировать тексты и опубликовать их через существующие инструменты.")
