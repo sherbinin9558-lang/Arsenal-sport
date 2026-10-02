@@ -6,6 +6,7 @@ from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
+from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1388,15 +1389,8 @@ ACTIVE_ORDER_STATUSES = {"Новая", "Связались", "Ожидает о�
 
 def max_stock(product):
     by_size = product.get("stock_by_size") or {}
-    if isinstance(by_size, dict):
-        try:
-            return sum(max(0, int(v or 0)) for v in by_size.values())
-        except Exception:
-            return 0
-    try:
-        return max(0, int(product.get("total_stock", 0) or 0))
-    except Exception:
-        return 0
+    qty, _, known = stock_info(product)
+    return qty if known and qty is not None else 0
 
 def max_product_title(product):
     return f"{product.get('brand','')} {product.get('name','')}".strip() or "Товар"
@@ -1442,7 +1436,7 @@ def render_max():
         st.markdown("---")
         section = st.radio(
             "Раздел MAX",
-            ["Обзор", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Аналитика"],
+            ["Обзор", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
             horizontal=True,
             key="max_section",
         )
@@ -1557,6 +1551,196 @@ def render_max():
                     if ns != current:
                         update_order(order.get("id"), status=ns)
                         st.rerun()
+
+        elif section == "Автоматизация":
+            st.subheader("🚀 Центр автоматизации Arsenal Sport")
+            st.caption("Бесплатный локальный контур: массовые фото, контент, склад, план на 30 дней, массовое редактирование и аналитика.")
+
+            auto_tab1, auto_tab2, auto_tab3, auto_tab4 = st.tabs(["📸 Фото", "✍️ Контент", "📦 Каталог", "📊 Аналитика"])
+
+            with auto_tab1:
+                st.markdown("### Массовая обработка фотографий")
+                st.caption("Названия файлов лучше делать по артикулу: например ART-001.jpg. Фото сохраняются отдельно и не заменяют исходный каталог.")
+                photo_files = st.file_uploader(
+                    "Загрузите несколько фото",
+                    type=["jpg", "jpeg", "png", "webp"],
+                    accept_multiple_files=True,
+                    key="auto_photos",
+                )
+                if photo_files:
+                    names = [f.name for f in photo_files]
+                    st.write("Файлов загружено:", len(names))
+                    if st.button("📸 Привязать фото к товарам", type="primary", key="auto_match_photos"):
+                        products_now = load_products()
+                        matched = 0
+                        skipped = []
+                        articles = {str(p.get("article","")).strip().lower(): i for i,p in enumerate(products_now) if str(p.get("article","")).strip()}
+                        for f in photo_files:
+                            stem = Path(f.name).stem.strip().lower()
+                            idx = articles.get(stem)
+                            if idx is None:
+                                for i,p in enumerate(products_now):
+                                    key = product_key(p, i).lower()
+                                    if stem == key or stem in key:
+                                        idx = i
+                                        break
+                            if idx is None:
+                                skipped.append(f.name)
+                                continue
+                            path = save_uploaded_photo(f, products_now[idx], idx)
+                            products_now[idx]["original_image"] = path
+                            matched += 1
+                        save_products(products_now)
+                        st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
+                        if skipped:
+                            st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
+                        st.rerun()
+
+            with auto_tab2:
+                st.markdown("### Массовый контент")
+                st.caption("Генерация выполняется без платного API. Тексты можно сразу использовать для Instagram, Telegram, VK, Stories и Reels.")
+                if not products:
+                    st.info("Сначала добавьте товары в каталог.")
+                else:
+                    limit = st.slider("Сколько товаров обработать", 1, min(100, len(products)), min(30, len(products)), key="auto_content_limit")
+                    if st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
+                        bundles = {}
+                        for i,p in enumerate(products[:limit]):
+                            bundles[str(i)] = {"product": max_product_title(p), "content": content_for_product(p)}
+                        st.session_state["auto_content_bundles"] = bundles
+                        st.success(f"Контент подготовлен для {limit} товаров.")
+                    bundles = st.session_state.get("auto_content_bundles", {})
+                    if bundles:
+                        for item in list(bundles.values())[:10]:
+                            with st.expander(item["product"]):
+                                for channel, value in item["content"].items():
+                                    st.markdown(f"**{channel}**")
+                                    st.text_area(channel, value, height=120, key=f"auto_text_{item['product']}_{channel}")
+
+                st.markdown("---")
+                st.markdown("### 📅 План на 30 дней")
+                if st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
+                    generated = make_30_day_plan(products)
+                    existing = load_plan()
+                    existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
+                    added = 0
+                    for item in generated:
+                        key = (item["date"], item["product"], item["platform"], item["type"])
+                        if key not in existing_keys:
+                            existing.append(item)
+                            added += 1
+                    save_plan(existing)
+                    st.success(f"Добавлено {added} публикаций без дублей.")
+                    st.rerun()
+
+            with auto_tab3:
+                st.markdown("### Массовое редактирование")
+                if products:
+                    labels = [f"{i+1}. {max_product_title(p)}" for i,p in enumerate(products)]
+                    selected = st.multiselect("Товары", labels, key="auto_bulk_products")
+                    indexes = [labels.index(x) for x in selected]
+                    field = st.selectbox("Что изменить", ["category", "brand", "sizes", "color"], key="auto_bulk_field")
+                    if field == "category":
+                        value = st.selectbox("Новое значение", CATEGORIES, key="auto_bulk_value_cat")
+                    else:
+                        value = st.text_input("Новое значение", key="auto_bulk_value_text")
+                    if st.button("✏️ Применить к выбранным", type="primary", key="auto_bulk_apply"):
+                        if not indexes:
+                            st.warning("Выберите хотя бы один товар.")
+                        elif not str(value).strip():
+                            st.warning("Значение не должно быть пустым.")
+                        else:
+                            products_now = load_products()
+                            changed = bulk_update(products_now, indexes, field, value.strip())
+                            save_products(products_now)
+                            st.success(f"Изменено товаров: {changed}.")
+                            st.rerun()
+                else:
+                    st.info("Каталог пуст.")
+
+                st.markdown("---")
+                st.markdown("### 📦 Остатки по размерам")
+                if products:
+                    stock_labels = [f"{i+1}. {max_product_title(p)}" for i,p in enumerate(products)]
+                    stock_choice = st.selectbox("Товар", stock_labels, key="auto_stock_product")
+                    stock_idx = stock_labels.index(stock_choice)
+                    sp = products[stock_idx]
+                    current_stock = sp.get("stock_by_size") if isinstance(sp.get("stock_by_size"), dict) else {}
+                    raw_sizes = str(sp.get("sizes","")).replace(";", ",")
+                    sizes_list = [x.strip() for x in raw_sizes.split(",") if x.strip()]
+                    if not sizes_list and current_stock:
+                        sizes_list = list(current_stock.keys())
+                    if not sizes_list:
+                        sizes_list = ["S", "M", "L", "XL"]
+                    st.caption("Введите количество через запятую в порядке размеров: " + ", ".join(sizes_list))
+                    qty_text = st.text_input("Количество", value=", ".join(str(current_stock.get(s, 0)) for s in sizes_list), key="auto_stock_qty")
+                    if st.button("💾 Сохранить остатки", key="auto_stock_save"):
+                        parts = [x.strip() for x in qty_text.split(",")]
+                        stock = {}
+                        for i,size in enumerate(sizes_list):
+                            try: stock[size] = max(0, int(parts[i])) if i < len(parts) else 0
+                            except Exception: stock[size] = 0
+                        products_now = load_products()
+                        products_now[stock_idx]["stock_by_size"] = stock
+                        products_now[stock_idx]["total_stock"] = sum(stock.values())
+                        save_products(products_now)
+                        st.success("Остатки сохранены.")
+                        st.rerun()
+
+            with auto_tab4:
+                st.markdown("### Аналитика магазина")
+                a = automation_analytics(products, leads, orders, plan)
+                q1,q2,q3,q4 = st.columns(4)
+                q1.metric("Товары", a["products"])
+                q2.metric("Заявки", a["leads"])
+                q3.metric("Заказы", a["orders"])
+                q4.metric("В плане", a["plan"])
+                st.markdown("**Категории**")
+                for name,count in a["categories"]:
+                    st.write(f"• {name}: {count}")
+                st.markdown("**Источники заявок**")
+                if a["sources"]:
+                    for name,count in a["sources"]:
+                        st.write(f"• {name}: {count}")
+                else:
+                    st.caption("Пока нет заявок.")
+                st.markdown("**Товары в заказах**")
+                if a["top_products"]:
+                    for name,count in a["top_products"]:
+                        st.write(f"• {name}: {count}")
+                else:
+                    st.caption("Пока нет заказов.")
+
+                st.markdown("---")
+                st.markdown("### 🔎 Умный поиск")
+                query = st.text_input("Например: бутсы 42 искусственное поле", key="auto_smart_search")
+                if query:
+                    found = product_search(products, query)
+                    if found:
+                        for p in found[:20]:
+                            qty, _, known = stock_info(p)
+                            stock_text = str(qty) if known and qty is not None else "не указан"
+                            st.write(f"**{max_product_title(p)}** · {p.get('sizes','—')} · остаток: {stock_text}")
+                    else:
+                        st.info("Подходящих товаров не найдено.")
+
+                st.markdown("---")
+                st.markdown("### ⚡ Быстрый запуск")
+                st.caption("Запускает бесплатный контент-конвейер для всего каталога: тексты + план на 30 дней. Фото остаются отдельным шагом, чтобы не перезаписывать исходные файлы.")
+                if st.button("⚡ Запустить автоматизацию", type="primary", key="auto_run_all"):
+                    generated = make_30_day_plan(products)
+                    existing = load_plan()
+                    existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
+                    for item in generated:
+                        key = (item["date"], item["product"], item["platform"], item["type"])
+                        if key not in existing_keys:
+                            existing.append(item)
+                    save_plan(existing)
+                    st.session_state["auto_content_bundles"] = {
+                        str(i): {"product": max_product_title(p), "content": content_for_product(p)}
+                        for i,p in enumerate(products)
+                    }
+                    st.success("Готово: контент подготовлен, план на 30 дней сформирован.")
 
         elif section == "Склад":
             st.subheader("Склад и контроль остатков")
