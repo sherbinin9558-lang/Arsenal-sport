@@ -1,7 +1,7 @@
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime, csv, requests, base64, re
+import json, io, datetime, csv, requests, base64, re, tempfile, os
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
@@ -1587,11 +1587,9 @@ def render_max():
                             if idx is None:
                                 skipped.append(f.name)
                                 continue
-                            path = save_uploaded_photo(f, products_now[idx], idx)
+                            try:\n                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")\n                            except Exception as e:\n                                skipped.append(f"{f.name}: файл не удалось прочитать ({e})")\n                                continue\n                            path = save_uploaded_photo(f, products_now[idx], idx)
                             products_now[idx]["original_image"] = path
-                            try:
-                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
-                                p_now = products_now[idx]
+                            p_now = products_now[idx]
                                 card_img = generate_card(
                                     source_img,
                                     p_now.get("name",""),
