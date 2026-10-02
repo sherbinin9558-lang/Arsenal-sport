@@ -1,5 +1,5 @@
 {
-    "store_name": "Arsenal Sport",
+    "store_name": "AI Agent Content Manager",
     "city": "Краснодар",
     "delivery": "По России",
     "telegram": "",
@@ -13,9 +13,9 @@
     "return_policy": "Возврат и обмен — по действующим правилам магазина.",
     "delivery_methods": "Самовывоз, доставка по Краснодару, отправка по России",
     "delivery_terms": "",
-    "content_signature": "Arsenal Sport — спортивная одежда, обувь и экипировка",
+    "content_signature": "AI Agent Content Manager — спортивная одежда, обувь и экипировка",
     "cta": "Напишите нам — поможем выбрать товар и оформить заказ.",
-    "hashtags": "#arsenal_sport #спорт #экипировка",
+    "hashtags": "#ai_agent_content_manager #спорт #экипировка",
     "ai_seller_instructions": "Отвечай дружелюбно и по делу. Уточняй товар, размер и город. Не придумывай наличие, цену или характеристики.",
     "notification_contact": "",
     "card_template": "Dark Premium",
