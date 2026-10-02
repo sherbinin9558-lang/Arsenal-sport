@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 
 from core_models import Product, OrderItem, ORDER_STATUSES, new_id
-from commerce_core import product_search, filter_products, inventory_summary, create_order, stock_label
+from crm_core import load_leads, update_lead
+from commerce_core import product_search, filter_products, inventory_summary, create_order, stock_label, reserve_stock
 
 PRODUCTS_FILE = Path("products.json")
 ORDERS_FILE = Path("orders.json")
@@ -230,6 +231,18 @@ with tabs[2]:
         if st.button("Создать заказ", type="primary", use_container_width=True):
             try:
                 order = create_order(name, contact, cart, source="Professional Core", comment=comment)
+                # Reserve stock only after the customer explicitly creates the order.
+                working_products = load_products()
+                for item in cart:
+                    product = next((x for x in working_products if x.id == item.product_id), None)
+                    if product is None or not reserve_stock(product, item.size, item.quantity):
+                        raise ValueError(f"Недостаточно подтверждённого остатка: {item.product_name}, размер {item.size or "—"}")
+                raw_products = load_json(PRODUCTS_FILE, [])
+                for raw in raw_products:
+                    product = next((x for x in working_products if x.id == str(raw.get("id") or raw.get("article") or "")), None)
+                    if product:
+                        raw["stock_by_size"] = product.stock_by_size
+                save_json(PRODUCTS_FILE, raw_products)
                 orders.append(order.to_dict())
                 save_orders(orders)
                 st.session_state.professional_cart = []
