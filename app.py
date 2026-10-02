@@ -1205,12 +1205,14 @@ def max_dialog():
     # ---------- 2. Центр продаж ----------
     store_stats = max_store_metrics(manager_products, manager_leads, manager_orders, manager_plan)
     st.markdown("### 🔥 Центр продаж")
-    s1,s2,s3,s4,s5 = st.columns(5)
+    potential_orders = sum(1 for x in manager_leads if x.get("status") in {"В работе","Ожидает ответа"})
+    s1,s2,s3,s4,s5,s6 = st.columns(6)
     s1.metric("Новые лиды", new_leads_count)
-    s2.metric("В работе", in_work_count)
-    s3.metric("Активные заказы", store_stats["active_orders"])
-    s4.metric("Завершено", store_stats["completed_orders"])
-    s5.metric("Конверсия", f"{store_stats['conversion']:.1f}%")
+    s2.metric("Потенциал", potential_orders)
+    s3.metric("В работе", in_work_count)
+    s4.metric("Активные заказы", store_stats["active_orders"])
+    s5.metric("Завершено", store_stats["completed_orders"])
+    s6.metric("Конверсия", f"{store_stats['conversion']:.1f}%")
     if store_stats["amount"]:
         st.caption(f"Сумма заказов с распознанной суммой: {store_stats['amount']:,.0f} ₽".replace(",", " "))
     if store_stats["categories"]:
@@ -1545,9 +1547,10 @@ def max_dialog():
             st.write(f"**Товар:** {customer.get('product','—')}")
             st.write(f"**Создано:** {customer.get('created_at','—')}")
             notes=st.text_area("Заметки менеджера",value=customer.get("notes",""),key=f"cust_notes_{customer.get('id')}")
+            interested=st.text_input("Интересующие товары",value=", ".join(customer.get("interested_products",[]) or ([customer.get("product","")] if customer.get("product") else [])),key=f"cust_products_{customer.get('id')}")
             customer_status=st.selectbox("Статус клиента",["Новый","Потенциальный","Постоянный"],index=["Новый","Потенциальный","Постоянный"].index(customer.get("customer_status","Новый")) if customer.get("customer_status","Новый") in ["Новый","Потенциальный","Постоянный"] else 0,key=f"cust_type_{customer.get('id')}")
             if st.button("💾 Сохранить карточку",key=f"save_customer_{customer.get('id')}"):
-                set_customer_profile(customer.get("id"),notes,customer.get("interested_products") or [customer.get("product","")],customer_status)
+                set_customer_profile(customer.get("id"),notes,[x.strip() for x in interested.split(",") if x.strip()],customer_status)
                 st.success("Карточка клиента сохранена.")
                 st.rerun()
         with cc2:
@@ -1559,6 +1562,9 @@ def max_dialog():
             interaction=st.text_area("Добавить взаимодействие",key=f"interaction_{customer.get('id')}")
             if st.button("➕ Записать",key=f"add_interaction_{customer.get('id')}"):
                 if interaction.strip(): add_lead_interaction(customer.get("id"),interaction.strip()); st.success("Взаимодействие записано."); st.rerun()
+            if st.button("🔁 Напомнить связаться",key=f"followup_{customer.get('id')}"):
+                update_lead(customer.get("id"), follow_up_at=str(datetime.date.today()+datetime.timedelta(days=1)), follow_up_note="Повторный контакт с клиентом")
+                st.success("Повторный контакт назначен на завтра."); st.rerun()
     else:
         st.info("CRM пока пуст.")
     
