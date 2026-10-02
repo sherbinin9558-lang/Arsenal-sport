@@ -272,15 +272,24 @@ with tabs[2]:
         name = st.text_input("Имя клиента")
         contact = st.text_input("Телефон / Telegram")
         comment = st.text_area("Комментарий к заказу")
+        lead_options = {"Без обращения": ""}
+        for lead in load_leads():
+            if lead.get("status") not in ("Завершён", "Отменён"):
+                lead_options[f"#{lead.get('id')} · {lead.get('name', 'Клиент')} · {lead.get('product', 'товар')}"] = str(lead.get("id"))
+        selected_lead_label = st.selectbox("Связать с обращением CRM", list(lead_options.keys()))
+        selected_lead_id = lead_options[selected_lead_label]
+
         if st.button("Создать заказ", type="primary", use_container_width=True):
             try:
-                order = create_order(name, contact, cart, source="Professional Core", comment=comment)
+                order = create_order(name, contact, cart, source="Professional Core", comment=comment, lead_id=selected_lead_id)
                 # Reserve stock only after the customer explicitly creates the order.
                 working_products = load_products()
                 for item in cart:
                     product = next((x for x in working_products if x.id == item.product_id), None)
                     if product is None or not reserve_stock(product, item.size, item.quantity):
-                        raise ValueError(f"Недостаточно подтверждённого остатка: {item.product_name}, размер {item.size or "—"}")
+                        raise ValueError(
+                            f"Недостаточно подтверждённого остатка: {item.product_name}, размер {item.size or '—'}"
+                        )
                 raw_products = load_json(PRODUCTS_FILE, [])
                 for raw in raw_products:
                     product = next((x for x in working_products if x.id == str(raw.get("id") or raw.get("article") or "")), None)
@@ -289,8 +298,10 @@ with tabs[2]:
                 save_json(PRODUCTS_FILE, raw_products)
                 orders.append(order.to_dict())
                 save_orders(orders)
+                if selected_lead_id:
+                    update_lead(selected_lead_id, status="Заказ оформлен", order_id=order.id)
                 st.session_state.professional_cart = []
-                st.success(f"Заказ {order.id} создан.")
+                st.success(f"Заказ {order.id} создан и связан с CRM.")
                 st.rerun()
             except ValueError as exc:
                 st.error(str(exc))
@@ -303,7 +314,7 @@ with tabs[3]:
     sm = st.columns(4)
     for col, status in zip(sm, ORDER_STATUSES[:4]):
         col.metric(status, status_counts.get(status, 0))
-    st.caption("Статус меняется вручную менеджером и сохраняется в orders.json. Остаток товара не списывается при создании заявки — это защищает от ложного списания до подтверждения заказа.")
+    st.caption("Менеджер меняет статус заказа прямо здесь. При создании заказа остаток резервируется по выбранному размеру, а связанное обращение CRM переводится в «Заказ оформлен».")
     if not orders:
         st.info("Заказов пока нет. Первый заказ автоматически появится здесь.")
     else:
@@ -315,6 +326,8 @@ with tabs[3]:
                 top[1].write(order.get("customer_name", "—"))
                 top[1].caption(order.get("customer_contact", "—"))
                 top[2].write(f"Сумма: {order.get('total', 0):,.0f} ₽")
+                if order.get("lead_id"):
+                    top[2].caption(f"CRM: обращение #{order.get('lead_id')}")
                 current = order.get("status", "Новая")
                 selected_status = top[3].selectbox(
                     "Статус",
@@ -325,8 +338,30 @@ with tabs[3]:
                 if selected_status != current:
                     order["status"] = selected_status
                     save_orders(orders)
+                    lead_id = order.get("lead_id")
+                    if lead_id:
+                        if selected_status == "Завершён":
+                            update_lead(lead_id, status="Завершён")
+                        elif selected_status == "Отменён":
+                            update_lead(lead_id, status="Отменён")
+                        elif selected_status in ("Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"):
+                            update_lead(lead_id, status="Заказ оформлен")
                     st.rerun()
                 for item in order.get("items", []):
                     st.caption(f"• {item.get('product_name', '')} · {item.get('size', '')} · {item.get('quantity', 0)} шт.")
+
+st.divider()
+st.subheader("Клиенты и повторные продажи")
+contacts = {}
+for order in orders:
+    contact = str(order.get("customer_contact", "")).strip().lower()
+    if contact:
+        contacts[contact] = contacts.get(contact, 0) + 1
+repeat_customers = sum(1 for count in contacts.values() if count > 1)
+cm1, cm2, cm3 = st.columns(3)
+cm1.metric("Клиентов с заказами", len(contacts))
+cm2.metric("Повторных клиентов", repeat_customers)
+cm3.metric("Среднее заказов на клиента", f"{(len(orders) / len(contacts)):.1f}" if contacts else "0.0")
+st.caption("Повторные клиенты считаются по совпадению телефона или Telegram-контакта в сохранённых заказах.")
 
 st.caption("Arsenal Sport · Professional Core · store-agnostic foundation")
