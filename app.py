@@ -404,7 +404,7 @@ def publish_reel_to_vk(video_bytes, caption):
         return False, f"Ошибка VK: {e}"
 
 # ==================== ИНТЕРФЕЙС ====================
-st.set_page_config(page_title="AI Agent Content Manager Content Manager", layout="wide")
+st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
@@ -455,11 +455,11 @@ else:
 
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
-:root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
-.block-container {padding-top:0!important;}\n .main-title {font-size:2.45rem;font-weight:850;color:#111318;text-align:center;margin:24px 0 16px;letter-spacing:.02em;text-shadow:0 0 5px rgba(255,255,255,.75),0 0 12px rgba(180,185,195,.45);}
+:root {--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#ffffff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}
+.block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:850;color:#171a21;text-align:left;margin:18px 0 12px;letter-spacing:.01em;}
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}\n 
-.stApp {background:#eef1f5;}
-section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
+.stApp {background:#f6f7fb;}
+section[data-testid="stSidebar"] {background:#ffffff;border-right:1px solid #e4e7ec;}
 section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
 .sidebar-ai-agent {font-size:1.05rem;font-weight:850;letter-spacing:.02em;color:#a98cff;text-shadow:0 0 6px rgba(169,140,255,.85),0 0 14px rgba(137,125,255,.55);margin:0 0 6px 0;text-align:left;line-height:1.2;}\n .sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
 .sidebar-max-kicker {font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}
@@ -470,31 +470,93 @@ div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
 button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
 button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
-div[data-baseweb="tab-list"] {gap:6px;background:#dfe3e9!important;padding:6px;border-radius:14px;border:1px solid #c7cdd6;display:flex!important;visibility:visible!important;opacity:1!important;}
-button[data-baseweb="tab"] {border-radius:10px;color:#303746!important;font-weight:700;visibility:visible!important;opacity:1!important;}
-button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5ff;}
+div[data-baseweb="tab-list"] {gap:5px;background:#ffffff!important;padding:5px;border-radius:14px;border:1px solid #e1e5eb;display:flex!important;visibility:visible!important;opacity:1!important;box-shadow:0 2px 10px rgba(20,25,40,.05);}
+button[data-baseweb="tab"] {border-radius:10px;color:#4b5565!important;font-weight:750;visibility:visible!important;opacity:1!important;min-height:40px;}
+button[data-baseweb="tab"][aria-selected="true"] {background:#eef0ff;color:#4338ca!important;}
 [data-testid="stFileUploader"] {border:1px dashed #b9c1ce;border-radius:14px;background:#f5f7fa;}
 .stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
 .stat-number {font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}
 .stat-label {font-size:.9rem;color:#aeb5c2;margin:0;}
 .section-kicker {font-size:.76rem;text-transform:uppercase;letter-spacing:.12em;color:#8f86f5;font-weight:800;margin-bottom:4px;}
-.section-title {font-size:1.7rem;font-weight:800;margin-bottom:2px;}
-.section-subtitle {color:#8f97a6;margin-bottom:18px;}
-.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#211f35;color:#c9c5ff;border:1px solid #34304f;font-size:.78rem;font-weight:650;}
+.section-title {font-size:1.7rem;font-weight:800;margin-bottom:3px;color:#171a21;}
+.section-subtitle {color:#687182;margin-bottom:18px;}
+.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#eef0ff;color:#4338ca;border:1px solid #dfe2ff;font-size:.78rem;font-weight:650;}
 [data-testid="stAlert"], div[data-baseweb="notification"] {background:#151922 !important;border:1px solid #303747 !important;color:#f5f7fa !important;border-radius:14px !important;}
+/* ===== Responsive layout: desktop / tablet / phone ===== */
+html, body { overflow-x:hidden !important; }
+.mobile-nav-hint {display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}
+.block-container { width:100% !important; max-width:1500px !important; margin:0 auto !important; padding-left:clamp(0.75rem,2.5vw,2.5rem) !important; padding-right:clamp(0.75rem,2.5vw,2.5rem) !important; }
+[data-testid="stHorizontalBlock"] { width:100% !important; }
+[data-testid="stTextInput"], [data-testid="stTextArea"], [data-testid="stSelectbox"], [data-testid="stNumberInput"], [data-testid="stDateInput"], [data-testid="stFileUploader"] { width:100% !important; }
+.stButton > button, button[kind="primary"] { min-height:44px; }
+@media (min-width: 769px) and (max-width: 1100px) {
+    .block-container { padding-left:1rem !important; padding-right:1rem !important; }
+    [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        flex:1 1 46% !important; min-width:46% !important; max-width:100% !important;
+    }
+    .main-title { font-size:2.05rem !important; }
+    .section-title { font-size:1.45rem !important; }
+    div[data-baseweb="tab-list"] { overflow-x:auto !important; flex-wrap:nowrap !important; }
+    button[data-baseweb="tab"] { flex:0 0 auto !important; white-space:nowrap !important; }
+}
+@media (max-width: 768px) {
+    .mobile-nav-hint {display:block;}
+    .main-title {display:none !important;}
+    .block-container { padding:0.65rem 0.7rem 1.2rem !important; }
+    .main-title { font-size:1.45rem !important; line-height:1.15 !important; margin:12px 0 10px !important; letter-spacing:.01em !important; }
+    .subtitle { font-size:.78rem !important; margin-bottom:12px !important; }
+    .section-title { font-size:1.28rem !important; line-height:1.2 !important; margin-top:4px !important; }
+    .section-subtitle { font-size:.82rem !important; margin-bottom:12px !important; }
+    .section-kicker { font-size:.65rem !important; }
+    .stat-box { padding:12px 8px !important; margin:3px 0 !important; border-radius:12px !important; }
+    .stat-number { font-size:1.55rem !important; }
+    .stat-label { font-size:.72rem !important; }
+    .stButton > button, button[kind="primary"] { min-height:46px !important; width:100% !important; }
+    [data-testid="stHorizontalBlock"] { flex-direction:column !important; gap:.55rem !important; }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        width:100% !important; min-width:100% !important; max-width:100% !important; flex:1 1 100% !important;
+    }
+    div[data-baseweb="tab-list"] {
+        position:sticky !important; top:0 !important; z-index:20 !important;
+        overflow-x:auto !important; overflow-y:hidden !important;
+        flex-wrap:nowrap !important; scrollbar-width:none !important;
+        -webkit-overflow-scrolling:touch !important;
+    }
+    div[data-baseweb="tab-list"]::-webkit-scrollbar { display:none !important; }
+    button[data-baseweb="tab"] {
+        flex:0 0 auto !important; min-width:max-content !important;
+        white-space:nowrap !important; padding:8px 10px !important;
+        font-size:.78rem !important;
+    }
+    section[data-testid="stSidebar"] { width:min(88vw,330px) !important; }
+    section[data-testid="stSidebar"] .stButton > button { width:100% !important; }
+    .sidebar-ai-agent { font-size:.95rem !important; }
+    .sidebar-max { padding:9px 10px 7px !important; }
+    .sidebar-max-title { font-size:1.05rem !important; }
+    .sidebar-max-text { font-size:.68rem !important; }
+    [data-testid="stFileUploader"] { padding:.25rem !important; }
+    [data-testid="stMetric"] {padding:10px 8px !important; background:#fff !important; border:1px solid #e4e7ec !important; border-radius:12px !important;}
+    [data-testid="stExpander"] {border-radius:12px !important;}
+    [data-baseweb="select"], [data-baseweb="input"], [data-testid="stTextArea"] {font-size:16px !important;}
+    [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
+    .stMarkdown, .stCaption { overflow-wrap:anywhere !important; }
+    [data-testid="stAlert"], div[data-baseweb="notification"] { font-size:.86rem !important; }
+}
+
 [data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#f5f7fa !important;}
 [data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
 </style>""",
     unsafe_allow_html=True,
 )
 
-st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
 
 tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
-        "📊 Dashboard", "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
-        "📅 План", "📊 Статистика", "⚙️ Настройки"
+        "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
+        "◷ План", "◉ Аналитика", "⚙ Настройки"
     ]
 )
 
@@ -519,7 +581,7 @@ with tab_dashboard:
         except Exception:
             pass
 
-    st.markdown('<div class="section-kicker">CONTROL CENTER</div><div class="section-title">Dashboard</div><div class="section-subtitle">Единая панель управления продажами, заявками, контентом, остатками и задачами.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">CONTROL CENTER</div><div class="section-title">Главная</div><div class="section-subtitle">Продажи, заявки, контент и остатки — в одном месте.</div>', unsafe_allow_html=True)
 
     d1, d2, d3, d4, d5 = st.columns(5)
     d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
