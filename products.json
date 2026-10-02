@@ -262,5 +262,83 @@
         "specs": "Эластичная лента, компактный формат",
         "category": "Инвентарь",
         "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas Entrada26 Jersey",
+        "brand": "adidas",
+        "article": "JZ2492",
+        "sizes": "S–XXL",
+        "color": "Чёрный/белый",
+        "description": "Футбольная тренировочная джерси для занятий и матчей.",
+        "specs": "Футбольная посадка, спортивный материал",
+        "category": "Футболка",
+        "source_url": "https://www.adidas.de/en/entrada26-jersey/JZ2492.html",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas Tiro 26 Competition Training Jersey",
+        "brand": "adidas",
+        "article": "JX4255",
+        "sizes": "S–XXL",
+        "color": "Синий",
+        "description": "Тренировочная футбольная джерси для интенсивных занятий.",
+        "specs": "CLIMACOOL, сетчатые вставки, облегающая посадка",
+        "category": "Футболка",
+        "source_url": "https://www.adidas.de/en/tiro-26-competition-training-jersey/JX4255.html",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas FIFA World Cup 26 Germany Jersey",
+        "brand": "adidas",
+        "article": "KH2305",
+        "sizes": "XS–3XL",
+        "color": "Чёрный",
+        "description": "Футбольная джерси сборной Германии из актуальной коллекции.",
+        "specs": "Спортивный материал, футбольная посадка",
+        "category": "Футболка",
+        "source_url": "https://www.adidas.de/en/fifa-world-cup-26-germany-jersey/KH2305.html",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas F50 League Shin Guards",
+        "brand": "adidas",
+        "article": "F50-SG-LEAGUE",
+        "sizes": "Уточняется",
+        "color": "Разные",
+        "description": "Футбольные щитки для тренировок и матчей.",
+        "specs": "Лёгкая защитная конструкция",
+        "category": "Аксессуары",
+        "source_url": "https://www.adidas.de/en/football-shinguards_straps",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas Tiro Competition Backpack",
+        "brand": "adidas",
+        "article": "TIRO-BP-COMP",
+        "sizes": "Универсальный",
+        "color": "Чёрный",
+        "description": "Спортивный рюкзак для формы, обуви и экипировки.",
+        "specs": "Отделения для спортивных вещей",
+        "category": "Аксессуары",
+        "source_url": "https://www.adidas.de/en/men-tiro-teamwear",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
+    },
+    {
+        "name": "adidas UEFA Champions League 26/27 League Ball",
+        "brand": "adidas",
+        "article": "UCL-2627-LB",
+        "sizes": "5",
+        "color": "Разноцветный",
+        "description": "Футбольный мяч из актуальной коллекции UEFA Champions League.",
+        "specs": "Размер 5, тренировочный и игровой формат",
+        "category": "Инвентарь",
+        "source_url": "https://www.adidas.de/en/football-accessories",
+        "source_name": "adidas Deutschland",
+        "date_added": "2026-10-02"
     }
 ]
