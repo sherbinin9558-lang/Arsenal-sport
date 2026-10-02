@@ -1,5 +1,5 @@
 streamlit
 Pillow
-rembg[CPU]
 moviepy==1.0.3
+imageio-ffmpeg
 requests
