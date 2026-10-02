@@ -2036,23 +2036,47 @@ def render_max():
             st.subheader("Контент → продажи → AI")
             growth = ai_summary(products, leads, orders, plan)
             f = growth["funnel"]
+
             x, y, z, q = st.columns(4)
             x.metric("Заявки", f["leads"])
             y.metric("Заказы", f["orders"])
             z.metric("Конверсия", f"{f['lead_to_order']:.1f}%")
             q.metric("Выручка", f"{f['revenue']:,.0f} ₽".replace(",", " "))
+
+            st.caption("Рекомендации строятся локально по данным магазина. При малом объёме данных система показывает направление для теста, а не выдаёт его за доказанный результат.")
+
             st.markdown("---")
             st.subheader("🤖 Что делать дальше")
             for rec in growth["recommendations"]:
                 st.write(f"• {rec}")
+
             st.markdown("---")
-            st.subheader("📦 Товары, связанные с продажами")
-            for row in growth["products"][:10]:
-                st.write(f"**{row['product']}** · заявки {row['leads']} · заказы {row['orders']} · {row['revenue']:,.0f} ₽".replace(",", " "))
+            st.subheader("🎯 AI-фокус: товар · канал · формат")
+            a1, a2, a3 = st.columns(3)
+            with a1:
+                st.markdown("**Товары**")
+                for row in growth["products"][:5]:
+                    st.write(f"**{row['product']}**")
+                    st.caption(f"Сигнал {row['score']:.2f} · лиды {row['leads']} · заказы {row['orders']} · остаток {row['stock']}")
+            with a2:
+                st.markdown("**Каналы**")
+                for row in growth["channels"]:
+                    st.write(f"**{row['channel']}**")
+                    st.caption(f"Сигнал {row['score']:.2f} · публикации {row['published']} · лиды {row['leads']} · заказы {row['orders']}")
+            with a3:
+                st.markdown("**Форматы**")
+                for row in growth["formats"]:
+                    st.write(f"**{row['format']}**")
+                    st.caption(f"Сигнал {row['score']:.2f} · публикации {row['published']}")
+
             st.markdown("---")
-            st.subheader("📝 Следующие материалы")
+            st.subheader("📝 Следующий контент")
             for item in growth["next_content"]:
-                st.write(f"• {item['type']} · {item['product']} — {item['idea']}")
+                st.write(f"• **{item['type']} · {item['channel']}** · {item['product']}")
+                st.caption(f"{item['idea']} {item['reason']}")
+
+            st.caption(f"Режим AI: {growth.get('ai_mode', 'local_explainable')} · без платного API.")
+
 
 
         if st.button("Закрыть MAX", key="close_max"):
