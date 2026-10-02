@@ -395,13 +395,23 @@ with tab1:
                 card.save(card_buf, format="PNG")
                 card_b64 = base64.b64encode(card_buf.getvalue()).decode("ascii")
 
-                add_product({
+                original_b64 = None
+                if up:
+                    original_buf = io.BytesIO()
+                    img.save(original_buf, format="JPEG", quality=95)
+                    original_b64 = base64.b64encode(original_buf.getvalue()).decode("ascii")
+
+                product_data = {
                     "name": name, "brand": brand, "article": article,
                     "sizes": sizes, "color": color, "description": description,
                     "specs": specs, "category": category,
                     "card_image": card_b64,
                     "date_added": str(datetime.date.today())
-                })
+                }
+                if original_b64:
+                    product_data["original_image"] = original_b64
+
+                add_product(product_data)
                 st.success("✅ Карточка создана!")
                 st.image(card, caption="Готово (1080×1350)", width=400)
                 buf = io.BytesIO()
@@ -464,15 +474,31 @@ with tab2:
                             key=f"ct_{real_i}")
                     nd = st.text_area("Описание", p.get('description',''), key=f"d_{real_i}")
                     nsp = st.text_input("Характеристики", p.get('specs',''), key=f"sp_{real_i}")
+                    new_original = st.file_uploader(
+                        "📷 Исходное фото товара",
+                        type=["jpg", "jpeg", "png", "webp"],
+                        key=f"orig_{real_i}",
+                        help="Фото будет использоваться для автоматического создания карточки и Reels."
+                    )
                     if st.button("💾 Сохранить", key=f"save_{real_i}"):
                         updated = {
                             "name": nn, "brand": nb, "article": na, "sizes": ns,
                             "color": nc, "description": nd, "specs": nsp,
                             "category": ncat, "date_added": p.get('date_added', str(datetime.date.today()))
                         }
-                        # Не теряем сохранённую карточку при редактировании товара.
+                        # Не теряем сохранённую карточку и исходное фото.
                         if p.get("card_image"):
                             updated["card_image"] = p["card_image"]
+                        if p.get("original_image"):
+                            updated["original_image"] = p["original_image"]
+                        if new_original:
+                            original_buf = io.BytesIO()
+                            Image.open(new_original).convert("RGB").save(
+                                original_buf, format="JPEG", quality=95
+                            )
+                            updated["original_image"] = base64.b64encode(
+                                original_buf.getvalue()
+                            ).decode("ascii")
                         update_product(real_i, updated)
                         st.success("Обновлено!")
                         st.rerun()
@@ -732,10 +758,19 @@ with tab4:
                 source_bytes = reel_file.getvalue()
             else:
                 if not stored_card:
-                    # Автоматически создаём карточку для старого товара,
-                    # у которого card_image ещё не сохранена.
+                    # Используем исходное фото, если оно сохранено у товара.
+                    source_image = None
+                    original_b64 = reel_product.get("original_image")
+                    if original_b64:
+                        try:
+                            source_image = Image.open(
+                                io.BytesIO(base64.b64decode(original_b64))
+                            ).convert("RGB")
+                        except Exception:
+                            source_image = None
+
                     auto_card = generate_card(
-                        None,
+                        source_image,
                         reel_product.get("name", ""),
                         reel_product.get("brand", ""),
                         reel_product.get("article", ""),
@@ -757,10 +792,15 @@ with tab4:
                     reel_product = updated_product
                     stored_card = updated_product["card_image"]
 
-                    st.success(
-                        "✅ Карточка этого товара автоматически создана и сохранена. "
-                        "Теперь Reels будет использовать её и в следующий раз."
-                    )
+                    if source_image:
+                        st.success(
+                            "✅ Карточка автоматически создана с исходным фото товара и сохранена."
+                        )
+                    else:
+                        st.warning(
+                            "Карточка создана без фото: у старого товара исходное фото не сохранено. "
+                            "Добавь его в «Каталог → Редактировать»."
+                        )
                 else:
                     source_bytes = base64.b64decode(stored_card)
 
