@@ -298,7 +298,6 @@ def publish_reel_to_telegram(video_bytes, caption):
             "caption": caption,
             "supports_streaming": "true",
         }
-
         resp = requests.post(
             api_url,
             files=files,
@@ -514,7 +513,7 @@ section[data-testid="stSidebar"] {display:block !important; visibility:visible !
 button[key="sidebar_max"], button[key="dash_open_max"] {box-shadow:0 0 0 1px rgba(184,255,0,.45),0 0 14px rgba(184,255,0,.45) !important;}
 [data-testid="stSidebar"] [data-testid="stToggle"] label {color:#b8ff00 !important;text-shadow:0 0 6px rgba(184,255,0,.55) !important;}
 /* MAX popup: bright lime chevrons on dark controls. */
-[data-testid="stExpander"] svg {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 4px rgba(184,255,0,.65)) !important;}
+[data-testid="stExpander"] svg, [data-testid="stExpander"] button svg, [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:#b8ff00 !important;opacity:1 !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;}
 [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
 
 [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
@@ -597,8 +596,7 @@ html, body { overflow-x:hidden !important; }
         background:#f4f5f8 !important; opacity:1 !important;
         border:1px solid #e1e4eb !important;
     }
-    button[data-baseweb="tab"] * {color:#252b3a !important; opacity:1 !important;}
-    button[data-baseweb="tab"][aria-selected="true"] {
+    button[data-baseweb="tab"] * {color:#252b3a !important; opacity:1 !important;}    button[data-baseweb="tab"][aria-selected="true"] {
         color:#4c1d95 !important;
         background:linear-gradient(135deg,#eee9ff,#e5deff) !important;
         border-color:#c9bfff !important;
@@ -616,7 +614,7 @@ html, body { overflow-x:hidden !important; }
     [data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important; font-weight:900 !important;}
     [data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important; font-weight:700 !important;}
     [data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;}
-    [data-testid="stExpander"] {border-radius:12px !important;}\n    [data-testid="stExpander"] svg {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 4px rgba(184,255,0,.65)) !important;}\n    [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
+    [data-testid="stExpander"] {border-radius:12px !important;}\n    [data-testid="stExpander"] svg, [data-testid="stExpander"] button svg, [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:#b8ff00 !important;opacity:1 !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;}\n    [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
     [data-baseweb="select"], [data-baseweb="input"], [data-testid="stTextArea"] {font-size:16px !important;}
     [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
     .stMarkdown, .stCaption { overflow-wrap:anywhere !important; }
@@ -897,7 +895,6 @@ def parse_bulk_file(uploaded_file):
             return []
         headers = [str(x or "").strip() for x in rows[0]]
         return [dict(zip(headers, row)) for row in rows[1:] if any(x not in (None, "") for x in row)]
-
     text = raw.decode("utf-8-sig")
     sample = text[:4096]
     try:
@@ -1197,8 +1194,7 @@ with tab3:
                 )
 
             st.markdown("---")
-            st.subheader("🅥 ВКонтакте")
-            st.text_area(
+            st.subheader("🅥 ВКонтакте")            st.text_area(
                 "Текст поста",
                 vk,
                 height=200,
@@ -1497,8 +1493,7 @@ with tab5:
                         wk = d.isocalendar()[1]
                     except Exception:
                         wk = 0
-                    weeks.setdefault(wk, []).append((i, item))
-                for wk in sorted(weeks.keys()):
+                    weeks.setdefault(wk, []).append((i, item))                for wk in sorted(weeks.keys()):
                     with st.expander(f"Неделя {wk} · {len(weeks[wk])} материалов"):
                         for i, item in weeks[wk]:
                             st.write(f"**{item.get('date','')}** · {item.get('platform','')} · {item.get('type','')} · **{item.get('status','Идея')}**")
@@ -1797,8 +1792,7 @@ def ai_sales_reply(products, message):
     if any(k in lower for k in ("достав", "оплат", "возврат", "налич", "размер")) and not found:
         return knowledge_answer(q), []
     if found:
-        top = found[:5]
-        lines = ["Нашёл подходящие варианты:"]
+        top = found[:5]        lines = ["Нашёл подходящие варианты:"]
         for i, p in enumerate(top, 1):
             title = f"{p.get('brand','')} {p.get('name','')}".strip()
             details = []
@@ -2097,8 +2091,7 @@ def render_max():
                 st.markdown("---")
                 st.markdown("### 📅 План на 30 дней")
                 if st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
-                    generated = make_30_day_plan(products)
-                    existing = load_plan()
+                    generated = make_30_day_plan(products)                    existing = load_plan()
                     existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
                     added = 0
                     for item in generated:
