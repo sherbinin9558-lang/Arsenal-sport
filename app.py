@@ -700,6 +700,34 @@ button[key="sidebar_max"], button[key="dash_open_max"] {
     box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
     font-weight:900 !important;
 }
+/* Final chrome cleanup: hide platform/GitHub/settings entry points only. */
+header[data-testid="stHeader"] [data-testid="stToolbar"],
+header[data-testid="stHeader"] [data-testid="stToolbar"] *,
+[data-testid="stToolbar"] a[href*="github.com"],
+[data-testid="stToolbar"] a[href*="settings" i],
+[data-testid="stToolbar"] button[aria-label*="GitHub" i],
+[data-testid="stToolbar"] button[aria-label*="Settings" i],
+a[href*="github.com"],
+a[href*="gitlab.com"],
+a[href*="bitbucket.org"] {
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+}
+
+/* MAX expander arrows: lime/neon, including BaseWeb icon internals. */
+[data-testid="stDialog"] [data-testid="stExpander"] summary svg,
+[data-testid="stDialog"] [data-testid="stExpander"] summary svg *,
+[data-testid="stDialog"] [data-testid="stExpander"] button svg,
+[data-testid="stDialog"] [data-testid="stExpander"] button svg * {
+    color:#b8ff00 !important;
+    stroke:#b8ff00 !important;
+    fill:none !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    filter:drop-shadow(0 0 6px rgba(184,255,0,.95)) !important;
+}
+
 /* Neon theme switch, without changing its behavior. */
 [data-testid="stSidebar"] [data-testid="stToggle"] label,
 [data-testid="stSidebar"] [data-baseweb="checkbox"] label {
@@ -1210,7 +1238,8 @@ with tab3:
                 )
 
             st.markdown("---")
-            st.subheader("🅥 ВКонтакте")            st.text_area(
+            st.subheader("🅥 ВКонтакте")
+            st.text_area(
                 "Текст поста",
                 vk,
                 height=200,
@@ -1509,7 +1538,8 @@ with tab5:
                         wk = d.isocalendar()[1]
                     except Exception:
                         wk = 0
-                    weeks.setdefault(wk, []).append((i, item))                for wk in sorted(weeks.keys()):
+                    weeks.setdefault(wk, []).append((i, item))
+                for wk in sorted(weeks.keys()):
                     with st.expander(f"Неделя {wk} · {len(weeks[wk])} материалов"):
                         for i, item in weeks[wk]:
                             st.write(f"**{item.get('date','')}** · {item.get('platform','')} · {item.get('type','')} · **{item.get('status','Идея')}**")
@@ -1808,7 +1838,8 @@ def ai_sales_reply(products, message):
     if any(k in lower for k in ("достав", "оплат", "возврат", "налич", "размер")) and not found:
         return knowledge_answer(q), []
     if found:
-        top = found[:5]        lines = ["Нашёл подходящие варианты:"]
+        top = found[:5]
+        lines = ["Нашёл подходящие варианты:"]
         for i, p in enumerate(top, 1):
             title = f"{p.get('brand','')} {p.get('name','')}".strip()
             details = []
@@ -2107,7 +2138,8 @@ def render_max():
                 st.markdown("---")
                 st.markdown("### 📅 План на 30 дней")
                 if st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
-                    generated = make_30_day_plan(products)                    existing = load_plan()
+                    generated = make_30_day_plan(products)
+                    existing = load_plan()
                     existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
                     added = 0
                     for item in generated:
