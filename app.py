@@ -487,7 +487,15 @@ with tab_dashboard:
     cm = conversion_metrics(leads, orders)
     wm = workflow_metrics(plan)
     low = low_stock_products(products)
-    due, overdue = max_due_content(plan)
+    due, overdue = [], []
+    today = datetime.date.today()
+    for item in plan:
+        try:
+            item_date = datetime.date.fromisoformat(str(item.get("date", "")))
+            if item.get("status") != "Опубликовано":
+                (overdue if item_date < today else due if item_date == today else []).append(item)
+        except Exception:
+            pass
 
     st.markdown('<div class="section-kicker">CONTROL CENTER</div><div class="section-title">Dashboard</div><div class="section-subtitle">Единая панель управления продажами, заявками, контентом, остатками и задачами.</div>', unsafe_allow_html=True)
 
