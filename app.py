@@ -451,6 +451,19 @@ else:
     .sidebar-max-kicker {color:#5b4bd6;}
     .sidebar-max-title {color:#21164d;}
     .sidebar-max-text {color:#5f6472;}
+    .stApp, .stApp * {color:#17151c;}
+    .stApp [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stMarkdownContainer"] li, .stApp [data-testid="stMarkdownContainer"] span, .stApp label, .stApp [data-testid="stCaptionContainer"] {color:#17151c !important;}
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color:#17151c !important;}
+    .stApp input, .stApp textarea, .stApp [data-baseweb="select"] * {color:#17151c !important;}
+    .stApp input::placeholder, .stApp textarea::placeholder {color:#667080 !important;opacity:1 !important;}
+    .stApp button:not([data-baseweb="tab"]) {color:#17151c !important;}
+    .stApp button[kind="primary"] {color:#ffffff !important;}
+    button[data-baseweb="tab"] {color:#17151c !important;background:#ffffff !important;border-color:#dfe3ea !important;}
+    button[data-baseweb="tab"] * {color:#17151c !important;}
+    button[data-baseweb="tab"][aria-selected="true"] {color:#32165f !important;background:linear-gradient(135deg,#f1eaff,#e8ddff) !important;border-color:#bda6e8 !important;box-shadow:0 0 0 1px rgba(72,35,125,.16),0 0 11px rgba(83,43,145,.18) !important;}
+    button[data-baseweb="tab"][aria-selected="true"] * {color:#32165f !important;}
+    .section-kicker {color:#4b247c !important;text-shadow:0 0 7px rgba(75,36,124,.22) !important;}
+    .pill {color:#32165f !important;}
     """
 
 st.markdown(
