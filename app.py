@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
-from crm_core import create_lead, crm_metrics, load_leads
+from crm_core import create_lead, crm_metrics, load_leads, update_lead, STATUSES
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1168,6 +1168,25 @@ with tab8:
         st.session_state["sales_last_found"] = []
         st.rerun()
     st.markdown("### 📊 CRM")
+    st.caption("Воронка AI-продавца: новое обращение → работа менеджера → заказ → завершение.")
+    crm_leads = load_leads()
+    if crm_leads:
+        lead_status = st.selectbox("Фильтр обращений", ["Все"] + STATUSES, key="crm_lead_filter")
+        visible_leads = crm_leads if lead_status == "Все" else [x for x in crm_leads if x.get("status") == lead_status]
+        for lead in reversed(visible_leads[-30:]):
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2.5, 3, 2])
+                c1.markdown(f"**#{lead.get('id')} · {lead.get('name','Клиент')}**")
+                c1.caption(f"{lead.get('created_at','')} · {lead.get('source','')}")
+                c2.write(f"Контакт: {lead.get('contact','—')}")
+                c2.caption(f"Товар: {lead.get('product','—')}")
+                current = lead.get("status", "Новый")
+                new_status = c3.selectbox("Статус", STATUSES, index=STATUSES.index(current) if current in STATUSES else 0, key=f"crm_status_{lead.get('id')}")
+                if new_status != current:
+                    update_lead(lead.get("id"), status=new_status)
+                    st.rerun()
+                if lead.get("message"):
+                    st.caption(lead["message"])
     lead_stats = crm_metrics(load_leads())
     lc1, lc2, lc3 = st.columns(3)
     lc1.metric("Обращений", lead_stats.get("total", 0))
