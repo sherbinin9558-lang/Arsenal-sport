@@ -469,12 +469,90 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p>', unsafe_allow_html=True)
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
-        "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
+        "📊 Dashboard", "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
         "📅 План", "📊 Статистика", "⚙️ Настройки"
     ]
 )
+
+# ========== DASHBOARD ==========
+with tab_dashboard:
+    products = load_products()
+    plan = load_plan()
+    leads = load_leads()
+    orders = load_orders()
+    crm = crm_metrics(leads)
+    om = order_metrics(orders, ACTIVE_ORDER_STATUSES)
+    cm = conversion_metrics(leads, orders)
+    wm = workflow_metrics(plan)
+    low = low_stock_products(products)
+    due, overdue = max_due_content(plan)
+
+    st.markdown('<div class="section-kicker">CONTROL CENTER</div><div class="section-title">Dashboard</div><div class="section-subtitle">Единая панель управления продажами, заявками, контентом, остатками и задачами.</div>', unsafe_allow_html=True)
+
+    d1, d2, d3, d4, d5 = st.columns(5)
+    d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
+    d2.metric("Заявки", crm.get("total", 0))
+    d3.metric("Заказы", om.get("total", 0))
+    d4.metric("Конверсия", f'{cm["conversion"]:.1f}%')
+    d5.metric("Товаров", len(products))
+
+    st.markdown("---")
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### Контент и задачи")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("В плане", wm.get("total", 0))
+        c2.metric("На проверке", wm.get("counts", {}).get("На проверке", 0))
+        c3.metric("Просрочено", wm.get("overdue", 0))
+        if overdue:
+            st.warning(f"Просроченных публикаций: {len(overdue)}")
+        if due:
+            st.info(f"На сегодня запланировано: {len(due)}")
+        if not overdue and not due:
+            st.success("Срочных контент-задач нет.")
+
+    with right:
+        st.markdown("### Склад")
+        s1, s2 = st.columns(2)
+        s1.metric("Позиций в каталоге", len(products))
+        s2.metric("Низкий остаток", len(low))
+        if low:
+            for product, qty in low[:8]:
+                st.write(f'• {max_product_title(product)} — {qty} шт.')
+        else:
+            st.success("Дефицитных позиций нет.")
+
+    st.markdown("---")
+    a, b = st.columns(2)
+    with a:
+        st.markdown("### Продажи")
+        st.write(f'Активных заказов: **{om["active"]}**')
+        st.write(f'Завершённых заказов: **{om["completed"]}**')
+        st.write(f'Отменённых заказов: **{om["cancelled"]}**')
+        st.write(f'Сумма неотменённых заказов: **{om["amount"]:,.0f} ₽**'.replace(",", " "))
+    with b:
+        st.markdown("### Быстрые действия")
+        if st.button("➕ Добавить товар", key="dash_add_product", use_container_width=True):
+            st.info("Откройте раздел «Создать» — там можно сразу загрузить фото и создать карточку.")
+        if st.button("📅 Открыть контент-план", key="dash_open_plan", use_container_width=True):
+            st.info("Откройте раздел «План» для управления публикациями и workflow.")
+        if st.button("⚡ Открыть MAX", key="dash_open_max", use_container_width=True):
+            st.session_state["open_max"] = True
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### Состояние системы")
+    checks = [
+        ("Каталог", bool(products), f'{len(products)} товаров'),
+        ("CRM", True, f'{len(leads)} заявок'),
+        ("Заказы", True, f'{len(orders)} заказов'),
+        ("Контент workflow", True, f'{len(plan)} материалов'),
+        ("Склад", True, f'{len(low)} позиций с низким остатком'),
+    ]
+    for name, ok, detail in checks:
+        st.write(("🟢" if ok else "🟡") + f" **{name}** — {detail}")
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
 with tab1:
