@@ -1078,6 +1078,16 @@ with tab8:
             for lead in reversed(manager_leads[-5:]):
                 st.write(f"**#{lead.get('id', '—')} · {lead.get('name', 'Клиент')}** · {lead.get('status', 'Новый')}")
                 st.caption(f"{lead.get('contact', '—')} · {lead.get('product', 'Товар не указан')}")
+                current_lead_status = lead.get("status", "Новый")
+                new_lead_status = st.selectbox(
+                    "Статус",
+                    CRM_STATUSES,
+                    index=CRM_STATUSES.index(current_lead_status) if current_lead_status in CRM_STATUSES else 0,
+                    key=f"manager_lead_status_{lead.get('id')}",
+                )
+                if new_lead_status != current_lead_status:
+                    update_lead(lead.get("id"), status=new_lead_status)
+                    st.rerun()
         else:
             st.info("Новых обращений пока нет.")
 
@@ -1090,6 +1100,25 @@ with tab8:
                 order_id = order.get("id", "—")
                 st.write(f"**{order_id} · {customer}** · {status}")
                 st.caption(f"Контакт: {order.get('customer_contact', '—')}")
+                if order.get("lead_id"):
+                    st.caption(f"CRM: обращение #{order.get('lead_id')}")
+                new_order_status = st.selectbox(
+                    "Статус заказа",
+                    ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"],
+                    index=["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"].index(status) if status in ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"] else 0,
+                    key=f"manager_order_status_{order_id}",
+                )
+                if new_order_status != status:
+                    order["status"] = new_order_status
+                    save_json(Path("orders.json"), manager_orders)
+                    if order.get("lead_id"):
+                        if new_order_status == "Завершён":
+                            update_lead(order["lead_id"], status="Завершён")
+                        elif new_order_status == "Отменён":
+                            update_lead(order["lead_id"], status="Отменён")
+                        elif new_order_status != "Новая":
+                            update_lead(order["lead_id"], status="Заказ оформлен")
+                    st.rerun()
         else:
             st.info("Заказов пока нет.")
 
