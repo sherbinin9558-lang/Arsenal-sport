@@ -1293,3 +1293,110 @@ def max_store_metrics(products, leads, orders, plan):
             except Exception:
                 pass
     lead_to_order = sum(x.get("status") == "Заказ оформлен" for x in leads)
+
+# ==================== MAX UI ====================
+def load_orders():
+    return load_json(Path("orders.json"), [])
+
+def render_max():
+    @st.dialog("⚡ Arsenal Sport MAX", width="large")
+    def dialog():
+        products = load_products()
+        plan = load_plan()
+        leads = load_leads()
+        orders = load_orders()
+        due, overdue = max_due_content(plan)
+        crm = crm_metrics(leads)
+
+        st.caption("Центр управления магазином: каталог, контент, заявки и продажи.")
+
+        a, b, c, d = st.columns(4)
+        a.metric("Товары", len(products))
+        b.metric("Заявки", crm.get("total", 0))
+        c.metric("Активные заказы", len([o for o in orders if o.get("status", "Новая") in ACTIVE_ORDER_STATUSES]))
+        d.metric("Контент сегодня", len(due))
+
+        st.markdown("---")
+        section = st.radio(
+            "Раздел MAX",
+            ["Обзор", "AI-продавец", "CRM", "Контент"],
+            horizontal=True,
+            key="max_section",
+        )
+
+        if section == "Обзор":
+            st.subheader("Состояние магазина")
+            st.write(
+                f"Товаров: {len(products)} · карточек: "
+                f"{sum(bool(p.get('card_image')) for p in products)} · "
+                f"публикаций в плане: {len(plan)}"
+            )
+            if overdue:
+                st.error(f"Просрочено публикаций: {len(overdue)}")
+            elif due:
+                st.info(f"На сегодня: {len(due)} публикаций")
+            else:
+                st.success("На сегодня срочных публикаций нет.")
+
+        elif section == "AI-продавец":
+            st.subheader("AI-продавец по каталогу")
+            q = st.text_input(
+                "Что ищет клиент?",
+                placeholder="Например: бутсы 42 размера",
+                key="max_sales_query",
+            )
+            if st.button("🔎 Найти товар", type="primary", key="max_sales_search"):
+                ans, found = ai_sales_reply(products, q)
+                st.session_state["max_sales_answer"] = ans
+                st.session_state["max_sales_found"] = found
+            if st.session_state.get("max_sales_answer"):
+                st.text_area(
+                    "Готовый ответ",
+                    st.session_state["max_sales_answer"],
+                    height=180,
+                    key="max_sales_answer_box",
+                )
+
+        elif section == "CRM":
+            st.subheader("CRM — заявки")
+            if not leads:
+                st.info("Заявок пока нет.")
+            for lead in reversed(leads[-20:]):
+                title = lead.get("name") or lead.get("contact") or f"Заявка #{lead.get('id', '')}"
+                with st.expander(f"{title} · {lead.get('status', 'Новый')}"):
+                    st.write(f"Контакт: {lead.get('contact', '—')}")
+                    st.write(f"Товар: {lead.get('product', '—')}")
+                    st.write(f"Сообщение: {lead.get('message', '—')}")
+                    current_status = lead.get("status", "Новый")
+                    ns = st.selectbox(
+                        "Статус",
+                        CRM_STATUSES,
+                        index=CRM_STATUSES.index(current_status) if current_status in CRM_STATUSES else 0,
+                        key=f"max_lead_status_{lead.get('id')}",
+                    )
+                    if ns != current_status:
+                        update_lead(lead.get("id"), status=ns)
+                        st.rerun()
+
+        else:
+            st.subheader("Контент")
+            if not products:
+                st.info("Сначала добавьте товар в каталог.")
+            elif st.button("✨ Создать идеи на 7 дней", type="primary", key="max_plan_suggest"):
+                st.session_state["max_suggestions"] = planner_suggestions(products)
+
+            for item in st.session_state.get("max_suggestions", []):
+                st.write(
+                    f"**{item.get('date', '')} · {item.get('platform', '')} · "
+                    f"{item.get('type', '')}** — {item.get('product', '')}"
+                )
+
+        if st.button("Закрыть MAX", key="close_max"):
+            st.session_state["open_max"] = False
+            st.rerun()
+
+    dialog()
+
+
+if st.session_state.get("open_max", False):
+    render_max()
