@@ -512,6 +512,33 @@ section[data-testid="stSidebar"] {display:block !important; visibility:visible !
 [data-testid="stDialog"] button[aria-label="Close"] svg line {color:#b8ff00 !important;stroke:#b8ff00 !important;opacity:1 !important;visibility:visible !important;}
 button[key="sidebar_max"], button[key="dash_open_max"] {box-shadow:0 0 0 1px rgba(184,255,0,.45),0 0 14px rgba(184,255,0,.45) !important;}
 [data-testid="stSidebar"] [data-testid="stToggle"] label {color:#b8ff00 !important;text-shadow:0 0 6px rgba(184,255,0,.55) !important;}
+/* MAX header: keep the identity visible inside the popup. */
+.max-header {
+    display:block !important;
+    width:100% !important;
+    padding:4px 0 10px !important;
+    visibility:visible !important;
+    opacity:1 !important;
+}
+.max-header-title {
+    font-size:1.45rem !important;
+    line-height:1.2 !important;
+    font-weight:900 !important;
+    color:#21164d !important;
+    visibility:visible !important;
+    opacity:1 !important;
+}
+.max-header-title span {
+    color:#7cff00 !important;
+    text-shadow:0 0 8px rgba(184,255,0,.55) !important;
+}
+.max-header-subtitle {
+    margin-top:3px !important;
+    font-size:.82rem !important;
+    color:#687182 !important;
+    visibility:visible !important;
+    opacity:1 !important;
+}
 /* MAX popup: bright lime chevrons on dark controls. */
 [data-testid="stExpander"] svg, [data-testid="stExpander"] button svg, [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:#b8ff00 !important;opacity:1 !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;}
 [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
@@ -1923,6 +1950,13 @@ def render_max():
         low = low_stock_products(products)
         cm = conversion_metrics(leads, orders)
 
+        st.markdown(
+            '<div class="max-header">'
+            '<div class="max-header-title">⚡ AI Agent Content Manager <span>MAX</span></div>'
+            '<div class="max-header-subtitle">Центр управления магазином</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.caption("Бесплатный центр управления магазином: каталог, контент, заявки, заказы и продажи.")
 
         a, b, c, d, e = st.columns(5)
