@@ -496,7 +496,7 @@ def publish_reel_to_vk(video_bytes, caption):
         return False, f"Ошибка VK: {e}"
 
 # ==================== ИНТЕРФЕЙС ====================
-st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", page_icon="🏆")
+st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide")
 
 with st.sidebar:
     st.title("Arsenal Sport")
@@ -547,7 +547,7 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 :root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
-.main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:8px 0 0;letter-spacing:.02em;}
+.block-container {padding-top:1rem!important;}\n .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:0 0 0;letter-spacing:.02em;}
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
@@ -579,7 +579,7 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
     unsafe_allow_html=True,
 )
 
-st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
 st.markdown("---")
 
