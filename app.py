@@ -700,6 +700,34 @@ button[key="sidebar_max"], button[key="dash_open_max"] {
     box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
     font-weight:900 !important;
 }
+/* Final chrome cleanup: hide platform/GitHub/settings entry points only. */
+header[data-testid="stHeader"] [data-testid="stToolbar"],
+header[data-testid="stHeader"] [data-testid="stToolbar"] *,
+[data-testid="stToolbar"] a[href*="github.com"],
+[data-testid="stToolbar"] a[href*="settings" i],
+[data-testid="stToolbar"] button[aria-label*="GitHub" i],
+[data-testid="stToolbar"] button[aria-label*="Settings" i],
+a[href*="github.com"],
+a[href*="gitlab.com"],
+a[href*="bitbucket.org"] {
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+}
+
+/* MAX expander arrows: lime/neon, including BaseWeb icon internals. */
+[data-testid="stDialog"] [data-testid="stExpander"] summary svg,
+[data-testid="stDialog"] [data-testid="stExpander"] summary svg *,
+[data-testid="stDialog"] [data-testid="stExpander"] button svg,
+[data-testid="stDialog"] [data-testid="stExpander"] button svg * {
+    color:#b8ff00 !important;
+    stroke:#b8ff00 !important;
+    fill:none !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    filter:drop-shadow(0 0 6px rgba(184,255,0,.95)) !important;
+}
+
 /* Neon theme switch, without changing its behavior. */
 [data-testid="stSidebar"] [data-testid="stToggle"] label,
 [data-testid="stSidebar"] [data-baseweb="checkbox"] label {
