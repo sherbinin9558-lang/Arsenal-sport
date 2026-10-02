@@ -756,17 +756,63 @@ div[role="dialog"] [data-testid="stExpander"] svg * {
 div[role="dialog"] [data-testid="stExpander"] button:hover {
     color:#d6ff66 !important;
 }
-/* Remove the temporary top MAX launcher; MAX lives in the sidebar. */
-button[key="top_max_launcher"] { display:none !important; visibility:hidden !important; pointer-events:none !important; }
+/* MAX lives only in the sidebar. Remove all obsolete top-launcher rules. */
 button[key="top_max_launcher"] {
-    background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
-    color:#101500 !important;
-    border:1px solid #d7ff72 !important;
-    box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
-    font-weight:900 !important;
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
 }
-@media (max-width:768px) {
-    button[key="top_max_launcher"] { min-height:42px !important; font-size:.9rem !important; }
+
+/* Tablet/mobile: keep the customer sidebar physically OPEN.
+   Streamlit can remember the collapsed state on touch devices; CSS below
+   keeps the actual app sidebar at the left edge instead of leaving MAX hidden. */
+@media (max-width:1100px) {
+    section[data-testid="stSidebar"],
+    aside[data-testid="stSidebar"],
+    div[data-testid="stSidebar"] {
+        display:block !important;
+        visibility:visible !important;
+        opacity:1 !important;
+        position:fixed !important;
+        left:0 !important;
+        top:0 !important;
+        bottom:0 !important;
+        width:280px !important;
+        min-width:280px !important;
+        max-width:280px !important;
+        margin-left:0 !important;
+        transform:translateX(0) !important;
+        -webkit-transform:translateX(0) !important;
+        z-index:100000 !important;
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        pointer-events:auto !important;
+    }
+
+    section[data-testid="stSidebar"] > div:first-child,
+    aside[data-testid="stSidebar"] > div:first-child {
+        width:280px !important;
+        min-width:280px !important;
+        max-width:280px !important;
+        visibility:visible !important;
+        opacity:1 !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stSidebar"] button[aria-label*="Close sidebar" i],
+    [data-testid="stSidebar"] button[aria-label*="Collapse sidebar" i] {
+        display:none !important;
+        visibility:hidden !important;
+        pointer-events:none !important;
+    }
+
+    .sidebar-max,
+    button[key="sidebar_max"] {
+        display:block !important;
+        visibility:visible !important;
+        opacity:1 !important;
+        pointer-events:auto !important;
+    }
 }
 /* Keep the MAX launcher visually prominent. */
 button[key="sidebar_max"], button[key="dash_open_max"] {
