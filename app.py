@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
+from crm_core import create_lead, crm_metrics, load_leads
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1110,6 +1111,25 @@ with tab8:
     last_found = st.session_state.get("sales_last_found", [])
     if last_found:
         st.markdown("**Карточки найденных товаров**")
+        st.markdown("### 🧾 Передать обращение в CRM")
+        st.caption("Если клиент готов продолжить, обращение сохраняется в CRM. Это не подтверждает наличие или оплату товара.")
+        lead_name = st.text_input("Имя клиента", key="sales_lead_name")
+        lead_contact = st.text_input("Телефон / Telegram", key="sales_lead_contact")
+        lead_message = st.text_area("Комментарий клиента", value=st.session_state.get("sales_chat", [])[-1][1] if st.session_state.get("sales_chat") else "", key="sales_lead_message")
+        lead_product = f"{last_found[0].get('brand','')} {last_found[0].get('name','')}".strip()
+        if st.button("📥 Создать обращение в CRM", type="primary", key="create_sales_lead"):
+            if not lead_contact.strip():
+                st.error("Укажите телефон или Telegram клиента.")
+            else:
+                lead = create_lead(
+                    lead_name.strip() or "Клиент",
+                    lead_contact.strip(),
+                    "AI-продавец",
+                    lead_message.strip(),
+                    lead_product,
+                )
+                st.success(f"Обращение {lead.get('id', '—')} сохранено в CRM.")
+                st.rerun()
         for idx, p in enumerate(last_found):
             title = f"{p.get('brand','')} {p.get('name','')}".strip()
             st.markdown(f"### {idx+1}. {title}")
@@ -1147,6 +1167,12 @@ with tab8:
         st.session_state["sales_chat"] = []
         st.session_state["sales_last_found"] = []
         st.rerun()
+    st.markdown("### 📊 CRM")
+    lead_stats = crm_metrics(load_leads())
+    lc1, lc2, lc3 = st.columns(3)
+    lc1.metric("Обращений", lead_stats.get("total", 0))
+    lc2.metric("Новых", lead_stats.get("new", 0))
+    lc3.metric("Заказов из CRM", lead_stats.get("orders", 0))
     st.caption("Ядро работает без платного AI API. Внешний AI можно подключить позже как дополнительный слой.")
 
 # ========== 7: НАСТРОЙКИ ==========
