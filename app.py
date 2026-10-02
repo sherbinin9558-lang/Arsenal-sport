@@ -280,16 +280,26 @@ def publish_reel_to_telegram(video_bytes, caption):
 
         size_mb = len(video_bytes) / (1024 * 1024)
         if size_mb > 50:
-            return False, f"Видео весит {size_mb:.1f} МБ. Telegram Bot API не примет такой файл через sendVideo; нужно уменьшить Reels."
+            return False, f"Видео весит {size_mb:.1f} МБ — больше лимита Telegram Bot API 50 МБ."
 
+        caption = (caption or "").strip()[:1024]
         api_url = _telegram_api(token, "sendVideo")
-        files = {"video": ("reel.mp4", video_bytes, "video/mp4")}
+
+        files = {
+            "video": ("arsenal_sport_reel.mp4", video_bytes, "video/mp4")
+        }
         data = {
             "chat_id": channel,
-            "caption": (caption or "")[:1024],
+            "caption": caption,
             "supports_streaming": "true",
         }
-        resp = requests.post(api_url, files=files, data=data, timeout=180)
+
+        resp = requests.post(
+            api_url,
+            files=files,
+            data=data,
+            timeout=(20, 300),
+        )
 
         try:
             result = resp.json()
@@ -297,16 +307,48 @@ def publish_reel_to_telegram(video_bytes, caption):
             result = {}
 
         if resp.ok and result.get("ok") is True:
-            return True, f"Reels опубликован в Telegram ({channel})."
+            return True, f"Reels опубликован в Telegram ({channel}). Размер: {size_mb:.1f} МБ."
 
-        description = result.get("description") or resp.text
-        if "chat not found" in description.lower():
-            return False, "Telegram не нашёл канал. Проверь TELEGRAM_CHANNEL: можно указать @username канала или числовой ID вида -100xxxxxxxxxx."
-        if "not enough rights" in description.lower() or "forbidden" in description.lower():
-            return False, "Бот найден, но Telegram не разрешил публикацию. Добавь бота в канал администратором с правом публикации сообщений."
-        if "file is too big" in description.lower():
+        description = result.get("description") or resp.text or "неизвестная ошибка"
+        lower = description.lower()
+
+        if "chat not found" in lower:
+            return False, "Telegram не нашёл канал. Проверь TELEGRAM_CHANNEL: @username канала или числовой ID вида -100xxxxxxxxxx."
+        if "not enough rights" in lower or "forbidden" in lower:
+            return False, "Бот найден, но Telegram запретил публикацию. Бот должен быть администратором канала с правом публикации сообщений."
+        if "file is too big" in lower:
             return False, f"Telegram отклонил видео как слишком большое ({size_mb:.1f} МБ)."
-        return False, f"Telegram API: {description} (HTTP {resp.status_code})"
+        if "wrong file identifier/http url specified" in lower:
+            return False, f"Telegram не принял MP4. Размер {size_mb:.1f} МБ. Ответ API: {description}"
+
+        # Резервный канал: если sendVideo не прошёл из-за формата/обработки,
+        # пробуем загрузить тот же MP4 как документ. Это позволяет не терять файл
+        # и одновременно показывает, что проблема именно в обработке video Telegram.
+        try:
+            doc_resp = requests.post(
+                _telegram_api(token, "sendDocument"),
+                files={"document": ("arsenal_sport_reel.mp4", video_bytes, "video/mp4")},
+                data={
+                    "chat_id": channel,
+                    "caption": caption,
+                },
+                timeout=(20, 300),
+            )
+            try:
+                doc_result = doc_resp.json()
+            except Exception:
+                doc_result = {}
+
+            if doc_resp.ok and doc_result.get("ok") is True:
+                return True, (
+                    f"Telegram не принял файл как видео, поэтому отправил его как MP4-документ. "
+                    f"Размер: {size_mb:.1f} МБ. Причина sendVideo: {description}"
+                )
+        except requests.RequestException:
+            pass
+
+        return False, f"Telegram API не принял Reels: {description} (HTTP {resp.status_code}, {size_mb:.1f} МБ)."
+
     except KeyError as e:
         return False, f"Не найден секрет: {e}. Нужны TELEGRAM_TOKEN и TELEGRAM_CHANNEL."
     except requests.RequestException as e:
