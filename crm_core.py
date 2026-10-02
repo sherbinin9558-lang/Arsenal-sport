@@ -51,3 +51,27 @@ def crm_metrics(leads):
         "orders": sum(x.get("status") == "Заказ оформлен" for x in leads),
         "completed": sum(x.get("status") == "Завершён" for x in leads),
     }
+
+
+def add_lead_interaction(lead_id, message, direction="manager"):
+    leads = load_leads()
+    for lead in leads:
+        if lead.get("id") == lead_id:
+            history = lead.setdefault("history", [])
+            history.append({
+                "time": datetime.now().isoformat(timespec="minutes"),
+                "direction": direction,
+                "message": message,
+            })
+            lead["updated_at"] = datetime.now().isoformat(timespec="minutes")
+            save_leads(leads)
+            return lead
+    return None
+
+def set_customer_profile(lead_id, notes="", interested_products=None, customer_status=None):
+    changes = {"notes": notes}
+    if interested_products is not None:
+        changes["interested_products"] = interested_products
+    if customer_status:
+        changes["customer_status"] = customer_status
+    return update_lead(lead_id, **changes)
