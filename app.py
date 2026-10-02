@@ -1589,6 +1589,26 @@ def render_max():
                                 continue
                             path = save_uploaded_photo(f, products_now[idx], idx)
                             products_now[idx]["original_image"] = path
+                            try:
+                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
+                                p_now = products_now[idx]
+                                card_img = generate_card(
+                                    source_img,
+                                    p_now.get("name",""),
+                                    p_now.get("brand",""),
+                                    p_now.get("article",""),
+                                    p_now.get("sizes",""),
+                                    p_now.get("color",""),
+                                    p_now.get("description",""),
+                                    p_now.get("specs",""),
+                                    p_now.get("category","Другое"),
+                                    "Dark Premium",
+                                )
+                                card_buf = io.BytesIO()
+                                card_img.save(card_buf, format="PNG")
+                                products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
+                            except Exception:
+                                pass
                             matched += 1
                         save_products(products_now)
                         st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
