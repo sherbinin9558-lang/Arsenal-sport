@@ -100,7 +100,7 @@ def draw_centered(draw, text, font, fill, y, w):
     draw.text(((w - (bbox[2] - bbox[0])) // 2, y), text, font=font, fill=fill)
 
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
-    t = TEMPLATES.get(template, TEMPLATES["Тёмный"])
+    t = TEMPLATES.get(template, TEMPLATES["Графит"])
     canvas = Image.new("RGB", CARD_SIZE, t["bg"])
     draw = ImageDraw.Draw(canvas)
 
@@ -323,7 +323,7 @@ st.set_page_config(page_title="Arsenal Sport Content Manager", layout="wide", pa
 
 with st.sidebar:
     st.title("Arsenal Sport")
-    st.caption("Content Studio · v2.4")
+    st.caption("Content Studio · v2.5")
     dark_mode = st.toggle("🌙 Тёмная тема", value=True)
     st.markdown("---")
     st.metric("📦 Товаров", len(load_products()))
@@ -1030,4 +1030,4 @@ with tab7:
         st.rerun()
 
 st.markdown("---")
-st.caption("Arsenal Sport Content Studio v2.4 · рабочее пространство магазина")
+st.caption("Arsenal Sport Content Studio v2.5 · рабочее пространство магазина")
