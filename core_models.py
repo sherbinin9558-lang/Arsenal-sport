@@ -77,6 +77,7 @@ class Order:
     status: str = "Новая"
     source: str = "Сайт"
     comment: str = ""
+    lead_id: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 
     @property
