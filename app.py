@@ -1,7 +1,7 @@
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import json, io, datetime, csv, requests, base64, re, tempfile, os
+import json, io, datetime, csv, requests, base64, re, tempfile, os, hmac, hashlib, time
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
@@ -405,6 +405,7 @@ def publish_reel_to_vk(video_bytes, caption):
 
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="AI Agent Content Manager Content Manager", layout="wide")
+require_admin_auth()
 
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
