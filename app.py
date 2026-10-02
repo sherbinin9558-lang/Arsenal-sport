@@ -328,8 +328,14 @@ with st.sidebar:
     st.caption("Content Studio · v2.6 MAX")
     dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
     st.markdown("---")
-    st.metric("📦 Товаров", len(load_products()))
-    st.metric("📅 В плане", len(load_plan()))
+    st.markdown(
+        '<div class="sidebar-max"><div class="sidebar-max-kicker">ARSENAL SPORT</div>'
+        '<div class="sidebar-max-title">⚡ MAX</div>'
+        '<div class="sidebar-max-text">Центр управления магазином</div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
+        st.session_state["open_max"] = True
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
@@ -357,6 +363,10 @@ else:
     section[data-testid="stSidebar"] {background:#e5e9ef!important;border-right:1px solid #d5dbe4!important;}
     div[data-baseweb="tab-list"] {background:#e3e7ed!important;border-color:#d5dbe4!important;}
     [data-testid="stFileUploader"] {background:#f5f7fa!important;border-color:#b9c1ce!important;}
+    .sidebar-max {background:linear-gradient(135deg,#f8f9fb,#ece8ff);border-color:#d8d1ff;}
+    .sidebar-max-kicker {color:#655bd0;}
+    .sidebar-max-title {color:#202633;}
+    .sidebar-max-text {color:#687080;}
     """
 
 st.markdown(
@@ -366,7 +376,11 @@ st.markdown(
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
-section[data-testid="stSidebar"] .stMetric {background:#151922;border:1px solid var(--border);border-radius:14px;padding:8px 12px;}
+section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
+.sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
+.sidebar-max-kicker {font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}
+.sidebar-max-title {font-size:1.18rem;font-weight:850;color:#fff;margin-top:2px;}
+.sidebar-max-text {font-size:.72rem;color:#aeb5c2;margin-top:2px;}
 div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button {border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
@@ -393,6 +407,10 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
 st.markdown("---")
+
+if st.session_state.get("open_max"):
+    st.session_state["open_max"] = False
+    st.markdown('<script>window.location.hash="max";</script>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
