@@ -3,6 +3,7 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64
 from pathlib import Path
+from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -369,26 +370,20 @@ button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5
 .section-title {font-size:1.7rem;font-weight:800;margin-bottom:2px;}
 .section-subtitle {color:#8f97a6;margin-bottom:18px;}
 .pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#211f35;color:#c9c5ff;border:1px solid #34304f;font-size:.78rem;font-weight:650;}
+[data-testid="stAlert"], div[data-baseweb="notification"] {background:#151922 !important;border:1px solid #303747 !important;color:#f5f7fa !important;border-radius:14px !important;}
+[data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#f5f7fa !important;}
+[data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
 </style>""",
     unsafe_allow_html=True,
 )
-
-st.markdown('<p class="main-title">ARSENAL SPORT</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Content Studio · товары, карточки, тексты и Reels в одном месте</p>', unsafe_allow_html=True)
-st.markdown("---")
-
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "📸 Создать", "📦 Каталог", "✍️ Тексты", "🎬 Reels",
-    "📅 План", "📊 Статистика", "⚙️ Настройки"
-])
 
 st.markdown('<p class="main-title">🏆 ARSENAL SPORT</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Content Manager — управление контентом магазина</p>', unsafe_allow_html=True)
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📸 Создать", "📦 Каталог", "📱 Тексты", "🎬 Reels",
-    "📅 План", "📊 Статистика", "⚙️ Настройки"
+    "📅 План", "📊 Статистика", "⚙️ Настройки", "⚡ MAX"
 ])
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
@@ -990,6 +985,62 @@ with tab6:
             sc[s] = sc.get(s,0) + 1
         for s, n in sorted(sc.items(), key=lambda x: -x[1]):
             st.write(f"**{s}:** {n}")
+
+# ========== 8: MAX ==========
+with tab8:
+    st.markdown('<div class="section-kicker">ARSENAL SPORT MAX</div><div class="section-title">Центр управления</div><div class="section-subtitle">Бесплатное ядро: каталог, умный поиск, контент-пакет, база знаний и автоплан.</div>', unsafe_allow_html=True)
+
+    products_max = load_products()
+    plan_max = load_plan()
+    metrics = catalog_metrics(products_max, plan_max)
+
+    m1,m2,m3,m4,m5 = st.columns(5)
+    m1.metric("Товаров", metrics["products"])
+    m2.metric("Карточек", metrics["cards"])
+    m3.metric("Фото", metrics["original_photos"])
+    m4.metric("В плане", metrics["planned"])
+    m5.metric("Опубликовано", metrics["published"])
+
+    st.markdown("---")
+    st.subheader("🔎 Умный поиск по каталогу")
+    q = st.text_input("Запрос", placeholder="Например: чёрные кроссовки для футбола")
+    found = product_search(products_max, q)
+    if q:
+        st.caption(f"Найдено: {len(found)}")
+    for p in found[:8]:
+        st.write(f"**{p.get('brand','')} {p.get('name','')}** · {p.get('category','Другое')} · размеры: {p.get('sizes','уточняйте')}")
+
+    if products_max:
+        st.markdown("---")
+        st.subheader("⚡ Контент-пакет за один шаг")
+        bundle_names = [f"{p.get('brand','')} {p.get('name','')}".strip() for p in products_max]
+        bi = st.selectbox("Товар для пакета", range(len(bundle_names)), format_func=lambda x: bundle_names[x], key="max_bundle_product")
+        if st.button("🚀 Собрать Instagram + Telegram + VK + Reels + Stories", type="primary"):
+            bundle = auto_content_bundle(products_max[bi])
+            st.session_state["max_bundle"] = bundle
+        if "max_bundle" in st.session_state:
+            b = st.session_state["max_bundle"]
+            st.text_area("Instagram", b["instagram"], height=170, key="max_i")
+            st.text_area("Telegram", b["telegram"], height=150, key="max_t")
+            st.text_area("VK", b["vk"], height=140, key="max_v")
+            st.text_area("Reels — хук", b["reels_hook"], height=90, key="max_r")
+            st.text_area("Stories", b["stories"], height=120, key="max_s")
+
+        st.markdown("---")
+        st.subheader("📅 Автоплан на 7 дней")
+        if st.button("Создать 7 идей из каталога", key="max_plan_btn"):
+            suggestions = planner_suggestions(products_max)
+            for item in suggestions:
+                add_plan(item)
+            st.success(f"Добавлено {len(suggestions)} идей в контент-план.")
+            st.rerun()
+
+    st.markdown("---")
+    st.subheader("🤖 Бесплатный AI-продавец — база знаний")
+    question = st.text_input("Вопрос клиента", placeholder="Есть ли доставка? Поможете подобрать размер?")
+    if question:
+        st.info(knowledge_answer(question))
+    st.caption("Ядро работает без платного AI API. Внешний AI можно подключить позже как дополнительный слой.")
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
