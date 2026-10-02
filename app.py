@@ -644,10 +644,144 @@ with tab1:
                 st.download_button("⬇️ Скачать карточку", buf.getvalue(),
                     file_name=f"{name.replace(' ','_')}_card.png", mime="image/png")
 
+
+# ==================== МАССОВЫЙ ИМПОРТ ====================
+BULK_FIELDS = ["name", "brand", "article", "sizes", "color", "category", "description", "specs"]
+
+def _bulk_value(row, *keys):
+    normalized = {str(k).strip().lower().replace(" ", "_"): v for k, v in row.items()}
+    aliases = {
+        "name": ["name", "название", "товар"],
+        "brand": ["brand", "бренд"],
+        "article": ["article", "артикул"],
+        "sizes": ["sizes", "размеры", "размер"],
+        "color": ["color", "цвет"],
+        "category": ["category", "категория"],
+        "description": ["description", "описание"],
+        "specs": ["specs", "характеристики"],
+    }
+    for key in keys:
+        for alias in aliases.get(key, [key]):
+            value = normalized.get(alias)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    return ""
+
+def parse_bulk_file(uploaded_file):
+    raw = uploaded_file.getvalue()
+    name = (uploaded_file.name or "").lower()
+
+    if name.endswith(".xlsx"):
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            raise RuntimeError("Для XLSX нужен openpyxl. CSV можно загружать без дополнительных зависимостей.")
+        wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return []
+        headers = [str(x or "").strip() for x in rows[0]]
+        return [dict(zip(headers, row)) for row in rows[1:] if any(x not in (None, "") for x in row)]
+
+    text = raw.decode("utf-8-sig")
+    sample = text[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=";,\\t,")
+    except csv.Error:
+        dialect = csv.excel
+        dialect.delimiter = ";"
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    return [dict(row) for row in reader if any(str(v or "").strip() for v in row.values())]
+
+def bulk_import_products(uploaded_file, update_existing=False):
+    rows = parse_bulk_file(uploaded_file)
+    products = load_products()
+    existing = {
+        str(p.get("article", "")).strip().lower(): i
+        for i, p in enumerate(products)
+        if str(p.get("article", "")).strip()
+    }
+    added = updated = skipped = 0
+    errors = []
+
+    for line_no, row in enumerate(rows, start=2):
+        name = _bulk_value(row, "name")
+        brand = _bulk_value(row, "brand")
+        article = _bulk_value(row, "article")
+        if not name:
+            skipped += 1
+            errors.append(f"Строка {line_no}: нет названия.")
+            continue
+
+        category = _bulk_value(row, "category") or "Другое"
+        if category not in CATEGORIES:
+            category = "Другое"
+
+        product = {
+            "name": name,
+            "brand": brand,
+            "article": article,
+            "sizes": _bulk_value(row, "sizes"),
+            "color": _bulk_value(row, "color"),
+            "description": _bulk_value(row, "description"),
+            "specs": _bulk_value(row, "specs"),
+            "category": category,
+            "date_added": str(datetime.date.today()),
+        }
+
+        key = article.lower()
+        if update_existing and key and key in existing:
+            products[existing[key]].update(product)
+            updated += 1
+        else:
+            products.append(product)
+            if key:
+                existing[key] = len(products) - 1
+            added += 1
+
+    save_products(products)
+    return added, updated, skipped, errors
+
+
 # ========== 2: КАТАЛОГ ==========
 with tab2:
     st.markdown('<div class="section-kicker">PRODUCT LIBRARY</div><div class="section-title">Каталог</div><div class="section-subtitle">Все товары и готовые материалы — в одном рабочем пространстве.</div>', unsafe_allow_html=True)
     st.info("➕ Для нового товара откройте вкладку «📸 Создать».")
+
+        st.markdown("### 📥 Массовая загрузка товаров")
+        st.caption("Загрузите CSV или XLSX — товары добавятся в каталог без удаления существующих.")
+        template_csv = io.StringIO()
+        writer = csv.writer(template_csv, delimiter=";")
+        writer.writerow(["Название", "Бренд", "Артикул", "Размеры", "Цвет", "Категория", "Описание", "Характеристики"])
+        writer.writerow(["Футбольная форма", "Пример", "ART-001", "S,M,L,XL", "Чёрный", "Другое", "Описание товара", "Материал, особенности"])
+        st.download_button(
+            "⬇️ Скачать шаблон CSV",
+            template_csv.getvalue().encode("utf-8-sig"),
+            file_name="arsenal_sport_products_template.csv",
+            mime="text/csv",
+            key="bulk_template_csv",
+        )
+        bulk_file = st.file_uploader(
+            "Файл с товарами",
+            type=["csv", "xlsx"],
+            key="bulk_products_file",
+            help="В CSV используйте первую строку как названия колонок. Для XLSX — первая строка должна содержать заголовки.",
+        )
+        bulk_update = st.checkbox("Обновлять существующие товары по артикулу", value=False, key="bulk_update_existing")
+        if bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
+            try:
+                added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
+                st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
+                if errors:
+                    with st.expander("⚠️ Строки с ошибками"):
+                        for err in errors[:50]:
+                            st.write(err)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Не удалось импортировать файл: {e}")
+
+        st.markdown("---")
     products = load_products()
     if not products:
         st.info("Каталог пуст.")
