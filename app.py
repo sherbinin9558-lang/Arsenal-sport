@@ -8,6 +8,7 @@ from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
+from growth_engine import ai_summary
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1373,18 +1374,48 @@ with tab5:
 
 # ========== 6: СТАТИСТИКА ==========
 with tab6:
-    st.markdown('<div class="section-kicker">ANALYTICS</div><div class="section-title">Статистика</div><div class="section-subtitle">Ключевые показатели контентной работы.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">GROWTH ENGINE</div><div class="section-title">Контент · Продажи · Аналитика · AI</div><div class="section-subtitle">Единый контур: товар → контент → публикация → заявка → заказ → выручка → следующая рекомендация.</div>', unsafe_allow_html=True)
     products = load_products()
     plan = load_plan()
+    leads = load_leads()
+    orders = load_orders()
+    growth = ai_summary(products, leads, orders, plan)
+    f = growth["funnel"]
 
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f'<div class="stat-box"><p class="stat-number">{len(products)}</p><p class="stat-label">товаров</p></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="stat-box"><p class="stat-number">{len(plan)}</p><p class="stat-label">записей в плане</p></div>', unsafe_allow_html=True)
-    pub = len([p for p in plan if p.get('status') == 'Опубликовано'])
-    c3.markdown(f'<div class="stat-box"><p class="stat-number">{pub}</p><p class="stat-label">опубликовано</p></div>', unsafe_allow_html=True)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Контент", f["content"])
+    c2.metric("Опубликовано", f["published"])
+    c3.metric("Заявки", f["leads"])
+    c4.metric("Заказы", f["orders"])
+    c5.metric("Выручка", f"{f['revenue']:,.0f} ₽".replace(",", " "))
 
     st.markdown("---")
+    a, b = st.columns(2)
+    with a:
+        st.subheader("Воронка")
+        st.write(f"Контент: **{f['content']}**")
+        st.write(f"Опубликовано: **{f['published']}**")
+        st.write(f"Заявки: **{f['leads']}**")
+        st.write(f"Заказы: **{f['orders']}**")
+        st.write(f"Завершённые заказы: **{f['completed_orders']}**")
+        st.write(f"Конверсия заявка → заказ: **{f['lead_to_order']:.1f}%**")
+    with b:
+        st.subheader("🤖 AI-рекомендации")
+        for rec in growth["recommendations"]:
+            st.write(f"• {rec}")
 
+    st.markdown("---")
+    st.subheader("📦 Товары: связь контента и продаж")
+    st.caption("Связь определяется по названию/артикулу товара в заявке, заказе и контент-плане; это атрибуция по совпадению, а не доказательство причинности.")
+    for row in growth["products"][:20]:
+        st.write(f"**{row['product']}** · контент {row['content']} · заявки {row['leads']} · заказы {row['orders']} · {row['revenue']:,.0f} ₽ · остаток {row['stock']} шт.".replace(",", " "))
+
+    st.markdown("---")
+    st.subheader("🚀 Следующий контент")
+    for item in growth["next_content"]:
+        st.write(f"• **{item['priority']}** · {item['type']} · {item['product']} — {item['idea']}")
+
+    st.markdown("---")
     if products:
         st.subheader("📦 Категории")
         cc = {}
@@ -2002,25 +2033,27 @@ def render_max():
                     st.rerun()
 
         else:
-            st.subheader("Аналитика")
-            x, y, z = st.columns(3)
-            x.metric("Заявки", cm["leads"])
-            y.metric("Заказов из CRM", cm["lead_orders"])
-            z.metric("Конверсия заявка → заказ", f"{cm['conversion']:.1f}%")
+            st.subheader("Контент → продажи → AI")
+            growth = ai_summary(products, leads, orders, plan)
+            f = growth["funnel"]
+            x, y, z, q = st.columns(4)
+            x.metric("Заявки", f["leads"])
+            y.metric("Заказы", f["orders"])
+            z.metric("Конверсия", f"{f['lead_to_order']:.1f}%")
+            q.metric("Выручка", f"{f['revenue']:,.0f} ₽".replace(",", " "))
             st.markdown("---")
-            st.write(f"Всего заказов: **{om['total']}**")
-            st.write(f"Активных: **{om['active']}**")
-            st.write(f"Завершённых: **{om['completed']}**")
-            st.write(f"Отменённых: **{om['cancelled']}**")
-            st.write(f"Сумма неотменённых заказов: **{om['amount']:,.0f} ₽**".replace(",", " "))
+            st.subheader("🤖 Что делать дальше")
+            for rec in growth["recommendations"]:
+                st.write(f"• {rec}")
             st.markdown("---")
-            st.write("Категории каталога:")
-            counts = {}
-            for p in products:
-                cat = p.get("category", "Другое")
-                counts[cat] = counts.get(cat, 0) + 1
-            for cat, count in sorted(counts.items(), key=lambda x: -x[1]):
-                st.write(f"• {cat}: {count}")
+            st.subheader("📦 Товары, связанные с продажами")
+            for row in growth["products"][:10]:
+                st.write(f"**{row['product']}** · заявки {row['leads']} · заказы {row['orders']} · {row['revenue']:,.0f} ₽".replace(",", " "))
+            st.markdown("---")
+            st.subheader("📝 Следующие материалы")
+            for item in growth["next_content"]:
+                st.write(f"• {item['type']} · {item['product']} — {item['idea']}")
+
 
         if st.button("Закрыть MAX", key="close_max"):
             st.session_state["open_max"] = False
