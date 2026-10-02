@@ -561,8 +561,8 @@ div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
 button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
 button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
-div[data-baseweb="tab-list"] {gap:6px;background:#e3e7ed;padding:6px;border-radius:14px;border:1px solid #d5dbe4;}
-button[data-baseweb="tab"] {border-radius:10px;color:#9da5b3;font-weight:650;}
+div[data-baseweb="tab-list"] {gap:6px;background:#dfe3e9!important;padding:6px;border-radius:14px;border:1px solid #c7cdd6;display:flex!important;visibility:visible!important;opacity:1!important;}
+button[data-baseweb="tab"] {border-radius:10px;color:#303746!important;font-weight:700;visibility:visible!important;opacity:1!important;}
 button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5ff;}
 [data-testid="stFileUploader"] {border:1px dashed #b9c1ce;border-radius:14px;background:#f5f7fa;}
 .stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
