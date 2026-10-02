@@ -342,27 +342,27 @@ with st.sidebar:
     st.caption(f"Сегодня · {datetime.date.today().strftime('%d.%m.%Y')}")
 
 if dark_mode:
-    bg_css = "body {background: #0b0e13;}"
+    bg_css = "body {background: #eef1f5;}"
 else:
-    bg_css = "body {background: #f6f7fb;}"
+    bg_css = "body {background: #eef1f5;}"
 
 st.markdown(
     "<style>\n" + bg_css + """
 :root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
 .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:8px 0 0;letter-spacing:.02em;}
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
-.stApp {background:var(--bg);}
-section[data-testid="stSidebar"] {background:#10131a;border-right:1px solid var(--border);}
+.stApp {background:#eef1f5;}
+section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
 section[data-testid="stSidebar"] .stMetric {background:#151922;border:1px solid var(--border);border-radius:14px;padding:8px 12px;}
 div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
 .stButton > button {border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}
 .stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
 button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
 button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
-div[data-baseweb="tab-list"] {gap:6px;background:#11151d;padding:6px;border-radius:14px;border:1px solid var(--border);}
+div[data-baseweb="tab-list"] {gap:6px;background:#e3e7ed;padding:6px;border-radius:14px;border:1px solid #d5dbe4;}
 button[data-baseweb="tab"] {border-radius:10px;color:#9da5b3;font-weight:650;}
 button[data-baseweb="tab"][aria-selected="true"] {background:#211f35;color:#e8e5ff;}
-[data-testid="stFileUploader"] {border:1px dashed #394152;border-radius:14px;background:#11151d;}
+[data-testid="stFileUploader"] {border:1px dashed #b9c1ce;border-radius:14px;background:#f5f7fa;}
 .stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
 .stat-number {font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}
 .stat-label {font-size:.9rem;color:#aeb5c2;margin:0;}
