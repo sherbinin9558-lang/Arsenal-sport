@@ -101,48 +101,121 @@ def draw_centered(draw, text, font, fill, y, w):
     bbox = draw.textbbox((0, 0), text, font=font)
     draw.text(((w - (bbox[2] - bbox[0])) // 2, y), text, font=font, fill=fill)
 
+def _fit_text_lines(draw, text, font, max_w, max_lines=2):
+    words = (text or "").split()
+    lines = []
+    cur = ""
+    for word in words:
+        test = f"{cur} {word}".strip()
+        if draw.textbbox((0, 0), test, font=font)[2] <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = word
+            if len(lines) >= max_lines:
+                break
+    if cur and len(lines) < max_lines:
+        lines.append(cur)
+    return lines
+
+
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
-    t = TEMPLATES.get(template, TEMPLATES["Графит"])
-    canvas = Image.new("RGB", CARD_SIZE, t["bg"])
+    # Профессиональная рекламная композиция Arsenal Sport.
+    # API функции не меняется — меняется только визуальный слой карточки.
+    t = TEMPLATES.get(template, TEMPLATES["Спортивный"])
+    W, H = CARD_SIZE
+    canvas = Image.new("RGB", CARD_SIZE, (9, 12, 18))
     draw = ImageDraw.Draw(canvas)
+
+    # Мягкий вертикальный градиент.
+    top = (10, 14, 22)
+    bottom = (25, 29, 39)
+    for y in range(H):
+        k = y / max(1, H - 1)
+        c = tuple(int(top[i] * (1-k) + bottom[i] * k) for i in range(3))
+        draw.line([(0, y), (W, y)], fill=c)
+
+    # Сдержанный фирменный glow без перегруза.
+    for r in range(420, 0, -12):
+        alpha = int(18 * (1 - r / 420))
+        c = (32 + alpha, 42 + alpha, 82 + alpha)
+        draw.ellipse((W-300-r, 280-r, W-300+r, 280+r), fill=c)
+
+    # Акцентные диагонали — спортивная динамика.
+    draw.polygon([(0, 0), (300, 0), (0, 190)], fill=(20, 26, 39))
+    draw.polygon([(W, H), (W-330, H), (W, H-230)], fill=(19, 24, 36))
+    draw.line([(55, 190), (240, 5)], fill=(105, 120, 255), width=4)
+    draw.line([(70, 205), (255, 20)], fill=(105, 120, 255), width=1)
 
     logo_img = get_logo()
     if logo_img:
-        logo_w = 450
-        ratio = logo_w / logo_img.width
+        logo_w = 255
+        ratio = logo_w / max(1, logo_img.width)
         lr = logo_img.resize((logo_w, int(logo_img.height * ratio)), Image.Resampling.LANCZOS)
-        canvas.paste(lr, ((CARD_SIZE[0] - logo_w) // 2, 40), lr)
+        canvas.paste(lr, (60, 52), lr)
     else:
-        draw_centered(draw, "ARSENAL SPORT", get_font(50, True), t["accent"], 55, CARD_SIZE[0])
+        draw.text((60, 58), "ARSENAL SPORT", font=get_font(38, True), fill=(245,247,250))
 
-    draw.line([(100, 160), (CARD_SIZE[0] - 100, 160)], fill=t["accent"], width=3)
+    # Категория — небольшой editorial label.
+    cat = category.upper()
+    cat_font = get_font(23, True)
+    cat_w = draw.textbbox((0, 0), cat, font=cat_font)[2]
+    pill_x = W - cat_w - 72
+    draw.rounded_rectangle((pill_x-22, 50, W-52, 91), radius=20, fill=(32, 39, 55), outline=(76, 89, 120), width=1)
+    draw.text((pill_x, 60), cat, font=cat_font, fill=(191, 201, 224))
 
-    fcat = get_font(30, True)
-    ctext = f"{CATEGORY_EMOJI.get(category,'📦')} {category.upper()}"
-    bb = draw.textbbox((0, 0), ctext, font=fcat)
-    draw.text((CARD_SIZE[0] - (bb[2] - bb[0]) - 60, 185), ctext, font=fcat, fill=t["sec"])
-
+    # Фото — главный объект. Сохраняем пропорции и добавляем аккуратную рамку.
     if image:
-        iw, ih = image.size
-        ratio = min(760 / iw, 760 / ih)
-        ns = (int(iw * ratio), int(ih * ratio))
-        image = image.resize(ns, Image.Resampling.LANCZOS)
-        canvas.paste(image, ((CARD_SIZE[0] - ns[0]) // 2, 260))
+        img = image.convert("RGB")
+        iw, ih = img.size
+        max_w, max_h = 900, 760
+        ratio = min(max_w / max(1, iw), max_h / max(1, ih))
+        ns = (max(1, int(iw * ratio)), max(1, int(ih * ratio)))
+        img = img.resize(ns, Image.Resampling.LANCZOS)
+        x = (W - ns[0]) // 2
+        y = 175 + max(0, (760 - ns[1]) // 2)
 
-    draw.text((60, 1050), brand.upper(), font=get_font(42), fill=t["sec"])
+        # Лёгкая тень.
+        shadow = Image.new("RGBA", (ns[0]+36, ns[1]+36), (0,0,0,0))
+        sd = ImageDraw.Draw(shadow)
+        sd.rounded_rectangle((18,18,ns[0]+18,ns[1]+18), radius=28, fill=(0,0,0,120))
+        canvas.paste(shadow, (x-18, y-18), shadow)
 
-    nu = name.upper()
-    ft = fit_font(draw, nu, CARD_SIZE[0] - 120)
-    draw.text((60, 1100), nu, font=ft, fill=t["text"])
+        # Белая тонкая рамка, как у premium product campaign.
+        frame = Image.new("RGB", (ns[0]+12, ns[1]+12), (232,235,241))
+        frame.paste(img, (6,6))
+        mask = Image.new("L", frame.size, 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle((0,0,frame.width-1,frame.height-1), radius=24, fill=255)
+        canvas.paste(frame, (x-6, y-6), mask)
 
-    desc = description[:90] + ("..." if len(description) > 90 else "")
-    draw.text((60, 1200), desc, font=get_font(30), fill=t["sec"])
+    # Нижняя информационная зона.
+    panel_y = 955
+    draw.rounded_rectangle((44, panel_y, W-44, H-44), radius=34, fill=(14, 18, 27), outline=(52, 61, 79), width=2)
+    draw.line([(76, panel_y+38), (230, panel_y+38)], fill=(105, 120, 255), width=5)
 
-    fs = get_font(26)
-    draw.text((60, 1255), f"Арт: {article}  |  Размеры: {sizes}  |  Цвет: {color}", font=fs, fill=t["sec"])
-    if specs:
-        ss = specs[:75] + ("..." if len(specs) > 75 else "")
-        draw.text((60, 1295), ss, font=fs, fill=t["sec"])
+    brand_text = (brand or "ARSENAL SPORT").upper()
+    draw.text((76, panel_y+62), brand_text[:28], font=get_font(25, True), fill=(137, 150, 178))
+
+    title_font = fit_font(draw, (name or "ТОВАР").upper(), 860, max_size=58, min_size=34)
+    title_lines = _fit_text_lines(draw, (name or "ТОВАР").upper(), title_font, 860, 2)
+    ty = panel_y + 104
+    for line in title_lines:
+        draw.text((76, ty), line, font=title_font, fill=(248,249,252))
+        ty += title_font.size + 4
+
+    # Только полезные характеристики — без цены.
+    meta = []
+    if color: meta.append(str(color))
+    if sizes: meta.append(f"Размеры {sizes}")
+    if article: meta.append(f"арт. {article}")
+    meta_text = "  •  ".join(meta)
+    if meta_text:
+        draw.text((76, H-108), meta_text[:70], font=get_font(22), fill=(148,157,175))
+
+    # Небольшой CTA без ощущения баннера.
+    draw.text((W-310, H-108), "ARSENAL SPORT", font=get_font(21, True), fill=(105, 120, 255))
 
     return canvas
 
