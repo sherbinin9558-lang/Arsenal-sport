@@ -1,12 +1,18 @@
 """Content workflow helpers for Arsenal Sport AI Content Manager. Pure local functions; no external dependencies."""
 from collections import Counter
 import datetime
+import hashlib
 
 WORKFLOW_STATUSES = ["Идея", "В работе", "На проверке", "Готово", "Опубликовано"]
 PLATFORM_ORDER = ["Instagram", "Telegram", "VK"]
 
+def content_identity(item):
+    raw = "|".join(str(item.get(k, "")) for k in ("date", "platform", "product", "type", "idea"))
+    return "cnt-" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
 def ensure_workflow(item):
     item = dict(item or {})
+    item.setdefault("content_id", content_identity(item))
     status = item.get("status", "Идея")
     if status not in WORKFLOW_STATUSES:
         status = "Идея"
@@ -22,6 +28,9 @@ def change_status(item, status, actor="manager"):
     old = item.get("status", "Идея")
     if old != status:
         item["status"] = status
+        if status == "Опубликовано":
+            item.setdefault("publication_id", item.get("content_id"))
+            item.setdefault("published_at", datetime.datetime.now().isoformat(timespec="minutes"))
         item["history"].append({
             "time": datetime.datetime.now().isoformat(timespec="seconds"),
             "action": "status",
