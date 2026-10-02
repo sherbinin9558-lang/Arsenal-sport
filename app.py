@@ -481,363 +481,49 @@ else:
 
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
-/* Hide Streamlit platform controls from the customer-facing UI. */
-#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n/* Remove mobile bottom platform chrome; keep only app controls. */\n[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n# Hide repository / platform navigation links and icons from the customer UI.
-# This affects only Streamlit chrome; MAX, sidebar and app controls remain intact.
-a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
-a[aria-label*="GitHub" i], a[title*="GitHub" i],
-a[aria-label*="Settings" i], a[title*="Settings" i],
-[data-testid="stToolbar"] *, [data-testid="stDecoration"] *,
-[data-testid="stStatusWidget"] *, [data-testid="stAppDeployButton"] * {
-    display:none !important; visibility:hidden !important; pointer-events:none !important;
-}
-[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer,
-[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {
-    display:none !important; visibility:hidden !important; height:0 !important; min-height:0 !important;
-    pointer-events:none !important;
-}
-section[data-testid="stSidebar"] {display:block !important; visibility:visible !important; opacity:1 !important;}
-/* MAX popup controls: keep the launcher, dialog and chevrons visible. */
-[data-testid="stDialog"] {z-index:9999 !important;}
-[data-testid="stDialog"] [data-testid="stExpander"] {background:#11151d !important;border:1px solid #3b3f4d !important;}
-[data-testid="stDialog"] [data-testid="stExpander"] summary,
-[data-testid="stDialog"] [data-testid="stExpander"] button {color:#f5f7fa !important;}
-[data-testid="stDialog"] [data-testid="stExpander"] svg,
-[data-testid="stDialog"] [data-testid="stExpander"] svg path,
-[data-testid="stDialog"] [data-testid="stExpander"] svg line,
-[data-testid="stDialog"] [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:none !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.75)) !important;}
-[data-testid="stDialog"] button[aria-label="Close"] {color:#b8ff00 !important;opacity:1 !important;visibility:visible !important;}
-[data-testid="stDialog"] button[aria-label="Close"] svg,
-[data-testid="stDialog"] button[aria-label="Close"] svg path,
-[data-testid="stDialog"] button[aria-label="Close"] svg line {color:#b8ff00 !important;stroke:#b8ff00 !important;opacity:1 !important;visibility:visible !important;}
-button[key="sidebar_max"], button[key="dash_open_max"] {box-shadow:0 0 0 1px rgba(184,255,0,.45),0 0 14px rgba(184,255,0,.45) !important;}
-[data-testid="stSidebar"] [data-testid="stToggle"] label {color:#b8ff00 !important;text-shadow:0 0 6px rgba(184,255,0,.55) !important;}
-/* MAX header: keep the identity visible inside the popup. */
-.max-header {
-    display:block !important;
-    width:100% !important;
-    padding:4px 0 10px !important;
-    visibility:visible !important;
-    opacity:1 !important;
-}
-.max-header-title {
-    font-size:1.45rem !important;
-    line-height:1.2 !important;
-    font-weight:900 !important;
-    color:#21164d !important;
-    visibility:visible !important;
-    opacity:1 !important;
-}
-.max-header-title span {
-    color:#7cff00 !important;
-    text-shadow:0 0 8px rgba(184,255,0,.55) !important;
-}
-.max-header-subtitle {
-    margin-top:3px !important;
-    font-size:.82rem !important;
-    color:#687182 !important;
-    visibility:visible !important;
-    opacity:1 !important;
-}
-/* MAX popup: bright lime chevrons on dark controls. */
-[data-testid="stExpander"] svg, [data-testid="stExpander"] button svg, [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:#b8ff00 !important;opacity:1 !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;}
-[data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
-
-[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
-:root {--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#ffffff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}
-.block-container {padding-top:0!important;}\n .main-title {font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
-.subtitle {text-align:center;color:#687182;margin:3px 0 18px;font-size:.92rem;}\n 
-.stApp {background:#f6f7fb;}
-section[data-testid="stSidebar"] {background:#ffffff;border-right:1px solid #e4e7ec;}
-section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
-.sidebar-ai-agent {font-size:1.05rem;font-weight:850;letter-spacing:.02em;color:#a98cff;text-shadow:0 0 6px rgba(169,140,255,.85),0 0 14px rgba(137,125,255,.55);margin:0 0 6px 0;text-align:left;line-height:1.2;}\n .sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
-.sidebar-max-kicker {font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}
-.sidebar-max-title {font-size:1.18rem;font-weight:850;color:#fff;margin-top:2px;}
-.sidebar-max-text {font-size:.72rem;color:#aeb5c2;margin-top:2px;}
-div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:16px;}
-.stButton > button {border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}
-.stButton > button:hover {border-color:var(--accent);color:#fff;box-shadow:0 0 0 1px rgba(137,125,255,.16);}
-button[kind="primary"] {background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
-button[kind="primary"]:hover {filter:brightness(1.06);box-shadow:0 6px 22px rgba(137,125,255,.22);}
-div[data-baseweb="tab-list"] {gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;box-shadow:none!important;}
-button[data-baseweb="tab"] {border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;box-shadow:none!important;}
-button[data-baseweb="tab"] * {color:#252b3a!important;opacity:1!important;}
-button[data-baseweb="tab"][aria-selected="true"] {background:transparent!important;color:#4c1d95!important;border-color:transparent!important;box-shadow:none!important;}
-button[data-baseweb="tab"][aria-selected="true"] * {color:#4c1d95!important;opacity:1!important;}
-[data-testid="stFileUploader"] {border:1px dashed #b9c1ce;border-radius:14px;background:#f5f7fa;}
-.stat-box {background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}
-.stat-number {font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}
-.stat-label {font-size:.9rem;color:#aeb5c2;margin:0;}
-.section-kicker {font-size:.76rem;text-transform:uppercase;letter-spacing:.12em;color:#8f86f5;font-weight:800;margin-bottom:4px;}
-.section-title {font-size:1.7rem;font-weight:800;margin-bottom:3px;color:#171a21;}
-.section-subtitle {color:#687182;margin-bottom:18px;}
-.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#eef0ff;color:#4338ca;border:1px solid #dfe2ff;font-size:.78rem;font-weight:650;}
-[data-testid="stAlert"], div[data-baseweb="notification"] {background:#151922 !important;border:1px solid #303747 !important;color:#f5f7fa !important;border-radius:14px !important;}
-/* ===== Responsive layout: desktop / tablet / phone ===== */
-html, body { overflow-x:hidden !important; }
-.mobile-nav-hint {display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}
-.block-container { width:100% !important; max-width:1500px !important; margin:0 auto !important; padding-left:clamp(0.75rem,2.5vw,2.5rem) !important; padding-right:clamp(0.75rem,2.5vw,2.5rem) !important; }
-[data-testid="stHorizontalBlock"] { width:100% !important; }
-[data-testid="stTextInput"], [data-testid="stTextArea"], [data-testid="stSelectbox"], [data-testid="stNumberInput"], [data-testid="stDateInput"], [data-testid="stFileUploader"] { width:100% !important; }
-.stButton > button, button[kind="primary"] { min-height:44px; }
-@media (min-width: 769px) and (max-width: 1100px) {
-    .block-container { padding-left:1rem !important; padding-right:1rem !important; }
-    [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        flex:1 1 46% !important; min-width:46% !important; max-width:100% !important;
-    }
-    .main-title { font-size:2.05rem !important; }
-    .section-title { font-size:1.45rem !important; }
-    div[data-baseweb="tab-list"] { overflow-x:auto !important; flex-wrap:nowrap !important; }
-    button[data-baseweb="tab"] { flex:0 0 auto !important; white-space:nowrap !important; }
-}
-@media (max-width: 768px) {
-    .mobile-nav-hint {display:block;}
-    .main-title {display:block !important; font-size:1.12rem !important; line-height:1.1 !important; margin:8px 0 7px !important; text-align:left !important; color:#24124f !important; text-shadow:0 0 9px rgba(91,70,214,.18) !important;}
-    .block-container { padding:0.65rem 0.7rem 1.2rem !important; }
-    .main-title { font-size:1.45rem !important; line-height:1.15 !important; margin:12px 0 10px !important; letter-spacing:.01em !important; }
-    .subtitle { font-size:.78rem !important; margin-bottom:12px !important; }
-    .section-title { font-size:1.28rem !important; line-height:1.2 !important; margin-top:4px !important; }
-    .section-subtitle { font-size:.82rem !important; margin-bottom:12px !important; }
-    .section-kicker { font-size:.65rem !important; }
-    .stat-box { padding:12px 8px !important; margin:3px 0 !important; border-radius:12px !important; }
-    .stat-number { font-size:1.55rem !important; }
-    .stat-label { font-size:.72rem !important; }
-    .stButton > button, button[kind="primary"] { min-height:46px !important; width:100% !important; }
-    [data-testid="stHorizontalBlock"] { flex-direction:column !important; gap:.55rem !important; }
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        width:100% !important; min-width:100% !important; max-width:100% !important; flex:1 1 100% !important;
-    }
-    div[data-baseweb="tab-list"] {
-        position:sticky !important; top:0 !important; z-index:20 !important;
-        overflow-x:auto !important; overflow-y:hidden !important;
-        flex-wrap:nowrap !important; scrollbar-width:none !important;
-        -webkit-overflow-scrolling:touch !important;
-    }
-    div[data-baseweb="tab-list"]::-webkit-scrollbar { display:none !important; }
-    button[data-baseweb="tab"] {
-        flex:0 0 auto !important; min-width:max-content !important;
-        white-space:nowrap !important; padding:9px 11px !important;
-        font-size:.78rem !important; color:#252b3a !important;
-        background:#f4f5f8 !important; opacity:1 !important;
-        border:1px solid #e1e4eb !important;
-    }
-    button[data-baseweb="tab"] * {color:#252b3a !important; opacity:1 !important;}    button[data-baseweb="tab"][aria-selected="true"] {
-        color:#4c1d95 !important;
-        background:linear-gradient(135deg,#eee9ff,#e5deff) !important;
-        border-color:#c9bfff !important;
-        box-shadow:0 0 10px rgba(91,70,214,.16) !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] * {color:#4c1d95 !important; opacity:1 !important;}
-    section[data-testid="stSidebar"] { width:min(78vw,280px) !important; }
-    section[data-testid="stSidebar"] > div:first-child { width:min(78vw,280px) !important; }
-    section[data-testid="stSidebar"] .stButton > button { width:100% !important; }
-    .sidebar-ai-agent { font-size:.95rem !important; }
-    .sidebar-max { padding:9px 10px 7px !important; }
-    .sidebar-max-title { font-size:1.05rem !important; }
-    .sidebar-max-text { font-size:.68rem !important; }
-    [data-testid="stFileUploader"] { padding:.25rem !important; }
-    [data-testid="stMetric"] {padding:11px 9px !important; background:#ffffff !important; border:1px solid #ddd8f5 !important; border-radius:12px !important; box-shadow:0 4px 14px rgba(91,70,214,.08) !important;}
-    [data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important; font-weight:900 !important;}
-    [data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important; font-weight:700 !important;}
-    [data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;}
-    [data-testid="stExpander"] {border-radius:12px !important;}\n    [data-testid="stExpander"] svg, [data-testid="stExpander"] button svg, [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {color:#b8ff00 !important;stroke:#b8ff00 !important;fill:#b8ff00 !important;opacity:1 !important;filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;}\n    [data-testid="stExpander"] svg path, [data-testid="stExpander"] svg line, [data-testid="stExpander"] svg polyline {stroke:#b8ff00 !important;}
-    [data-baseweb="select"], [data-baseweb="input"], [data-testid="stTextArea"] {font-size:16px !important;}
-    [data-testid="stDataFrame"], [data-testid="stTable"] { width:100% !important; overflow-x:auto !important; }
-    .stMarkdown, .stCaption { overflow-wrap:anywhere !important; }
-    [data-testid="stAlert"], div[data-baseweb="notification"] { font-size:.86rem !important; }
-}
-
-[data-testid="stAlert"] *, div[data-baseweb="notification"] * {color:#f5f7fa !important;}
-/* ===== Readable light theme + controlled violet neon accents ===== */
-[data-testid="stMetric"] {background:#ffffff !important;border:1px solid #ddd8f5 !important;border-radius:14px !important;box-shadow:0 4px 14px rgba(91,70,214,.08) !important;}
-[data-testid="stMetric"] [data-testid="stMetricValue"] {color:#21164d !important;font-weight:900 !important;opacity:1 !important;}
-[data-testid="stMetric"] [data-testid="stMetricLabel"] {color:#596174 !important;font-weight:700 !important;opacity:1 !important;}
-[data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#5b4bd6 !important;opacity:1 !important;}
-.section-kicker {color:#6d4aff !important;text-shadow:0 0 7px rgba(109,74,255,.20);}
-.section-title {color:#21164d !important;}
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {color:#21164d !important;}
-[data-testid="stText"], [data-testid="stCaptionContainer"] {color:#596174 !important;}
-
-[data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
-
-/* UI chrome cleanup + MAX/sidebar recovery v7 */
-/* Keep the real app sidebar available, but make the main menu compact. */
-aside[data-testid="stSidebar"], section[data-testid="stSidebar"], div[data-testid="stSidebar"] {
-    display:block !important;
-    visibility:visible !important;
-    opacity:1 !important;
-}
-@media (min-width: 769px) {
-    section[data-testid="stSidebar"] { width:280px !important; min-width:280px !important; max-width:280px !important; }
-    section[data-testid="stSidebar"] > div:first-child { width:280px !important; }
-}
-/* Hide only Streamlit/GitHub/platform chrome; do not hide app controls. */
-a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
-a[aria-label*="GitHub" i], a[title*="GitHub" i],
-a[aria-label*="Settings" i], a[title*="Settings" i] {
-    display:none !important;
-    visibility:hidden !important;
-    pointer-events:none !important;
-}
-[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
-[data-testid="stAppDeployButton"], footer,
-[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"],
-div[data-testid="stBottom"] * , div[data-testid="stBottomBlockContainer"] * {
-
-    display:none !important;
-    visibility:hidden !important;
-    height:0 !important;
-    min-height:0 !important;
-    pointer-events:none !important;
-}
-/* MAX dialog: force the real Streamlit dialog above all app chrome. */
-div[data-testid="stDialog"] {
-    display:flex !important;
-    visibility:visible !important;
-    opacity:1 !important;
-    position:fixed !important;
-    inset:0 !important;
-    z-index:2147483647 !important;
-    pointer-events:auto !important;
-}
-div[data-testid="stDialog"] > div {
-    visibility:visible !important;
-    opacity:1 !important;
-    pointer-events:auto !important;
-}
-div[data-testid="stDialog"] [role="dialog"] {
-    display:block !important;
-    visibility:visible !important;
-    opacity:1 !important;
-    position:relative !important;
-    z-index:2147483647 !important;
-    background:#ffffff !important;
-    color:#17151c !important;
-    border:1px solid #d9ddea !important;
-    border-radius:20px !important;
-    box-shadow:0 24px 80px rgba(0,0,0,.30) !important;
-    max-height:90vh !important;
-    overflow:auto !important;
-}
-div[role="dialog"] {
-    visibility:visible !important;
-    opacity:1 !important;
-    z-index:2147483647 !important;
-    pointer-events:auto !important;
-}
-div[data-testid="stDialog"] [role="dialog"] *,
-div[role="dialog"] * {
-    visibility:visible !important;
-}
-[data-testid="stDialog"] [data-testid="stExpander"] button,
-div[role="dialog"] [data-testid="stExpander"] button {
-    color:#b8ff00 !important;
-    opacity:1 !important;
-    visibility:visible !important;
-}
-[data-testid="stDialog"] [data-testid="stExpander"] button svg,
-[data-testid="stDialog"] [data-testid="stExpander"] button svg *,
-[data-testid="stDialog"] [data-testid="stExpander"] svg,
-[data-testid="stDialog"] [data-testid="stExpander"] svg *,
-div[role="dialog"] [data-testid="stExpander"] button svg,
-div[role="dialog"] [data-testid="stExpander"] button svg *,
-div[role="dialog"] [data-testid="stExpander"] svg,
-div[role="dialog"] [data-testid="stExpander"] svg * {
-    color:#b8ff00 !important;
-    stroke:#b8ff00 !important;
-    fill:none !important;
-    opacity:1 !important;
-    visibility:visible !important;
-    stroke-width:3px !important;
-    filter:drop-shadow(0 0 6px rgba(184,255,0,.9)) !important;
-}
-[data-testid="stDialog"] [data-testid="stExpander"] button:hover,
-div[role="dialog"] [data-testid="stExpander"] button:hover {
-    color:#d6ff66 !important;
-}
-/* MAX lives only in the sidebar. Remove all obsolete top-launcher rules. */
-button[key="top_max_launcher"] {
-    display:none !important;
-    visibility:hidden !important;
-    pointer-events:none !important;
-}
-
-/* Tablet/phone: do not override Streamlit's drawer transform or position.
-   The previous forced-fixed rule could hide the sidebar behind Streamlit's own
-   mobile navigation layer. Keep the real sidebar native and only style it. */
-@media (max-width:1100px) {
-    section[data-testid="stSidebar"],
-    aside[data-testid="stSidebar"],
-    div[data-testid="stSidebar"] {
-        visibility:visible !important;
-        opacity:1 !important;
-        width:280px !important;
-        max-width:280px !important;
-        pointer-events:auto !important;
-    }
-
-    section[data-testid="stSidebar"] > div:first-child,
-    aside[data-testid="stSidebar"] > div:first-child {
-        width:280px !important;
-        max-width:280px !important;
-    }
-
-    .sidebar-max,
-    button[key="sidebar_max"] {
-        display:block !important;
-        visibility:visible !important;
-        opacity:1 !important;
-        pointer-events:auto !important;
-    }
-}
-
-/* Keep the MAX launcher visually prominent. */
-button[key="sidebar_max"], button[key="dash_open_max"] {
-    background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
-    color:#101500 !important;
-    border:1px solid #d7ff72 !important;
-    box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
-    font-weight:900 !important;
-}
-/* Mobile/tablet MAX fallback.
-   Use normal document flow so Streamlit's mobile bottom bar cannot cover it. */
-button[key="mobile_max_launcher"] {
-    display:none !important;
-}
-@media (max-width:1100px) {
-    button[key="mobile_max_launcher"] {
-        display:block !important;
-        position:relative !important;
-        left:auto !important;
-        bottom:auto !important;
-        z-index:50 !important;
-        width:100% !important;
-        min-height:46px !important;
-        margin:8px 0 12px !important;
-        border-radius:12px !important;
-        background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
-        color:#101500 !important;
-        border:1px solid #d7ff72 !important;
-        box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 14px rgba(184,255,0,.45) !important;
-        font-weight:900 !important;
-    }
-}
-/* Neon theme switch, without changing its behavior. */
-[data-testid="stSidebar"] [data-testid="stToggle"] label,
-[data-testid="stSidebar"] [data-baseweb="checkbox"] label {
-    color:#b8ff00 !important;
-    text-shadow:0 0 7px rgba(184,255,0,.65) !important;
-}
-</style>""",
+/* ===== Clean customer UI ===== */
+/* 1) Hide Streamlit/GitHub/platform chrome. */
+#MainMenu,[data-testid="stToolbar"],[data-testid="stDecoration"],[data-testid="stStatusWidget"],[data-testid="stAppDeployButton"],footer,[data-testid="stBottom"],[data-testid="stBottomBlockContainer"],[data-testid="stBottomBlock"]{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;pointer-events:none!important;}
+a[href*="github.com"],a[href*="gitlab.com"],a[href*="bitbucket.org"],a[aria-label*="GitHub" i],a[title*="GitHub" i],a[aria-label*="Settings" i],a[title*="Settings" i]{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+/* 2) Native sidebar: width only. No fixed position, transform or forced drawer state. */
+section[data-testid="stSidebar"]{display:block!important;visibility:visible!important;opacity:1!important;background:#fff!important;border-right:1px solid #e4e7ec!important;}
+@media (min-width:769px){section[data-testid="stSidebar"]{width:280px!important;min-width:280px!important;max-width:280px!important;}section[data-testid="stSidebar"]>div:first-child{width:280px!important;max-width:280px!important;}}
+/* 3) Sidebar MAX. */
+button[key="sidebar_max"]{background:linear-gradient(135deg,#7cff00,#b8ff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55)!important;font-weight:900!important;}
+/* 4) Mobile/tablet MAX: normal document flow; never fixed/sticky. */
+.mobile-max-launcher{display:none!important;}
+@media (max-width:1100px){.mobile-max-launcher{display:block!important;width:100%!important;margin:0 0 10px!important;}.mobile-max-launcher button{width:100%!important;min-height:46px!important;border-radius:12px!important;background:linear-gradient(135deg,#7cff00,#b8ff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 14px rgba(184,255,0,.45)!important;font-weight:900!important;}}
+/* Main layout. */
+.block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
+.main-title{font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
+.mobile-nav-hint{display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}html,body{overflow-x:hidden!important;}
+/* MAX dialog. */
+div[data-testid="stDialog"]{display:flex!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:auto!important;}
+div[data-testid="stDialog"]>div,div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:relative!important;z-index:2147483647!important;background:#fff!important;color:#17151c!important;border:1px solid #d9ddea!important;border-radius:20px!important;box-shadow:0 24px 80px rgba(0,0,0,.30)!important;max-height:90vh!important;overflow:auto!important;}
+div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
+[data-testid="stDialog"] [data-testid="stExpander"] button,div[role="dialog"] [data-testid="stExpander"] button{color:#b8ff00!important;opacity:1!important;}
+[data-testid="stDialog"] [data-testid="stExpander"] button svg,[data-testid="stDialog"] [data-testid="stExpander"] button svg *,div[role="dialog"] [data-testid="stExpander"] button svg,div[role="dialog"] [data-testid="stExpander"] button svg *{color:#b8ff00!important;stroke:#b8ff00!important;fill:none!important;opacity:1!important;stroke-width:3px!important;filter:drop-shadow(0 0 6px rgba(184,255,0,.9))!important;}
+.max-header{display:block!important;width:100%!important;padding:4px 0 10px!important;}.max-header-title{font-size:1.45rem!important;line-height:1.2!important;font-weight:900!important;color:#21164d!important;}.max-header-title span{color:#7cff00!important;text-shadow:0 0 8px rgba(184,255,0,.55)!important;}.max-header-subtitle{margin-top:3px!important;font-size:.82rem!important;color:#687182!important;}
+/* Existing visual styles retained. */
+:root{--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#fff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}.stApp{background:#f6f7fb;}
+.sidebar-ai-agent{font-size:1.05rem;font-weight:850;letter-spacing:.02em;color:#a98cff;text-shadow:0 0 6px rgba(169,140,255,.85),0 0 14px rgba(137,125,255,.55);margin:0 0 6px;text-align:left;line-height:1.2;}.sidebar-max{padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}.sidebar-max-kicker{font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}.sidebar-max-title{font-size:1.18rem;font-weight:850;color:#fff;margin-top:2px;}.sidebar-max-text{font-size:.72rem;color:#aeb5c2;margin-top:2px;}
+.stButton>button{border-radius:11px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:650;transition:.2s;}button[kind="primary"]{background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;}
+div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;}button[data-baseweb="tab"]{border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;}button[data-baseweb="tab"] *{color:#252b3a!important;opacity:1!important;}button[data-baseweb="tab"][aria-selected="true"]{background:transparent!important;color:#4c1d95!important;border-color:transparent!important;}button[data-baseweb="tab"][aria-selected="true"] *{color:#4c1d95!important;opacity:1!important;}
+[data-testid="stHorizontalBlock"]{width:100%!important;}[data-testid="stTextInput"],[data-testid="stTextArea"],[data-testid="stSelectbox"],[data-testid="stNumberInput"],[data-testid="stDateInput"],[data-testid="stFileUploader"]{width:100%!important;}.stat-box{background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}.stat-number{font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}.stat-label{font-size:.9rem;color:#aeb5c2;margin:0;}
+.section-kicker{color:#6d4aff!important;text-shadow:0 0 7px rgba(109,74,255,.20);}.section-title{color:#21164d!important;}.stMarkdown h1,.stMarkdown h2,.stMarkdown h3{color:#21164d!important;}[data-testid="stText"],[data-testid="stCaptionContainer"]{color:#596174!important;}
+@media (min-width:769px) and (max-width:1100px){.block-container{padding-left:1rem!important;padding-right:1rem!important;}[data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;}[data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 46%!important;min-width:46%!important;max-width:100%!important;}div[data-baseweb="tab-list"]{overflow-x:auto!important;flex-wrap:nowrap!important;}button[data-baseweb="tab"]{flex:0 0 auto!important;white-space:nowrap!important;}}
+@media (max-width:768px){.mobile-nav-hint{display:block;}.main-title{font-size:1.35rem!important;line-height:1.15!important;margin:8px 0 7px!important;}.block-container{padding:.65rem .7rem 1.2rem!important;}.stButton>button,button[kind="primary"]{min-height:46px!important;width:100%!important;}[data-testid="stHorizontalBlock"]{flex-direction:column!important;gap:.55rem!important;}[data-testid="stHorizontalBlock"]>[data-testid="column"]{width:100%!important;min-width:100%!important;max-width:100%!important;flex:1 1 100%!important;}div[data-baseweb="tab-list"]{overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;scrollbar-width:none!important;-webkit-overflow-scrolling:touch!important;}button[data-baseweb="tab"]{flex:0 0 auto!important;min-width:max-content!important;white-space:nowrap!important;padding:9px 11px!important;font-size:.78rem!important;background:#f4f5f8!important;border:1px solid #e1e4eb!important;}button[data-baseweb="tab"][aria-selected="true"]{color:#4c1d95!important;background:linear-gradient(135deg,#eee9ff,#e5deff)!important;border-color:#c9bfff!important;}section[data-testid="stSidebar"]{width:min(78vw,280px)!important;}section[data-testid="stSidebar"]>div:first-child{width:min(78vw,280px)!important;}.sidebar-ai-agent{font-size:.95rem!important;}.sidebar-max{padding:9px 10px 7px!important;}.sidebar-max-title{font-size:1.05rem!important;}.sidebar-max-text{font-size:.68rem!important;}[data-baseweb="select"],[data-baseweb="input"],[data-testid="stTextArea"]{font-size:16px!important;}[data-testid="stDataFrame"],[data-testid="stTable"]{width:100%!important;overflow-x:auto!important;}.stMarkdown,.stCaption{overflow-wrap:anywhere!important;}}
+[data-testid="stSidebar"] [data-testid="stToggle"] label,[data-testid="stSidebar"] [data-baseweb="checkbox"] label{color:#b8ff00!important;text-shadow:0 0 7px rgba(184,255,0,.65)!important;}</style>""",
     unsafe_allow_html=True,
 )
 
-# Reliable tablet/phone fallback: MAX remains directly accessible even when
-# Streamlit remembers the native sidebar as collapsed.
+# Mobile/tablet-only MAX access; desktop keeps MAX in the sidebar.
+st.markdown('<div class="mobile-max-launcher">', unsafe_allow_html=True)
 if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
     st.session_state["open_max"] = True
     st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
@@ -929,9 +615,6 @@ with tab_dashboard:
             st.info("Откройте раздел «Создать» — там можно сразу загрузить фото и создать карточку.")
         if st.button("📅 Открыть контент-план", key="dash_open_plan", use_container_width=True):
             st.info("Откройте раздел «План» для управления публикациями и workflow.")
-        if st.button("⚡ Открыть MAX", key="dash_open_max", use_container_width=True):
-            st.session_state["open_max"] = True
-            st.rerun()
 
     st.markdown("---")
     st.markdown("### Состояние системы")
