@@ -483,8 +483,8 @@ st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* ===== Clean customer UI ===== */
 /* 1) Hide Streamlit/GitHub/platform chrome. */
-#MainMenu,[data-testid="stToolbar"],[data-testid="stDecoration"],[data-testid="stStatusWidget"],[data-testid="stAppDeployButton"],footer,[data-testid="stBottom"],[data-testid="stBottomBlockContainer"],[data-testid="stBottomBlock"]{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;pointer-events:none!important;}
-a[href*="github.com"],a[href*="gitlab.com"],a[href*="bitbucket.org"],a[aria-label*="GitHub" i],a[title*="GitHub" i],a[aria-label*="Settings" i],a[title*="Settings" i]{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+#MainMenu,[data-testid="stDecoration"],[data-testid="stStatusWidget"],[data-testid="stAppDeployButton"],footer,[data-testid="stBottom"],[data-testid="stBottomBlockContainer"],[data-testid="stBottomBlock"]{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;pointer-events:none!important;}
+/* GitHub + three-dot toolbar are intentionally visible. */
 /* 2) Native sidebar: width only. No fixed position, transform or forced drawer state. */
 section[data-testid="stSidebar"]{display:block!important;visibility:visible!important;opacity:1!important;background:#fff!important;border-right:1px solid #e4e7ec!important;}
 @media (min-width:769px){section[data-testid="stSidebar"]{width:280px!important;min-width:280px!important;max-width:280px!important;}section[data-testid="stSidebar"]>div:first-child{width:280px!important;max-width:280px!important;}}
