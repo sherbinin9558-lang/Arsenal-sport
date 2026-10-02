@@ -1,5 +1,7 @@
 streamlit
-Pillow
+Pillow<10.1.0,>=8.3.2
+numpy<2
 moviepy==1.0.3
+imageio<3
 imageio-ffmpeg
 requests
