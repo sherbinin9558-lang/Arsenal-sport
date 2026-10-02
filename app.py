@@ -547,7 +547,7 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 :root {--accent:#897dff;--accent2:#6f68d6;--bg:#0b0e13;--surface:#151922;--border:#252b38;--text:#f5f7fa;--muted:#98a0ae;}
-.block-container {padding-top:0!important;}\n .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:-8px 0 0;letter-spacing:.02em;}
+.block-container {padding-top:0!important;}\n .main-title {font-size:2.45rem;font-weight:850;color:#f5f7fa;text-align:center;margin:-28px 0 -6px;letter-spacing:.02em;}
 .subtitle {text-align:center;color:#98a0ae;margin:3px 0 18px;font-size:.92rem;}
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
