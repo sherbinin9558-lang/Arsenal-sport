@@ -749,39 +749,39 @@ with tab2:
     st.markdown('<div class="section-kicker">PRODUCT LIBRARY</div><div class="section-title">Каталог</div><div class="section-subtitle">Все товары и готовые материалы — в одном рабочем пространстве.</div>', unsafe_allow_html=True)
     st.info("➕ Для нового товара откройте вкладку «📸 Создать».")
 
-        st.markdown("### 📥 Массовая загрузка товаров")
-        st.caption("Загрузите CSV или XLSX — товары добавятся в каталог без удаления существующих.")
-        template_csv = io.StringIO()
-        writer = csv.writer(template_csv, delimiter=";")
-        writer.writerow(["Название", "Бренд", "Артикул", "Размеры", "Цвет", "Категория", "Описание", "Характеристики"])
-        writer.writerow(["Футбольная форма", "Пример", "ART-001", "S,M,L,XL", "Чёрный", "Другое", "Описание товара", "Материал, особенности"])
-        st.download_button(
-            "⬇️ Скачать шаблон CSV",
-            template_csv.getvalue().encode("utf-8-sig"),
-            file_name="arsenal_sport_products_template.csv",
-            mime="text/csv",
-            key="bulk_template_csv",
-        )
-        bulk_file = st.file_uploader(
-            "Файл с товарами",
-            type=["csv", "xlsx"],
-            key="bulk_products_file",
-            help="В CSV используйте первую строку как названия колонок. Для XLSX — первая строка должна содержать заголовки.",
-        )
-        bulk_update = st.checkbox("Обновлять существующие товары по артикулу", value=False, key="bulk_update_existing")
-        if bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
-            try:
-                added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
-                st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
-                if errors:
-                    with st.expander("⚠️ Строки с ошибками"):
-                        for err in errors[:50]:
-                            st.write(err)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Не удалось импортировать файл: {e}")
+    st.markdown("### 📥 Массовая загрузка товаров")
+    st.caption("Загрузите CSV или XLSX — товары добавятся в каталог без удаления существующих.")
+    template_csv = io.StringIO()
+    writer = csv.writer(template_csv, delimiter=";")
+    writer.writerow(["Название", "Бренд", "Артикул", "Размеры", "Цвет", "Категория", "Описание", "Характеристики"])
+    writer.writerow(["Футбольная форма", "Пример", "ART-001", "S,M,L,XL", "Чёрный", "Другое", "Описание товара", "Материал, особенности"])
+    st.download_button(
+        "⬇️ Скачать шаблон CSV",
+        template_csv.getvalue().encode("utf-8-sig"),
+        file_name="arsenal_sport_products_template.csv",
+        mime="text/csv",
+        key="bulk_template_csv",
+    )
+    bulk_file = st.file_uploader(
+        "Файл с товарами",
+        type=["csv", "xlsx"],
+        key="bulk_products_file",
+        help="В CSV используйте первую строку как названия колонок. Для XLSX — первая строка должна содержать заголовки.",
+    )
+    bulk_update = st.checkbox("Обновлять существующие товары по артикулу", value=False, key="bulk_update_existing")
+    if bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
+        try:
+            added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
+            st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
+            if errors:
+                with st.expander("⚠️ Строки с ошибками"):
+                    for err in errors[:50]:
+                        st.write(err)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось импортировать файл: {e}")
 
-        st.markdown("---")
+    st.markdown("---")
     products = load_products()
     if not products:
         st.info("Каталог пуст.")
