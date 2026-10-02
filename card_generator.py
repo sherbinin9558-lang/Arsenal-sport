@@ -63,7 +63,7 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
     if len(lines) <= max_lines:
         return lines
     lines = lines[:max_lines]
-    remainder = " ".join(words[len(" ".join(lines)).split():])
+    remainder = " ".join(words[len(lines):])
     if remainder:
         last = lines[-1]
         while remainder and draw.textbbox((0, 0), last + " …", font=font)[2] > max_w:
