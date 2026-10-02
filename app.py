@@ -469,7 +469,7 @@ else:
 st.markdown(
     "<style>\n" + bg_css + theme_css + """
 /* Hide Streamlit platform controls from the customer-facing UI. */
-#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}
+#MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], footer {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n/* Remove mobile bottom platform chrome; keep only app controls. */\n[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {display:none !important;visibility:hidden !important;height:0 !important;min-height:0 !important;pointer-events:none !important;}\n#MainMenu a[href*="github.com"], [data-testid="stToolbar"] a[href*="github.com"] {display:none !important;visibility:hidden !important;}
 /* MAX popup controls: keep the launcher, dialog and chevrons visible. */
 [data-testid="stDialog"] {z-index:9999 !important;}
 [data-testid="stDialog"] [data-testid="stExpander"] {background:#11151d !important;border:1px solid #3b3f4d !important;}
