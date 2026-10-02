@@ -1349,6 +1349,21 @@ DEFAULT_SETTINGS = {
     "vk": "",
     "instagram": "",
     "order_contact": "",
+    "phone": "",
+    "manager_name": "",
+    "pickup_address": "",
+    "payment_methods": "Наличные, перевод, карта",
+    "return_policy": "Возврат и обмен — по действующим правилам магазина.",
+    "delivery_methods": "Самовывоз, доставка по Краснодару, отправка по России",
+    "delivery_terms": "",
+    "content_signature": "Arsenal Sport — спортивная одежда, обувь и экипировка",
+    "cta": "Напишите нам — поможем выбрать товар и оформить заказ.",
+    "hashtags": "#arsenal_sport #спорт #экипировка",
+    "ai_seller_instructions": "Отвечай дружелюбно и по делу. Уточняй товар, размер и город. Не придумывай наличие, цену или характеристики.",
+    "notification_contact": "",
+    "card_template": "Dark Premium",
+    "show_price_on_cards": "Нет",
+    "main_sport": "Футбол",
 }
 
 def load_settings():
@@ -1368,19 +1383,47 @@ with tab7:
     st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация Arsenal Sport для контента и работы магазина.</div>', unsafe_allow_html=True)
     settings = load_settings()
 
+    st.markdown("### 🏪 Магазин")
     s1, s2 = st.columns(2)
     with s1:
         store_name = st.text_input("Название магазина", value=settings["store_name"], key="settings_store_name")
         city = st.text_input("Город", value=settings["city"], key="settings_city")
-        delivery = st.text_input("Доставка", value=settings["delivery"], key="settings_delivery")
-        order_contact = st.text_input("Контакт для заказа", value=settings["order_contact"], key="settings_order_contact")
+        phone = st.text_input("Телефон", value=settings["phone"], key="settings_phone")
+        manager_name = st.text_input("Имя менеджера", value=settings["manager_name"], key="settings_manager_name")
+        pickup_address = st.text_input("Адрес самовывоза", value=settings["pickup_address"], key="settings_pickup_address")
     with s2:
+        order_contact = st.text_input("Контакт для заказа", value=settings["order_contact"], key="settings_order_contact")
         telegram = st.text_input("Telegram", value=settings["telegram"], key="settings_telegram")
         vk = st.text_input("VK", value=settings["vk"], key="settings_vk")
         instagram = st.text_input("Instagram", value=settings["instagram"], key="settings_instagram")
-        st.info("Логотип уже используется из файла logo.png в проекте.")
+        st.info("Логотип используется из файла logo.png в проекте.")
 
-    if st.button("💾 Сохранить настройки", type="primary", key="save_store_settings"):
+    st.markdown("### 📦 Заказы и доставка")
+    o1, o2 = st.columns(2)
+    with o1:
+        payment_methods = st.text_input("Способы оплаты", value=settings["payment_methods"], key="settings_payment_methods")
+        delivery_methods = st.text_input("Способы доставки", value=settings["delivery_methods"], key="settings_delivery_methods")
+        delivery_terms = st.text_input("Сроки доставки", value=settings["delivery_terms"], key="settings_delivery_terms")
+    with o2:
+        delivery = st.text_input("Доставка", value=settings["delivery"], key="settings_delivery")
+        return_policy = st.text_area("Возврат и обмен", value=settings["return_policy"], key="settings_return_policy")
+
+    st.markdown("### ✍️ Контент")
+    c1, c2 = st.columns(2)
+    with c1:
+        content_signature = st.text_input("Подпись магазина", value=settings["content_signature"], key="settings_content_signature")
+        cta = st.text_input("Призыв к действию", value=settings["cta"], key="settings_cta")
+        hashtags = st.text_input("Стандартные хэштеги", value=settings["hashtags"], key="settings_hashtags")
+    with c2:
+        main_sport = st.selectbox("Основной спорт", ["Футбол", "Баскетбол", "Все виды спорта"], index=["Футбол", "Баскетбол", "Все виды спорта"].index(settings["main_sport"]) if settings["main_sport"] in ["Футбол", "Баскетбол", "Все виды спорта"] else 0, key="settings_main_sport")
+        card_template = st.selectbox("Шаблон карточки", list(TEMPLATES.keys()), index=list(TEMPLATES.keys()).index(settings["card_template"]) if settings["card_template"] in TEMPLATES else 0, key="settings_card_template")
+        show_price_on_cards = st.selectbox("Показывать цену на карточках", ["Нет", "Да"], index=0 if settings["show_price_on_cards"] == "Нет" else 1, key="settings_show_price")
+
+    st.markdown("### 🤖 AI-продавец")
+    ai_seller_instructions = st.text_area("Инструкция для AI-продавца", value=settings["ai_seller_instructions"], height=110, key="settings_ai_seller")
+    notification_contact = st.text_input("Куда отправлять уведомления о заявках", value=settings["notification_contact"], key="settings_notification_contact")
+
+    if st.button("💾 Сохранить все настройки", type="primary", key="save_store_settings"):
         save_settings({
             "store_name": store_name,
             "city": city,
@@ -1389,6 +1432,21 @@ with tab7:
             "vk": vk,
             "instagram": instagram,
             "order_contact": order_contact,
+            "phone": phone,
+            "manager_name": manager_name,
+            "pickup_address": pickup_address,
+            "payment_methods": payment_methods,
+            "return_policy": return_policy,
+            "delivery_methods": delivery_methods,
+            "delivery_terms": delivery_terms,
+            "content_signature": content_signature,
+            "cta": cta,
+            "hashtags": hashtags,
+            "ai_seller_instructions": ai_seller_instructions,
+            "notification_contact": notification_contact,
+            "card_template": card_template,
+            "show_price_on_cards": show_price_on_cards,
+            "main_sport": main_sport,
         })
         st.success("Настройки сохранены.")
         st.rerun()
