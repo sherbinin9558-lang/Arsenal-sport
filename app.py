@@ -22,11 +22,10 @@ STATUSES = ["Идея", "В работе", "Готово", "Опубликова
 PRIORITIES = ["Обычный", "Высокий", "Срочно"]
 
 TEMPLATES = {
-    "Графит":      {"bg": (15,18,24),  "text": (245,247,250), "sec": (165,172,184), "accent": (137,125,255)},
-    "Светлый":     {"bg": (245,247,250), "text": (25,29,38), "sec": (105,112,125), "accent": (111,104,214)},
-    "Минимализм":  {"bg": (250,251,253), "text": (25,29,38), "sec": (110,116,128), "accent": (111,104,214)},
-    "Спортивный":  {"bg": (18,25,36),  "text": (245,247,250), "sec": (166,181,201), "accent": (105,164,235)},
-    "Премиум":     {"bg": (18,20,27),  "text": (239,242,247), "sec": (177,184,198), "accent": (137,125,255)},
+    "Dark Premium":       {"bg": (9,12,18),   "text": (248,249,252), "sec": (148,157,175), "accent": (105,120,255)},
+    "Sport Performance": {"bg": (8,16,27),   "text": (248,250,255), "sec": (160,181,207), "accent": (65,160,255)},
+    "Editorial Sport":   {"bg": (244,246,249), "text": (20,24,32), "sec": (91,99,113), "accent": (35,71,150)},
+    "Black & Electric":  {"bg": (4,5,8),     "text": (250,250,252), "sec": (135,140,151), "accent": (168,92,255)},
 }
 
 CATEGORY_EMOJI = {
@@ -120,103 +119,140 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
     return lines
 
 
+def _fit_text_lines(draw, text, font, max_w, max_lines=2):
+    words = (text or "").split()
+    lines = []
+    cur = ""
+    for word in words:
+        test = f"{cur} {word}".strip()
+        if draw.textbbox((0, 0), test, font=font)[2] <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = word
+            if len(lines) >= max_lines:
+                break
+    if cur and len(lines) < max_lines:
+        lines.append(cur)
+    return lines
+
+
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
-    # Профессиональная рекламная композиция Arsenal Sport.
-    # API функции не меняется — меняется только визуальный слой карточки.
-    t = TEMPLATES.get(template, TEMPLATES["Спортивный"])
+    # Единая профессиональная система Arsenal Sport с четырьмя визуальными направлениями.
+    t = TEMPLATES.get(template, TEMPLATES["Dark Premium"])
     W, H = CARD_SIZE
-    canvas = Image.new("RGB", CARD_SIZE, (9, 12, 18))
+    accent = t["accent"]
+    light = template == "Editorial Sport"
+
+    canvas = Image.new("RGB", CARD_SIZE, t["bg"])
     draw = ImageDraw.Draw(canvas)
 
-    # Мягкий вертикальный градиент.
-    top = (10, 14, 22)
-    bottom = (25, 29, 39)
-    for y in range(H):
-        k = y / max(1, H - 1)
-        c = tuple(int(top[i] * (1-k) + bottom[i] * k) for i in range(3))
-        draw.line([(0, y), (W, y)], fill=c)
+    if light:
+        # Editorial: чистый журнальный фон.
+        draw.rectangle((0, 0, W, H), fill=t["bg"])
+        draw.polygon([(0, 0), (W, 0), (W, 185), (0, 245)], fill=(232,235,240))
+    else:
+        # Премиальный тёмный градиент.
+        top = t["bg"]
+        bottom = tuple(min(255, x + 16) for x in t["bg"])
+        for y in range(H):
+            k = y / max(1, H - 1)
+            c = tuple(int(top[i] * (1-k) + bottom[i] * k) for i in range(3))
+            draw.line([(0, y), (W, y)], fill=c)
 
-    # Сдержанный фирменный glow без перегруза.
-    for r in range(420, 0, -12):
-        alpha = int(18 * (1 - r / 420))
-        c = (32 + alpha, 42 + alpha, 82 + alpha)
-        draw.ellipse((W-300-r, 280-r, W-300+r, 280+r), fill=c)
+        # Мягкий световой акцент.
+        glow_center = (W-230, 285)
+        for r in range(390, 0, -15):
+            k = 1 - r / 390
+            c = tuple(min(255, int(t["bg"][i] + accent[i] * 0.10 * k)) for i in range(3))
+            draw.ellipse((glow_center[0]-r, glow_center[1]-r, glow_center[0]+r, glow_center[1]+r), fill=c)
 
-    # Акцентные диагонали — спортивная динамика.
-    draw.polygon([(0, 0), (300, 0), (0, 190)], fill=(20, 26, 39))
-    draw.polygon([(W, H), (W-330, H), (W, H-230)], fill=(19, 24, 36))
-    draw.line([(55, 190), (240, 5)], fill=(105, 120, 255), width=4)
-    draw.line([(70, 205), (255, 20)], fill=(105, 120, 255), width=1)
+        # Динамика для спортивного и electric вариантов.
+        if template == "Sport Performance":
+            draw.polygon([(0, 0), (355, 0), (0, 245)], fill=(14, 28, 46))
+            draw.line([(35, 230), (270, 0)], fill=accent, width=7)
+            draw.line([(55, 245), (290, 15)], fill=(140, 195, 255), width=2)
+            draw.polygon([(W, H), (W-350, H), (W, H-250)], fill=(13, 25, 42))
+        elif template == "Black & Electric":
+            draw.polygon([(0, 0), (250, 0), (0, 165)], fill=(16, 10, 27))
+            draw.line([(48, 175), (220, 0)], fill=accent, width=5)
+            draw.line([(W-210, H), (W, H-210)], fill=accent, width=3)
+        else:
+            draw.polygon([(0, 0), (300, 0), (0, 190)], fill=(20, 26, 39))
+            draw.line([(55, 190), (240, 5)], fill=accent, width=4)
 
+    # Брендинг.
     logo_img = get_logo()
+    logo_w = 235 if light else 255
     if logo_img:
-        logo_w = 255
         ratio = logo_w / max(1, logo_img.width)
         lr = logo_img.resize((logo_w, int(logo_img.height * ratio)), Image.Resampling.LANCZOS)
-        canvas.paste(lr, (60, 52), lr)
+        canvas.paste(lr, (60, 48), lr)
     else:
-        draw.text((60, 58), "ARSENAL SPORT", font=get_font(38, True), fill=(245,247,250))
+        draw.text((60, 55), "ARSENAL SPORT", font=get_font(36, True), fill=t["text"])
 
-    # Категория — небольшой editorial label.
+    # Категория.
     cat = category.upper()
-    cat_font = get_font(23, True)
+    cat_font = get_font(22, True)
     cat_w = draw.textbbox((0, 0), cat, font=cat_font)[2]
     pill_x = W - cat_w - 72
-    draw.rounded_rectangle((pill_x-22, 50, W-52, 91), radius=20, fill=(32, 39, 55), outline=(76, 89, 120), width=1)
-    draw.text((pill_x, 60), cat, font=cat_font, fill=(191, 201, 224))
+    if light:
+        draw.rounded_rectangle((pill_x-22, 50, W-52, 91), radius=20, fill=(226,230,236), outline=(188,194,204), width=1)
+    else:
+        draw.rounded_rectangle((pill_x-22, 50, W-52, 91), radius=20, fill=(30, 37, 51), outline=(70, 80, 105), width=1)
+    draw.text((pill_x, 60), cat, font=cat_font, fill=t["sec"])
 
-    # Фото — главный объект. Сохраняем пропорции и добавляем аккуратную рамку.
+    # Фото — главный объект.
     if image:
         img = image.convert("RGB")
         iw, ih = img.size
-        max_w, max_h = 900, 760
+        max_w, max_h = (910, 735) if not light else (900, 720)
         ratio = min(max_w / max(1, iw), max_h / max(1, ih))
         ns = (max(1, int(iw * ratio)), max(1, int(ih * ratio)))
         img = img.resize(ns, Image.Resampling.LANCZOS)
         x = (W - ns[0]) // 2
-        y = 175 + max(0, (760 - ns[1]) // 2)
+        y = 170 + max(0, (755 - ns[1]) // 2)
 
-        # Лёгкая тень.
         shadow = Image.new("RGBA", (ns[0]+36, ns[1]+36), (0,0,0,0))
         sd = ImageDraw.Draw(shadow)
-        sd.rounded_rectangle((18,18,ns[0]+18,ns[1]+18), radius=28, fill=(0,0,0,120))
+        sd.rounded_rectangle((18,18,ns[0]+18,ns[1]+18), radius=28, fill=(0,0,0,105))
         canvas.paste(shadow, (x-18, y-18), shadow)
 
-        # Белая тонкая рамка, как у premium product campaign.
-        frame = Image.new("RGB", (ns[0]+12, ns[1]+12), (232,235,241))
+        frame_color = (245,247,250) if light else (224,228,236)
+        frame = Image.new("RGB", (ns[0]+12, ns[1]+12), frame_color)
         frame.paste(img, (6,6))
-        mask = Image.new("L", frame.size, 0)
-        md = ImageDraw.Draw(mask)
-        md.rounded_rectangle((0,0,frame.width-1,frame.height-1), radius=24, fill=255)
-        canvas.paste(frame, (x-6, y-6), mask)
+        canvas.paste(frame, (x-6, y-6))
 
-    # Нижняя информационная зона.
+        if template == "Editorial Sport":
+            draw.line([(54, y+ns[1]+32), (300, y+ns[1]+32)], fill=accent, width=5)
+
+    # Информационная панель.
     panel_y = 955
-    draw.rounded_rectangle((44, panel_y, W-44, H-44), radius=34, fill=(14, 18, 27), outline=(52, 61, 79), width=2)
-    draw.line([(76, panel_y+38), (230, panel_y+38)], fill=(105, 120, 255), width=5)
+    panel_fill = (250,251,253) if light else (13,17,25)
+    panel_outline = (210,214,221) if light else (52,61,79)
+    draw.rounded_rectangle((44, panel_y, W-44, H-44), radius=34, fill=panel_fill, outline=panel_outline, width=2)
+    draw.line([(76, panel_y+38), (235, panel_y+38)], fill=accent, width=5)
 
     brand_text = (brand or "ARSENAL SPORT").upper()
-    draw.text((76, panel_y+62), brand_text[:28], font=get_font(25, True), fill=(137, 150, 178))
+    draw.text((76, panel_y+62), brand_text[:28], font=get_font(25, True), fill=t["sec"])
 
     title_font = fit_font(draw, (name or "ТОВАР").upper(), 860, max_size=58, min_size=34)
     title_lines = _fit_text_lines(draw, (name or "ТОВАР").upper(), title_font, 860, 2)
     ty = panel_y + 104
     for line in title_lines:
-        draw.text((76, ty), line, font=title_font, fill=(248,249,252))
+        draw.text((76, ty), line, font=title_font, fill=t["text"])
         ty += title_font.size + 4
 
-    # Только полезные характеристики — без цены.
     meta = []
     if color: meta.append(str(color))
     if sizes: meta.append(f"Размеры {sizes}")
     if article: meta.append(f"арт. {article}")
     meta_text = "  •  ".join(meta)
     if meta_text:
-        draw.text((76, H-108), meta_text[:70], font=get_font(22), fill=(148,157,175))
+        draw.text((76, H-108), meta_text[:70], font=get_font(22), fill=t["sec"])
 
-    # Небольшой CTA без ощущения баннера.
-    draw.text((W-310, H-108), "ARSENAL SPORT", font=get_font(21, True), fill=(105, 120, 255))
-
+    draw.text((W-310, H-108), "ARSENAL SPORT", font=get_font(21, True), fill=accent)
     return canvas
 
 # ==================== ТЕКСТЫ ====================
