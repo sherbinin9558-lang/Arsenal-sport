@@ -2109,7 +2109,8 @@ def render_max():
                 st.markdown("---")
                 st.markdown("### 📅 План на 30 дней")
                 if st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
-                    generated = make_30_day_plan(products)                    existing = load_plan()
+                    generated = make_30_day_plan(products)
+                    existing = load_plan()
                     existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
                     added = 0
                     for item in generated:
