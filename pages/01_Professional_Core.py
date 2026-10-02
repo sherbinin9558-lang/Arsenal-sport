@@ -3,12 +3,7 @@ import json
 from pathlib import Path
 
 from core_models import Product, OrderItem, ORDER_STATUSES, new_id
-from commerce_core import (
-    product_search,
-    filter_products,
-    inventory_summary,
-    create_order,
-)
+from commerce_core import product_search, filter_products, inventory_summary, create_order
 
 PRODUCTS_FILE = Path("products.json")
 ORDERS_FILE = Path("orders.json")
@@ -44,8 +39,6 @@ def load_products():
         sizes = parse_sizes(item.get("sizes", ""))
         stock = item.get("stock_by_size", {})
         if not stock:
-            # Demonstration data gets a safe, explicit inventory state instead
-            # of pretending that every listed size is actually in stock.
             stock = {size: 0 for size in sizes}
         result.append(Product(
             id=str(item.get("id") or item.get("article") or new_id("PRD")),
@@ -79,21 +72,21 @@ st.set_page_config(page_title="Arsenal Sport · Professional Core", page_icon="�
 
 st.markdown("""
 <style>
-:root { --accent:#897dff; }
-.block-container { max-width: 1500px; padding-top: 2rem; }
-.hero {
-    padding: 28px 32px; border-radius: 22px; margin-bottom: 22px;
-    background: linear-gradient(135deg,#11151d,#24203b);
-    border: 1px solid #34304f; color: #fff;
-}
-.hero h1 { margin:0; font-size:2.35rem; letter-spacing:.02em; }
-.hero p { color:#aeb5c2; margin:.45rem 0 0; font-size:1rem; }
-.kpi {
-    padding:18px; border-radius:16px; background:#151922;
-    border:1px solid #2a3040; min-height:105px;
-}
-.kpi .n { font-size:1.8rem; font-weight:850; color:#fff; }
-.kpi .l { color:#9ca5b5; font-size:.85rem; }
+:root { --accent:#897dff; --panel:#151922; --panel2:#1b202c; --line:#2a3040; --muted:#9ca5b5; }
+.block-container { max-width: 1500px; padding-top: 1.5rem; padding-bottom: 3rem; }
+.hero { padding: 30px 34px; border-radius: 24px; margin-bottom: 20px; background: radial-gradient(circle at 85% 20%, #3a315f 0, #24203b 28%, #11151d 70%); border:1px solid #34304f; color:#fff; box-shadow:0 16px 45px rgba(0,0,0,.18); }
+.hero h1 { margin:0; font-size:2.45rem; letter-spacing:.01em; }
+.hero p { color:#b9c0cd; margin:.5rem 0 0; font-size:1rem; }
+.badge { display:inline-block; padding:5px 10px; border-radius:999px; background:#2a2543; color:#c9c3ff; font-size:.78rem; margin-bottom:10px; }
+.kpi { padding:17px 18px; border-radius:17px; background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); min-height:104px; }
+.kpi .n { font-size:1.75rem; font-weight:850; color:#fff; }
+.kpi .l { color:var(--muted); font-size:.82rem; margin-top:3px; }
+.section-note { color:var(--muted); font-size:.88rem; margin-bottom:12px; }
+.product-name { font-size:1.05rem; font-weight:750; }
+.stock-ok { color:#78d6a0; font-weight:700; }
+.stock-low { color:#f2c36b; font-weight:700; }
+.stock-none { color:#ee8d8d; font-weight:700; }
+.meta { color:#9ca5b5; font-size:.86rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,28 +95,30 @@ summary = inventory_summary(products)
 orders = load_json(ORDERS_FILE, [])
 
 st.markdown(
-    '<div class="hero"><h1>🏆 Arsenal Sport · Professional Core</h1>'
-    '<p>Единое ядро каталога, продаж, заказов и CRM. Готово к подключению каналов продаж.</p></div>',
+    '<div class="hero"><div class="badge">PROFESSIONAL COMMERCE CORE</div>'
+    '<h1>🏆 Arsenal Sport</h1>'
+    '<p>Каталог · умный поиск · корзина · заказы · CRM — единая профессиональная система магазина.</p></div>',
     unsafe_allow_html=True,
 )
 
-k1, k2, k3, k4, k5 = st.columns(5)
-for col, value, label in [
-    (k1, summary["products"], "Товаров"),
-    (k2, summary["units"], "Единиц на остатке"),
-    (k3, summary["available"], "Есть в каталоге"),
-    (k4, summary["low_stock"], "Мало"),
-    (k5, len(orders), "Заказов"),
-]:
+kpis = [
+    (summary["products"], "Товаров"),
+    (summary["units"], "Единиц на остатке"),
+    (summary["available"], "В наличии"),
+    (summary["low_stock"], "Низкий остаток"),
+    (len(orders), "Заказов"),
+]
+cols = st.columns(5)
+for col, (value, label) in zip(cols, kpis):
     col.markdown(f'<div class="kpi"><div class="n">{value}</div><div class="l">{label}</div></div>', unsafe_allow_html=True)
 
 st.divider()
-
 tabs = st.tabs(["Каталог", "Умный поиск", "Корзина и заказ", "CRM"])
 
 with tabs[0]:
-    st.subheader("Профессиональный каталог")
-    f1, f2, f3, f4 = st.columns(4)
+    st.subheader("Каталог")
+    st.markdown('<div class="section-note">Фильтруйте ассортимент так, как это делает современный интернет-магазин. Реальные остатки не подменяются демонстрационными данными.</div>', unsafe_allow_html=True)
+    f1, f2, f3, f4, f5 = st.columns(5)
     sports = sorted({p.sport for p in products if p.sport})
     categories = sorted({p.category for p in products if p.category})
     brands = sorted({p.brand for p in products if p.brand})
@@ -136,8 +131,8 @@ with tabs[0]:
         brand = st.selectbox("Бренд", ["Все"] + brands)
     with f4:
         size = st.selectbox("Размер", ["Все"] + sizes)
-
-    only_available = st.checkbox("Только товары в наличии", value=False)
+    with f5:
+        only_available = st.checkbox("Только в наличии", value=False)
 
     filtered = filter_products(
         products,
@@ -147,40 +142,50 @@ with tabs[0]:
         size="" if size == "Все" else size,
         only_available=only_available,
     )
+    st.caption(f"Показано: {len(filtered)} товаров")
 
-    st.caption(f"Показано товаров: {len(filtered)}")
+    if not filtered:
+        st.info("По выбранным фильтрам товары не найдены.")
     for p in filtered:
         with st.container(border=True):
-            a, b, c, d = st.columns([3, 2, 2, 1])
+            a, b, c = st.columns([4, 3, 2])
             with a:
-                st.markdown(f"**{p.name}**")
-                st.caption(f"{p.brand} · {p.article}")
+                st.markdown(f'<div class="product-name">{p.name}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="meta">{p.brand} · Артикул {p.article or "—"}</div>', unsafe_allow_html=True)
+                if p.description:
+                    st.caption(p.description[:180] + ("…" if len(p.description) > 180 else ""))
             with b:
-                st.write(f"Спорт: {p.sport or '—'}")
-                st.write(f"Категория: {p.category or '—'}")
+                st.write(f"**Спорт:** {p.sport or '—'}")
+                st.write(f"**Категория:** {p.category or '—'}")
+                details = [x for x in [p.color, p.material, p.surface, p.season] if x]
+                if details:
+                    st.caption(" · ".join(details))
             with c:
-                st.write(f"Наличие: **{p.availability}**")
-                st.write(" · ".join(f"{s}: {p.stock_by_size.get(s,0)}" for s in p.sizes) or "Размеры не заданы")
-            with d:
-                st.write(f"{p.price:,.0f} ₽" if p.price else "Цена не задана")
+                status_class = "stock-ok" if p.total_stock > 3 else ("stock-low" if p.total_stock > 0 else "stock-none")
+                st.markdown(f'<div class="{status_class}">{p.availability}</div>', unsafe_allow_html=True)
+                if p.sizes:
+                    stock_line = " · ".join(f"{s}: {p.stock_by_size.get(s, 0)}" for s in p.sizes)
+                    st.caption(stock_line)
+                st.write(f"Цена: **{p.price:,.0f} ₽**" if p.price else "Цена пока не задана")
 
 with tabs[1]:
     st.subheader("Умный поиск")
-    query = st.text_input(
-        "Что ищет клиент?",
-        placeholder="Например: бутсы Nike 42 для искусственного поля",
-    )
+    st.markdown('<div class="section-note">Поиск учитывает название, бренд, спорт, категорию, назначение, поверхность, характеристики и размеры.</div>', unsafe_allow_html=True)
+    query = st.text_input("Запрос клиента", placeholder="Например: бутсы Nike 42 для искусственного поля")
     if query:
         matches = product_search(products, query)
-        st.caption(f"Найдено: {len(matches)}")
+        st.caption(f"Найдено подходящих товаров: {len(matches)}")
         for score, p in matches[:10]:
             with st.container(border=True):
-                st.markdown(f"**{p.name}** · {p.brand}")
-                st.write(
-                    f"{p.sport or 'спорт не задан'} · {p.category or 'категория не задана'} · "
-                    f"{p.availability}"
-                )
-                st.caption(f"Релевантность: {score} · Размеры: {', '.join(p.sizes) or '—'}")
+                left, right = st.columns([4, 1])
+                with left:
+                    st.markdown(f"**{p.name}** · {p.brand}")
+                    st.write(f"{p.sport or 'спорт не задан'} · {p.category or 'категория не задана'} · {p.availability}")
+                    if p.description:
+                        st.caption(p.description[:160])
+                with right:
+                    st.metric("Релевантность", score)
+                    st.caption("Размеры: " + (", ".join(p.sizes) or "—"))
 
 with tabs[2]:
     st.subheader("Корзина и заявка")
@@ -189,43 +194,30 @@ with tabs[2]:
 
     available = [p for p in products if p.active and p.total_stock > 0]
     if not available:
-        st.info("В каталоге пока нет подтверждённых остатков. Это нормально для демонстрационного режима: реальные остатки подключим позже.")
+        st.info("Подтверждённых остатков пока нет. В демо-режиме товары без stock_by_size намеренно считаются отсутствующими, чтобы система не обещала клиенту несуществующий товар.")
     else:
-        selected = st.selectbox(
-            "Товар",
-            range(len(available)),
-            format_func=lambda i: f"{available[i].brand} {available[i].name}",
-        )
+        selected = st.selectbox("Товар", range(len(available)), format_func=lambda i: f"{available[i].brand} {available[i].name}")
         p = available[selected]
         available_sizes = [s for s in p.sizes if p.stock_by_size.get(s, 0) > 0]
-        if available_sizes:
-            size = st.selectbox("Размер", available_sizes)
-            quantity = st.number_input(
-                "Количество",
-                min_value=1,
-                max_value=p.stock_by_size.get(size, 1),
-                value=1,
-            )
-            if st.button("Добавить в корзину", type="primary"):
-                st.session_state.professional_cart.append(
-                    OrderItem(p.id, p.name, size, int(quantity), p.price)
-                )
-                st.success("Товар добавлен в корзину.")
+        size = st.selectbox("Размер", available_sizes) if available_sizes else None
+        quantity = st.number_input("Количество", min_value=1, max_value=p.stock_by_size.get(size, 1) if size else 1, value=1)
+        if st.button("Добавить в корзину", type="primary", use_container_width=True):
+            st.session_state.professional_cart.append(OrderItem(p.id, p.name, size or "", int(quantity), p.price))
+            st.success("Товар добавлен в корзину.")
 
     cart = st.session_state.professional_cart
     if cart:
-        st.markdown("### Корзина")
+        st.markdown("### Ваша корзина")
         total = 0
         for i, item in enumerate(cart):
             subtotal = item.price * item.quantity
             total += subtotal
-            st.write(f"{i+1}. {item.product_name} · {item.size} · {item.quantity} шт. · {subtotal:,.0f} ₽")
-        st.markdown(f"**Итого: {total:,.0f} ₽**")
-
+            st.write(f"{i+1}. **{item.product_name}** · размер {item.size or '—'} · {item.quantity} шт. · {subtotal:,.0f} ₽")
+        st.markdown(f"### Итого: {total:,.0f} ₽")
         name = st.text_input("Имя клиента")
         contact = st.text_input("Телефон / Telegram")
-        comment = st.text_area("Комментарий")
-        if st.button("Создать заказ", type="primary"):
+        comment = st.text_area("Комментарий к заказу")
+        if st.button("Создать заказ", type="primary", use_container_width=True):
             try:
                 order = create_order(name, contact, cart, source="Professional Core", comment=comment)
                 orders.append(order.to_dict())
@@ -239,16 +231,16 @@ with tabs[2]:
 with tabs[3]:
     st.subheader("CRM заказов")
     if not orders:
-        st.info("Заказов пока нет.")
+        st.info("Заказов пока нет. Первый заказ автоматически появится здесь.")
     else:
         for order in reversed(orders):
             with st.container(border=True):
-                top = st.columns([2, 2, 2, 1])
-                top[0].markdown(f"**{order.get('id','—')}**")
-                top[0].caption(order.get("created_at",""))
-                top[1].write(order.get("customer_name","—"))
-                top[1].caption(order.get("customer_contact","—"))
-                top[2].write(f"Сумма: {order.get('total',0):,.0f} ₽")
+                top = st.columns([2, 2, 2, 1.5])
+                top[0].markdown(f"**{order.get('id', '—')}**")
+                top[0].caption(order.get("created_at", ""))
+                top[1].write(order.get("customer_name", "—"))
+                top[1].caption(order.get("customer_contact", "—"))
+                top[2].write(f"Сумма: {order.get('total', 0):,.0f} ₽")
                 current = order.get("status", "Новая")
                 selected_status = top[3].selectbox(
                     "Статус",
@@ -260,11 +252,7 @@ with tabs[3]:
                     order["status"] = selected_status
                     save_orders(orders)
                     st.rerun()
-
                 for item in order.get("items", []):
-                    st.caption(
-                        f"• {item.get('product_name','')} · "
-                        f"{item.get('size','')} · {item.get('quantity',0)} шт."
-                    )
+                    st.caption(f"• {item.get('product_name', '')} · {item.get('size', '')} · {item.get('quantity', 0)} шт.")
 
-st.caption("Professional Core · store-agnostic foundation · v1.0")
+st.caption("Arsenal Sport · Professional Core · store-agnostic foundation")
