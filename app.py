@@ -1088,9 +1088,39 @@ with tab8:
     last_found = st.session_state.get("sales_last_found", [])
     if last_found:
         st.markdown("**Карточки найденных товаров**")
-        for p in last_found:
+        for idx, p in enumerate(last_found):
             title = f"{p.get('brand','')} {p.get('name','')}".strip()
-            st.write(f"• **{title}** · {p.get('category','Другое')} · размеры: {p.get('sizes','уточняйте')}")
+            st.markdown(f"### {idx+1}. {title}")
+            cols = st.columns(4)
+            with cols[0]:
+                img = p.get("card_image") or p.get("original_image")
+                if img:
+                    try:
+                        st.image(img, use_container_width=True)
+                    except Exception:
+                        st.caption("Фото товара доступно в карточке каталога.")
+                else:
+                    st.caption("Фото пока не добавлено.")
+            with cols[1]:
+                st.write(f"**Категория:** {p.get('category','Другое')}")
+                st.write(f"**Размеры:** {p.get('sizes','уточняйте')}")
+                st.write(f"**Цвет:** {p.get('color','уточняйте')}")
+                st.write(f"**Артикул:** {p.get('article','уточняйте')}")
+            with cols[2]:
+                st.write(p.get("description","Описание пока не заполнено.") or "Описание пока не заполнено.")
+            with cols[3]:
+                if st.button("🔎 Подробнее", key=f"sales_details_{idx}"):
+                    st.session_state[f"sales_detail_{idx}"] = not st.session_state.get(f"sales_detail_{idx}", False)
+                if st.button("📦 Наличие", key=f"sales_stock_{idx}"):
+                    st.session_state["sales_stock_message"] = f"По товару «{title}» актуальное наличие нужно подтвердить перед заказом."
+                if st.button("🛒 Заказать", key=f"sales_order_{idx}"):
+                    st.session_state["sales_order_message"] = f"Заказ по товару «{title}»: напишите менеджеру Arsenal Sport и укажите товар, размер и количество."
+            if st.session_state.get(f"sales_detail_{idx}"):
+                st.info(f"{p.get('description','Описание пока не заполнено.') or 'Описание пока не заполнено.'}\n\nХарактеристики: {p.get('specs','уточняются')}")
+        if st.session_state.get("sales_stock_message"):
+            st.warning(st.session_state["sales_stock_message"])
+        if st.session_state.get("sales_order_message"):
+            st.success(st.session_state["sales_order_message"])
     if st.session_state["sales_chat"] and st.button("🗑️ Очистить диалог", key="clear_sales_chat"):
         st.session_state["sales_chat"] = []
         st.session_state["sales_last_found"] = []
