@@ -1775,7 +1775,7 @@ def render_max():
                     status = st.selectbox("Статус", ORDER_STATUSES)
                     source = st.selectbox("Источник", ["Manual", "Telegram", "Instagram", "VK", "Другое"])
                     attribution_items = [x for x in load_plan() if x.get("status") == "Опубликовано" and x.get("content_id")]
-                    content_choices = ["Не привязывать"] + [f"{x.get("date","")} · {x.get("platform","")} · {x.get("type","")} · {x.get("product","")}" for x in attribution_items[-50:]]
+                    content_choices = ["Не привязывать"] + [f'{x.get("date","")} · {x.get("platform","")} · {x.get("type","")} · {x.get("product","")}' for x in attribution_items[-50:]]
                     selected_content = st.selectbox("Контент / публикация", content_choices, key="max_order_content")
                 if st.form_submit_button("➕ Создать заказ"):
                     content_id = ""
