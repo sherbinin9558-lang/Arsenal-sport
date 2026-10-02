@@ -621,6 +621,62 @@ html, body { overflow-x:hidden !important; }
 [data-testid="stText"], [data-testid="stCaptionContainer"] {color:#596174 !important;}
 
 [data-testid="stAlert"] svg, div[data-baseweb="notification"] svg {color:#897dff !important;}
+
+/* UI chrome cleanup + MAX/sidebar recovery v7 */
+/* Keep the real app sidebar available on desktop and mobile. */
+aside[data-testid="stSidebar"], section[data-testid="stSidebar"], div[data-testid="stSidebar"] {
+    display:block !important;
+    visibility:visible !important;
+    opacity:1 !important;
+}
+/* Hide only Streamlit/GitHub/platform chrome; do not hide app controls. */
+a[href*="github.com"], a[href*="gitlab.com"], a[href*="bitbucket.org"],
+a[aria-label*="GitHub" i], a[title*="GitHub" i],
+a[aria-label*="Settings" i], a[title*="Settings" i] {
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+}
+[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+[data-testid="stAppDeployButton"], footer,
+[data-testid="stBottom"], [data-testid="stBottomBlockContainer"], [data-testid="stBottomBlock"] {
+    display:none !important;
+    visibility:hidden !important;
+    height:0 !important;
+    min-height:0 !important;
+    pointer-events:none !important;
+}
+/* MAX dialog: restore visibility and make navigation arrows lime/neon. */
+[data-testid="stDialog"], div[role="dialog"] {
+    z-index:99999 !important;
+    visibility:visible !important;
+    opacity:1 !important;
+}
+[data-testid="stDialog"] [data-testid="stExpander"] svg,
+[data-testid="stDialog"] [data-testid="stExpander"] svg * ,
+div[role="dialog"] [data-testid="stExpander"] svg,
+div[role="dialog"] [data-testid="stExpander"] svg * {
+    color:#b8ff00 !important;
+    stroke:#b8ff00 !important;
+    fill:none !important;
+    opacity:1 !important;
+    visibility:visible !important;
+    filter:drop-shadow(0 0 5px rgba(184,255,0,.8)) !important;
+}
+/* Keep the MAX launcher visually prominent. */
+button[key="sidebar_max"], button[key="dash_open_max"] {
+    background:linear-gradient(135deg,#7cff00,#b8ff00) !important;
+    color:#101500 !important;
+    border:1px solid #d7ff72 !important;
+    box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 16px rgba(184,255,0,.55) !important;
+    font-weight:900 !important;
+}
+/* Neon theme switch, without changing its behavior. */
+[data-testid="stSidebar"] [data-testid="stToggle"] label,
+[data-testid="stSidebar"] [data-baseweb="checkbox"] label {
+    color:#b8ff00 !important;
+    text-shadow:0 0 7px rgba(184,255,0,.65) !important;
+}
 </style>""",
     unsafe_allow_html=True,
 )
