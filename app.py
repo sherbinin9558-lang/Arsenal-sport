@@ -553,7 +553,7 @@ st.markdown(
 .stApp {background:#eef1f5;}
 section[data-testid="stSidebar"] {background:#e5e9ef;border-right:1px solid #d5dbe4;}
 section[data-testid="stSidebar"] .stMetric {background:transparent;border:0;border-radius:0;padding:2px 4px;}
-.sidebar-ai-agent {font-size:1.05rem;font-weight:850;letter-spacing:.02em;color:#f5f7fa;margin:0 0 6px 0;text-align:left;line-height:1.2;}\n .sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
+.sidebar-ai-agent {font-size:1.05rem;font-weight:850;letter-spacing:.02em;color:#a98cff;text-shadow:0 0 6px rgba(169,140,255,.85),0 0 14px rgba(137,125,255,.55);margin:0 0 6px 0;text-align:left;line-height:1.2;}\n .sidebar-max {padding:10px 12px 8px;border:1px solid #34304f;border-radius:14px;background:linear-gradient(135deg,#171c26,#211f35);margin:2px 0 8px;}
 .sidebar-max-kicker {font-size:.62rem;letter-spacing:.12em;font-weight:800;color:#9b93ff;}
 .sidebar-max-title {font-size:1.18rem;font-weight:850;color:#fff;margin-top:2px;}
 .sidebar-max-text {font-size:.72rem;color:#aeb5c2;margin-top:2px;}
