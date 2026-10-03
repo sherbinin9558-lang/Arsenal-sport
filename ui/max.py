@@ -8,6 +8,8 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
+from card_generator import generate_card
+
 from automation_suite import (
     analytics as automation_analytics,
     bulk_update,
@@ -214,6 +216,7 @@ def render_max():
                     st.rerun()
             with qb:
                 if st.button("↻ Обновить анализ MAX", use_container_width=True, key="max_refresh"):
+                    st.session_state.pop("max_data_snapshot", None)
                     st.rerun()
 
     elif section == "Аккаунт":
@@ -577,13 +580,13 @@ def render_max():
             if not products:
                 st.info("Сначала добавьте товары в каталог.")
             else:
-                limit = st.slider("Сколько товаров обработать", 1, min(100, len(products)), min(30, len(products)), key="auto_content_limit")
+                content_limit = st.slider("Сколько товаров обработать", 1, min(100, len(products)), min(30, len(products)), key="auto_content_limit")
                 if can("write_data") and st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
                     bundles = {}
-                    for i,p in enumerate(products[:limit]):
+                    for i,p in enumerate(products[:content_limit]):
                         bundles[str(i)] = {"product": max_product_title(p), "content": content_for_product(p)}
                     st.session_state["auto_content_bundles"] = bundles
-                    st.success(f"Контент подготовлен для {limit} товаров.")
+                    st.success(f"Контент подготовлен для {content_limit} товаров.")
                 bundles = st.session_state.get("auto_content_bundles", {})
                 if bundles:
                     for item in list(bundles.values())[:10]:
