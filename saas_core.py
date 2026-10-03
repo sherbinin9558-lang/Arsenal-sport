@@ -196,6 +196,9 @@ def subscription_snapshot():
             "status":row.get("status","trialing"),
             "provider":row.get("provider"),
             "current_period_end":row.get("current_period_end"),
+            "auto_renew":bool(row.get("auto_renew",False)),
+            "cancel_at_period_end":bool(row.get("cancel_at_period_end",False)),
+            "next_billing_at":row.get("next_billing_at"),
         }
     except Exception:
         return {"plan":tenant_plan(),"status":"unknown","provider":None,"current_period_end":None}
