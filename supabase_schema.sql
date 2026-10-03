@@ -122,3 +122,60 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+-- Team invitations and role administration.
+create table if not exists public.invitations (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  email text not null,
+  role text not null default 'manager',
+  status text not null default 'pending',
+  invited_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '7 days')
+);
+
+create index if not exists idx_invitations_tenant on public.invitations(tenant_id);
+create index if not exists idx_invitations_email on public.invitations(lower(email));
+
+create or replace function public.is_tenant_admin(target_tenant uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.memberships
+    where user_id = auth.uid()
+      and tenant_id = target_tenant
+      and role in ('owner','admin')
+  );
+$$;
+
+alter table public.invitations enable row level security;
+
+drop policy if exists "members can read team memberships" on public.memberships;
+create policy "members can read team memberships" on public.memberships
+for select using (public.is_tenant_member(tenant_id));
+
+drop policy if exists "admins can read invitations" on public.invitations;
+create policy "admins can read invitations" on public.invitations
+for select using (public.is_tenant_admin(tenant_id));
+
+drop policy if exists "admins can create invitations" on public.invitations;
+create policy "admins can create invitations" on public.invitations
+for insert with check (
+  public.is_tenant_admin(tenant_id)
+  and invited_by = auth.uid()
+  and role in ('admin','manager','editor','viewer')
+);
+
+drop policy if exists "admins can cancel invitations" on public.invitations;
+create policy "admins can cancel invitations" on public.invitations
+for update using (public.is_tenant_admin(tenant_id))
+with check (public.is_tenant_admin(tenant_id));
+
+drop policy if exists "admins can delete invitations" on public.invitations;
+create policy "admins can delete invitations" on public.invitations
+for delete using (public.is_tenant_admin(tenant_id));
+
