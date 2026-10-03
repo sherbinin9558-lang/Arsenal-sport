@@ -112,6 +112,10 @@ class RlsSchemaRegressionTests(unittest.TestCase):
                 self.assertIn("set search_path = ''", block, rel)
                 pos += len("security definer")
 
+    def test_fresh_schema_has_valid_dollar_quoting(self):
+        self.assertNotRegex(self.sql, r"(?m)^\\s*as \\$\\s*$")
+        self.assertIn("as $", self.sql)
+
     def test_fresh_schema_contains_atomic_save_rpc(self):
         self.assertIn("create or replace function public.save_app_data_batch", self.sql)
         self.assertIn("security invoker", self.sql.lower())
