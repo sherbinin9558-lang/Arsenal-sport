@@ -1174,7 +1174,11 @@ with tab2:
                         updated = {
                             "name": nn, "brand": nb, "article": na, "sizes": ns,
                             "color": nc, "description": nd, "specs": nsp,
-                            "category": ncat, "date_added": p.get('date_added', str(datetime.date.today()))
+                            "category": ncat, "date_added": p.get('date_added', str(datetime.date.today())),
+                            "price": p.get("price", ""),
+                            "stock": p.get("stock", 0),
+                            "total_stock": p.get("total_stock", p.get("stock", 0)),
+                            "stock_by_size": p.get("stock_by_size", {}),
                         }
                         # Не теряем сохранённую карточку и исходное фото.
                         if p.get("card_image"):
