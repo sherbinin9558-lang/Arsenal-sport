@@ -1250,7 +1250,7 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
-    if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max", on_click=_open_max_from_sidebar):
+    st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max", on_click=_open_max_from_sidebar)
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
