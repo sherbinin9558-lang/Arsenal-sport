@@ -60,3 +60,18 @@ class OrderSafetyRegressionTests(unittest.TestCase):
         self.assertIn("ORDER_STATUSES =", source)
         self.assertIn('if "id" in changes:', source)
         self.assertIn('if "status" in changes and changes["status"] not in ORDER_STATUSES:', source)
+
+
+class CrmSafetyRegressionTests(unittest.TestCase):
+    def test_lead_identity_and_status_are_validated(self):
+        source = (Path(__file__).resolve().parents[1] / "crm_core.py").read_text(encoding="utf-8")
+        self.assertIn('if "id" in changes:', source)
+        self.assertIn('if "status" in changes and changes["status"] not in STATUSES:', source)
+
+
+class RlsRoleSafetyRegressionTests(unittest.TestCase):
+    def test_owner_role_cannot_be_changed_by_member_role_rpc(self):
+        source = (Path(__file__).resolve().parents[1] / "supabase_schema.sql").read_text(encoding="utf-8")
+        self.assertIn("CANNOT_CHANGE_OWNER_ROLE", source)
+        self.assertIn("if target_current_role = 'owner' then", source)
+        self.assertIn("for update;", source)
