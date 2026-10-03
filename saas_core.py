@@ -459,6 +459,16 @@ def require_saas_access():
 
     st.session_state.pop("saas_auth_error", None)
 
+    tenant_status = str(st.session_state.get("saas_tenant_status", "active")).lower()
+    if tenant_status != "active":
+        if tenant_status == "suspended":
+            st.error("Магазин временно приостановлен. Обратитесь к администратору платформы.")
+        elif tenant_status == "cancelled":
+            st.error("Магазин закрыт. Доступ к рабочему пространству отключён.")
+        else:
+            st.error(f"Доступ к магазину ограничен: статус {tenant_status}.")
+        return False
+
     if not onboarding_complete() and not st.session_state.get("saas_onboarding_complete"):
         render_onboarding()
         return False
