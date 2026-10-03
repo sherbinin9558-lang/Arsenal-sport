@@ -48,6 +48,12 @@ class ProductStockRegressionTests(unittest.TestCase):
         self.assertIn('"stock": p.get("stock", 0)', source)
         self.assertIn('"total_stock": p.get("total_stock", p.get("stock", 0))', source)
 
+    def test_product_and_content_updates_merge_existing_fields(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn("existing = dict(p[idx] or {})", source)
+        self.assertIn("existing.update(updated)", source)
+        self.assertIn('existing.pop("_saas_record_id", None)', source)
+
     def test_stock_helpers_accept_legacy_stock_field(self):
         source = (Path(__file__).resolve().parents[1] / "inventory_core.py").read_text(encoding="utf-8")
         self.assertIn('product.get("total_stock", product.get("stock"))', source)
