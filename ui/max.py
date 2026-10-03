@@ -93,6 +93,21 @@ def get_logo():
 ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]
 ACTIVE_ORDER_STATUSES = {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
 
+
+
+def _record_id(product):
+    return str(product.get("_saas_record_id", "")).strip()
+
+
+def _current_product_index(products, record_id, fallback_index=None):
+    if record_id:
+        for i, product in enumerate(products):
+            if _record_id(product) == record_id:
+                return i
+    if fallback_index is not None and 0 <= fallback_index < len(products):
+        return fallback_index
+    return None
+
 def max_stock(product):
     by_size = product.get("stock_by_size") or {}
     qty, _, known = stock_info(product)
@@ -616,7 +631,8 @@ def render_max():
             if products:
                 labels = [f"{i+1}. {max_product_title(p)}" for i,p in enumerate(products)]
                 selected = st.multiselect("Товары", labels, key="auto_bulk_products")
-                indexes = [labels.index(x) for x in selected]
+                selected_indexes = [labels.index(x) for x in selected]
+                selected_ids = [_record_id(products[i]) for i in selected_indexes]
                 field = st.selectbox("Что изменить", ["category", "brand", "sizes", "color"], key="auto_bulk_field")
                 if field == "category":
                     value = st.selectbox("Новое значение", CATEGORIES, key="auto_bulk_value_cat")
@@ -629,6 +645,11 @@ def render_max():
                         st.warning("Значение не должно быть пустым.")
                     else:
                         products_now = load_products()
+                        indexes = []
+                        for fallback_index, record_id in zip(selected_indexes, selected_ids):
+                            current_index = _current_product_index(products_now, record_id, fallback_index)
+                            if current_index is not None:
+                                indexes.append(current_index)
                         changed = bulk_update(products_now, indexes, field, value.strip())
                         save_products(products_now)
                         st.success(f"Изменено товаров: {changed}.")
@@ -642,6 +663,7 @@ def render_max():
                 stock_labels = [f"{i+1}. {max_product_title(p)}" for i,p in enumerate(products)]
                 stock_choice = st.selectbox("Товар", stock_labels, key="auto_stock_product")
                 stock_idx = stock_labels.index(stock_choice)
+                stock_record_id = _record_id(products[stock_idx])
                 sp = products[stock_idx]
                 current_stock = sp.get("stock_by_size") if isinstance(sp.get("stock_by_size"), dict) else {}
                 raw_sizes = str(sp.get("sizes","")).replace(";", ",")
@@ -659,8 +681,12 @@ def render_max():
                         try: stock[size] = max(0, int(parts[i])) if i < len(parts) else 0
                         except Exception: stock[size] = 0
                     products_now = load_products()
-                    products_now[stock_idx]["stock_by_size"] = stock
-                    products_now[stock_idx]["total_stock"] = sum(stock.values())
+                    current_stock_idx = _current_product_index(products_now, stock_record_id, stock_idx)
+                    if current_stock_idx is None:
+                        st.error("Товар изменился или был удалён. Обновите MAX и повторите.")
+                        st.stop()
+                    products_now[current_stock_idx]["stock_by_size"] = stock
+                    products_now[current_stock_idx]["total_stock"] = sum(stock.values())
                     save_products(products_now)
                     st.success("Остатки сохранены.")
                     st.rerun()
