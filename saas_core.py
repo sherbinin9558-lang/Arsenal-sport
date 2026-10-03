@@ -1,7 +1,7 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
 import hashlib, json, os, time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
 import streamlit as st
