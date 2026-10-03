@@ -427,6 +427,8 @@ def data_save(entity,rows):
     rows=rows if isinstance(rows,list) else []
     if saas_enabled() and not can("write_data"):
         raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
+    if saas_enabled() and entity=="settings" and not can("settings"):
+        raise PermissionError("Только администратор или владелец может менять настройки магазина.")
     if not saas_enabled():
         os.makedirs("data",exist_ok=True)
         with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f: json.dump(rows,f,ensure_ascii=False,indent=2)
