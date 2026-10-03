@@ -93,3 +93,10 @@ class InventoryRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ContentIdentityRegressionTests(unittest.TestCase):
+    def test_saas_record_id_is_used_for_stable_content_identity(self):
+        source = (Path(__file__).resolve().parents[1] / "content_manager.py").read_text(encoding="utf-8")
+        self.assertIn('item.get("_saas_record_id")', source)
+        self.assertIn('item.get("content_id")', source)
