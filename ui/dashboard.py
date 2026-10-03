@@ -74,7 +74,7 @@ def render_dashboard(
                     fr_brand = st.text_input("Бренд", placeholder="Nike")
                     fr_article = st.text_input("Артикул", placeholder="ART-001")
                 with q2:
-                    fr_category = st.selectbox("Категория", CATEGORIES)
+                    fr_category = st.selectbox("Категория", categories)
                     fr_price = st.text_input("Цена, ₽", placeholder="4990")
                     fr_stock = st.number_input("Остаток", min_value=0, value=1, step=1)
                 fr_submit = st.form_submit_button("Создать товар и передать его MAX", type="primary", use_container_width=True)
