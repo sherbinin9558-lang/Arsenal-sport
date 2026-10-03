@@ -31,7 +31,7 @@ SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
 SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 
-def _save_checkout(tenant_id, payment_id, plan):
+def _save_checkout(tenant_id, checkout_id, payment_id, plan):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -48,7 +48,7 @@ def _save_checkout(tenant_id, payment_id, plan):
         json={
             "tenant_id": str(tenant_id),
             "provider": "yookassa",
-            "provider_order_id": str(payment_id),
+            "provider_order_id": str(checkout_id),
             "provider_payment_id": str(payment_id),
             "plan": plan,
             "status": "created",
@@ -57,6 +57,23 @@ def _save_checkout(tenant_id, payment_id, plan):
     )
     if not r.ok:
         raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+
+def get_checkout_by_order(checkout_id):
+    key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
+    url=_cfg("SUPABASE_URL").rstrip("/")
+    if not key or not url:
+        raise RuntimeError("Supabase checkout storage is not configured.")
+    headers={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json"}
+    r=requests.get(
+        f"{url}/rest/v1/billing_checkout_sessions",
+        headers=headers,
+        params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.yookassa","provider_order_id":f"eq.{checkout_id}","limit":"1"},
+        timeout=15,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+    rows=r.json()
+    return rows[0] if rows else None
 
 def configured():
     return bool(SHOP_ID and SECRET_KEY and PUBLIC_URL)
@@ -79,19 +96,19 @@ def create_checkout(plan, tenant_id):
         raise RuntimeError("ЮKassa не настроена: нужны YOO_KASSA_SHOP_ID, YOO_KASSA_SECRET_KEY и SAAS_PUBLIC_URL.")
     if not _cfg("SUPABASE_SERVICE_ROLE_KEY") or not _cfg("SUPABASE_URL"):
         raise RuntimeError("Не настроено серверное сохранение checkout: нужны SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY.")
-    payment_id=str(uuid.uuid4())
+    checkout_id=str(uuid.uuid4())
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
         "save_payment_method":True,
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&payment_id={payment_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
-        "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":payment_id},
+        "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
     }
     r=requests.post(
         "https://api.yookassa.ru/v3/payments",
         auth=(SHOP_ID,SECRET_KEY),
-        headers={"Idempotence-Key":payment_id,"Content-Type":"application/json"},
+        headers={"Idempotence-Key":checkout_id,"Content-Type":"application/json"},
         json=payload,
         timeout=20,
     )
@@ -102,7 +119,7 @@ def create_checkout(plan, tenant_id):
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
-    _save_checkout(tenant_id, data.get("id"), plan)
+    _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
     return data
 
 def get_payment(payment_id):
