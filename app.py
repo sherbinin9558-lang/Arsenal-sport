@@ -58,8 +58,15 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def load_products(): return data_load("products", [])
-def save_products(p): data_save("products", p)
+def load_products():
+    key = "_app_products_cache"
+    if key not in st.session_state:
+        st.session_state[key] = data_load("products", [])
+    return st.session_state[key]
+
+def save_products(p):
+    data_save("products", p)
+    st.session_state["_app_products_cache"] = p
 def add_product(prod):
     p = load_products()
     if not feature_allowed("products", len(p)):
@@ -107,8 +114,15 @@ def delete_product(record_id, existing=None):
         p.pop(idx)
         save_products(p)
 
-def load_plan(): return data_load("content_plan", [])
-def save_plan(pl): data_save("content_plan", pl)
+def load_plan():
+    key = "_app_plan_cache"
+    if key not in st.session_state:
+        st.session_state[key] = data_load("content_plan", [])
+    return st.session_state[key]
+
+def save_plan(pl):
+    data_save("content_plan", pl)
+    st.session_state["_app_plan_cache"] = pl
 
 ATTRIBUTION_FILE = Path("content_attribution.json")
 def load_attribution(): return data_load("content_attribution", [])
