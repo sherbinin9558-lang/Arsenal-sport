@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from datetime import datetime, date, timedelta
+import uuid
 from saas_core import data_load, data_save, feature_allowed, tenant_plan
 
 ORDERS_FILE = Path("orders.json")
@@ -14,9 +15,8 @@ def create_order(customer="", contact="", product="", product_id="", amount="", 
     orders = load_orders()
     if not feature_allowed("orders", len(orders)):
         raise ValueError(f"Лимит заказов тарифа {tenant_plan().upper()} достигнут.")
-    nums = [int(o.get("id", 0)) for o in orders if str(o.get("id", "")).isdigit()]
     order = {
-        "id": max(nums or [0]) + 1,
+        "id": uuid.uuid4().hex,
         "customer": customer.strip(), "contact": contact.strip(),
         "product": product.strip(), "product_id": str(product_id or ""),
         "amount": str(amount or "").strip(), "status": status, "source": source, "content_id": str(content_id or ""), "lead_id": str(lead_id or ""),
