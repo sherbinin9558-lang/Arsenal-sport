@@ -538,6 +538,7 @@ def render_platform_admin():
     st.dataframe(account_rows, use_container_width=True, hide_index=True)
     st.caption("Вкладка доступна только владельцу платформы из SAAS_ADMIN_EMAIL. Service-role ключ нужен для загрузки и управления данными.")
 
+
 @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
