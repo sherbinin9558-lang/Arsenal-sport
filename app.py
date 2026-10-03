@@ -78,9 +78,15 @@ def update_product(record_id, prod):
     p = load_products()
     idx = _find_record_index(p, record_id)
     if idx is not None:
-        prod = dict(prod or {})
-        prod["_saas_record_id"] = p[idx].get("_saas_record_id")
-        p[idx] = prod
+        existing = dict(p[idx] or {})
+        updated = dict(prod or {})
+        stable_id = existing.get("_saas_record_id")
+        existing.update(updated)
+        if stable_id:
+            existing["_saas_record_id"] = stable_id
+        else:
+            existing.pop("_saas_record_id", None)
+        p[idx] = existing
         save_products(p)
 
 def delete_product(record_id):
@@ -118,9 +124,15 @@ def update_plan(record_id, item):
     p = load_plan()
     idx = _find_record_index(p, record_id)
     if idx is not None:
-        item = dict(item or {})
-        item["_saas_record_id"] = p[idx].get("_saas_record_id")
-        p[idx] = item
+        existing = dict(p[idx] or {})
+        updated = dict(item or {})
+        stable_id = existing.get("_saas_record_id")
+        existing.update(updated)
+        if stable_id:
+            existing["_saas_record_id"] = stable_id
+        else:
+            existing.pop("_saas_record_id", None)
+        p[idx] = existing
         save_plan(p)
 
 def delete_plan(record_id):
