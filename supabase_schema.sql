@@ -152,7 +152,7 @@ returns boolean
 language sql
 security definer
 set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid() and tenant_id = target_tenant
@@ -169,7 +169,7 @@ returns boolean
 language sql
 security definer
 set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid()
@@ -183,7 +183,7 @@ returns boolean
 language sql
 security definer
 set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid()
@@ -229,7 +229,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   new_tenant uuid;
   store_name text;
@@ -373,7 +373,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   inv public.invitations;
   uid uuid := auth.uid();
@@ -430,7 +430,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   target_current_role text;
 begin
