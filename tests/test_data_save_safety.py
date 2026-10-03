@@ -42,6 +42,13 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn("raise DataConflictError", self.source)
 
 
+class OnboardingSettingsSafetyTests(unittest.TestCase):
+    def test_onboarding_preserves_existing_settings_record_identity(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('existing=data_load("settings",[])', source)
+        self.assertIn('onboarding_payload["_saas_record_id"]=existing[0]["_saas_record_id"]', source)
+
+
 class SettingsRecordSafetyTests(unittest.TestCase):
     def test_settings_preserve_saas_record_identity(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
