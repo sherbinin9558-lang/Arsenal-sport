@@ -18,10 +18,16 @@ class RlsSchemaRegressionTests(unittest.TestCase):
                 table,
             )
 
+    def _function_block(self, name):
+        start = self.sql.index(f"create or replace function public.{name}")
+        end = self.sql.find("create or replace function public.", start + 1)
+        return self.sql[start:] if end == -1 else self.sql[start:end]
+
     def test_tenant_helpers_are_security_definer_and_locked_down(self):
         for name in ("is_tenant_member", "is_tenant_writer", "is_tenant_admin"):
-            fn = rf"create or replace function public\.{name}\(target_tenant uuid\)(.*?)(?=create or replace function public\.|alter table public\.invitations)",
-            self.assertRegex(self.sql, fn[0], name)
+            block = self._function_block(name).lower()
+            self.assertIn("security definer", block, name)
+            self.assertIn("set search_path = ''", block, name)
             self.assertIn(
                 f"revoke all on function public.{name}(uuid) from public;",
                 self.sql,
@@ -41,12 +47,8 @@ class RlsSchemaRegressionTests(unittest.TestCase):
 
     def test_tenant_helpers_use_fixed_search_path(self):
         for name in ("is_tenant_member", "is_tenant_writer", "is_tenant_admin"):
-            fn_pos = self.sql.index(f"create or replace function public.{name}")
-            next_fn = self.sql.find(
-                "create or replace function public.", fn_pos + 1
-            )
-            block = self.sql[fn_pos:] if next_fn == -1 else self.sql[fn_pos:next_fn]
-            self.assertIn("security definer", block.lower(), name)
+            block = self._function_block(name).lower()
+            self.assertIn("security definer", block, name)
             self.assertIn("set search_path = ''", block, name)
 
     def test_app_data_policy_matrix_is_present(self):
@@ -62,7 +64,11 @@ class RlsSchemaRegressionTests(unittest.TestCase):
 
     def test_tenant_update_requires_admin(self):
         self.assertIn(
-            'for update using (public.is_tenant_admin(id))',
+            'for update to authenticated',
+            self.sql,
+        )
+        self.assertIn(
+            'using ((select public.is_tenant_admin(id)))',
             self.sql,
         )
         self.assertIn(
