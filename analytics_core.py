@@ -1,21 +1,30 @@
-import json
-from pathlib import Path
-from datetime import datetime
+"""Tenant-isolated analytics storage.
 
-EVENTS_FILE=Path("analytics_events.json")
+This module no longer writes to a repository-wide analytics_events.json.
+"""
+from datetime import datetime
+from saas_core import data_load, data_save
+
+ENTITY = "analytics_events"
 
 def load_events():
-    if not EVENTS_FILE.exists(): return []
-    try: return json.loads(EVENTS_FILE.read_text(encoding="utf-8"))
-    except Exception: return []
+    return data_load(ENTITY, [])
 
 def track(event, source="app", product_id="", meta=None):
-    events=load_events()
-    events.append({"event":event,"source":source,"product_id":product_id,
-                   "meta":meta or {},"at":datetime.now().isoformat(timespec="seconds")})
-    EVENTS_FILE.write_text(json.dumps(events,ensure_ascii=False,indent=2),encoding="utf-8")
+    events = load_events()
+    events.append({
+        "event": event,
+        "source": source,
+        "product_id": str(product_id or ""),
+        "meta": meta or {},
+        "at": datetime.now().isoformat(timespec="seconds"),
+    })
+    data_save(ENTITY, events)
+    return events[-1]
 
 def event_counts(events):
-    out={}
-    for e in events: out[e.get("event","unknown")]=out.get(e.get("event","unknown"),0)+1
+    out = {}
+    for e in events:
+        key = e.get("event", "unknown")
+        out[key] = out.get(key, 0) + 1
     return out
