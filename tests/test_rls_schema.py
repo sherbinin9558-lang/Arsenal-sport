@@ -70,6 +70,11 @@ class RlsSchemaRegressionTests(unittest.TestCase):
             self.sql,
         )
 
+    def test_member_role_rpc_cannot_demote_owner(self):
+        self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
+        self.assertIn("if target_current_role = 'owner' then", self.sql)
+        self.assertIn("grant execute on function public.set_member_role(uuid,uuid,text) to authenticated;", self.sql)
+
 
 if __name__ == "__main__":
     unittest.main()
