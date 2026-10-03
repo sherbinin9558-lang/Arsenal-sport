@@ -172,6 +172,18 @@ def activate_paid_subscription(plan, provider_payment_id, payment_method_id=None
     st.session_state["saas_tenant_status"]="active"
     return True
 
+def set_auto_renew(enabled):
+    token=st.session_state.get("saas_access_token")
+    tid=tenant_id()
+    if not saas_enabled() or not token:
+        st.session_state["auto_renew"]=bool(enabled)
+        return True
+    if current_role() not in ("owner","admin"):
+        raise PermissionError("Только владелец или администратор может менять автопродление.")
+    _request("PATCH","/rest/v1/subscriptions",token=token,params={"tenant_id":f"eq.{tid}"},json={"auto_renew":bool(enabled),"cancel_at_period_end":not bool(enabled)})
+    st.session_state["auto_renew"]=bool(enabled)
+    return True
+
 def subscription_snapshot():
     token=st.session_state.get("saas_access_token")
     tid=tenant_id()
