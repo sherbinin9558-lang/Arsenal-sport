@@ -389,7 +389,11 @@ def platform_admin_snapshot():
     tenants = _admin_request("GET","/rest/v1/tenants",params={"select":"id,name,slug,plan,status,created_at","order":"created_at.desc"})
     subs = _admin_request("GET","/rest/v1/subscriptions",params={"select":"tenant_id,plan,status,provider,current_period_end,auto_renew","order":"tenant_id"})
     members = _admin_request("GET","/rest/v1/memberships",params={"select":"tenant_id,user_id,role,created_at","order":"created_at.asc"})
-    return tenants, subs, members
+    try:
+        users = _admin_request("GET","/auth/v1/admin/users",params={"page":1,"per_page":1000}).get("users",[])
+    except Exception:
+        users = []
+    return tenants, subs, members, users
 
 def platform_admin_set_tenant(tenant_id_value, plan=None, status=None):
     if not platform_admin_enabled():
