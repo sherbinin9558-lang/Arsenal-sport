@@ -131,6 +131,35 @@ def render_account_bar():
                 if k.startswith("saas_"): del st.session_state[k]
             st.rerun()
 
+def plan_catalog():
+    return {
+        "starter":{"name":"STARTER","products":1000,"users":3,"description":"Для небольшого магазина"},
+        "pro":{"name":"PRO","products":10000,"users":10,"description":"Для растущего бизнеса"},
+        "business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"},
+    }
+
+def subscription_snapshot():
+    token=st.session_state.get("saas_access_token")
+    tid=tenant_id()
+    if not saas_enabled() or not token:
+        return {"plan":tenant_plan(),"status":"trialing","provider":None,"current_period_end":None}
+    try:
+        row=subscription(token,tid) or {}
+        return {
+            "plan":row.get("plan",tenant_plan()),
+            "status":row.get("status","trialing"),
+            "provider":row.get("provider"),
+            "current_period_end":row.get("current_period_end"),
+        }
+    except Exception:
+        return {"plan":tenant_plan(),"status":"unknown","provider":None,"current_period_end":None}
+
+def request_plan_change(plan):
+    if plan not in ("starter","pro","business"):
+        raise ValueError("Недопустимый тариф.")
+    st.session_state["requested_plan"]=plan
+    return True
+
 def current_role(token=None):
     if not saas_enabled():
         return "owner"
