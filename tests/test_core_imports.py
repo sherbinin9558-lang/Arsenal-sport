@@ -9,6 +9,7 @@ MODULES = (
     "automation_suite",
     "commerce_core",
     "inventory_core",
+    "content_manager",
 )
 
 
