@@ -35,9 +35,10 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn('"expected_updated_at":baseline[record_id].get("updated_at")', self.source)
         self.assertIn('data_load(entity,[])', self.source)
 
-    def test_preflight_raises_conflict_on_version_mismatch(self):
-        self.assertIn("current_versions", self.source)
-        self.assertIn("expected != actual", self.source)
+    def test_atomic_rpc_conflicts_are_mapped_to_data_conflict(self):
+        self.assertIn('"DATA_CONFLICT"', self.source)
+        self.assertIn('"RECORD_NOT_FOUND"', self.source)
+        self.assertIn('"RECORD_ALREADY_EXISTS"', self.source)
         self.assertIn("raise DataConflictError", self.source)
 
 
