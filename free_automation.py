@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 import uuid
 from saas_core import data_load, data_save, feature_allowed, tenant_plan
+from inventory_core import stock_info
 
 ORDERS_FILE = Path("orders.json")
 ORDER_STATUSES = ("Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён")
@@ -61,16 +62,8 @@ def order_metrics(orders, active_statuses):
 def stock_rows(products):
     rows = []
     for p in products:
-        by_size = p.get("stock_by_size") or {}
-        total = 0
-        if isinstance(by_size, dict) and by_size:
-            for value in by_size.values():
-                try: total += max(0, int(value or 0))
-                except Exception: pass
-        else:
-            try: total = max(0, int(p.get("total_stock", p.get("stock", 0)) or 0))
-            except Exception: total = 0
-        rows.append((p, total))
+        total, _, known = stock_info(p)
+        rows.append((p, total if known and total is not None else 0))
     return rows
 
 def low_stock(products, threshold=2):
