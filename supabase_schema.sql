@@ -341,10 +341,6 @@ using (public.is_tenant_member(tenant_id));
 
 
 -- Invitation acceptance by the invited account.
-drop policy if exists "invitees can read own invitations" on public.invitations;
-create policy "invitees can read own invitations" on public.invitations
-for select to authenticated using (lower(email) = lower(coalesce((select auth.jwt()->>'email'),'')) and status = 'pending' and expires_at > now());
-
 create or replace function public.accept_invitation(invite_id uuid)
 returns uuid
 language plpgsql
