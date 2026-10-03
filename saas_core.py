@@ -90,9 +90,22 @@ def _set_identity(user,tenant):
     st.session_state["saas_plan"]=tenant.get("plan","trial")
     st.session_state["saas_tenant_status"]=tenant.get("status","active")
 
+def supabase_health():
+    if not saas_enabled():
+        return False, "Supabase не настроен: проверьте SUPABASE_URL и SUPABASE_ANON_KEY."
+    try:
+        _request("GET", "/auth/v1/settings")
+        return True, "Supabase Auth доступен."
+    except Exception as e:
+        return False, f"Supabase недоступен: {e}"
+
 def login_ui():
-    st.markdown("## ⚡ AI Agent Content Manager")
-    st.caption("SaaS-платформа для управления магазином: каталог, контент, CRM, заказы и аналитика.")
+    st.markdown(
+        '<div class="dashboard-hero"><div class="dashboard-hero-kicker">AI BUSINESS PLATFORM</div>'
+        '<div class="dashboard-hero-title">Ваш магазин. Один рабочий центр.</div>'
+        '<div class="dashboard-hero-text">Каталог, контент, заявки, заказы и AI-помощник MAX — в одном месте.</div></div>',
+        unsafe_allow_html=True,
+    )
     tab1,tab2,tab3=st.tabs(["Войти","Создать магазин","Восстановить пароль"])
     with tab1:
         email=st.text_input("Email",key="saas_login_email")
@@ -112,20 +125,22 @@ def login_ui():
                     st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
-        store=st.text_input("Название магазина",key="saas_signup_store")
-        email=st.text_input("Email владельца",key="saas_signup_email")
-        password=st.text_input("Пароль",type="password",key="saas_signup_password")
+        st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
+        store=st.text_input("Название магазина",placeholder="Например, Demo Store",key="saas_signup_store")
+        email=st.text_input("Email владельца",placeholder="you@example.com",key="saas_signup_email")
+        password=st.text_input("Пароль",type="password",placeholder="Минимум 8 символов",key="saas_signup_password")
         repeat=st.text_input("Повторите пароль",type="password",key="saas_signup_password2")
-        if st.button("Создать магазин",type="primary",use_container_width=True,key="saas_signup"):
+        if st.button("Создать магазин и начать",type="primary",use_container_width=True,key="saas_signup"):
             if len(password)<8: st.error("Пароль должен содержать минимум 8 символов.")
             elif password!=repeat: st.error("Пароли не совпадают.")
-            elif not store.strip() or not email.strip(): st.error("Укажите название магазина и email.")
+            elif "@" not in email or "." not in email.split("@")[-1]: st.error("Проверьте email.")
+            elif not store.strip(): st.error("Укажите название магазина.")
             else:
                 try:
                     result=sign_up(email.strip(),password,store.strip())
                     token=result.get("access_token")
                     if not token:
-                        st.success("Аккаунт создан. Подтвердите email, затем войдите.")
+                        st.success("Аккаунт создан. Проверьте почту и подтвердите email. После подтверждения войдите — магазин и тариф Trial создаются автоматически.")
                     else:
                         user=result.get("user") or get_user(token)
                         tenant=current_tenant(token,user.get("id"))
@@ -347,26 +362,30 @@ def onboarding_complete():
     return bool(settings and isinstance(settings[0], dict) and settings[0].get("onboarding_complete"))
 
 def render_onboarding():
-    st.markdown("## 🚀 Настройка магазина")
-    st.caption("Заполним основные данные один раз. Их можно изменить позже в настройках.")
+    st.markdown(
+        '<div class="dashboard-hero"><div class="dashboard-hero-kicker">QUICK START</div>'
+        '<div class="dashboard-hero-title">Настроим магазин за 60 секунд</div>'
+        '<div class="dashboard-hero-text">Эти данные нужны MAX, чтобы писать контент, отвечать клиентам и подсказывать следующие действия. Их можно изменить позже.</div></div>',
+        unsafe_allow_html=True,
+    )
     with st.form("saas_onboarding_form"):
-        business=st.selectbox("Тип бизнеса", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"], key="onb_business")
-        city=st.text_input("Город / регион", key="onb_city")
+        business=st.selectbox("Что продаёте?", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"], key="onb_business")
+        city=st.text_input("Город / регион", placeholder="Краснодарский край", key="onb_city")
         telegram=st.text_input("Telegram магазина", placeholder="@your_store", key="onb_telegram")
         instagram=st.text_input("Instagram", placeholder="@your_store", key="onb_instagram")
         shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"], key="onb_shipping")
-        submitted=st.form_submit_button("Сохранить и открыть платформу", type="primary", use_container_width=True)
+        submitted=st.form_submit_button("Сохранить и открыть MAX", type="primary", use_container_width=True)
     if submitted:
-        data_save("settings", [{
-            "business_type": business,
-            "city": city.strip(),
-            "telegram": telegram.strip(),
-            "instagram": instagram.strip(),
-            "shipping": shipping,
-            "onboarding_complete": True
-        }])
-        st.session_state["saas_onboarding_complete"]=True
-        st.rerun()
+        try:
+            data_save("settings", [{
+                "business_type": business, "city": city.strip(), "telegram": telegram.strip(),
+                "instagram": instagram.strip(), "shipping": shipping, "onboarding_complete": True
+            }])
+            st.session_state["saas_onboarding_complete"]=True
+            st.success("Магазин настроен. MAX готов к работе.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def require_saas_access():
     if not saas_enabled():
