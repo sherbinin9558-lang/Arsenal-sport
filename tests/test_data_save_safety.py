@@ -104,6 +104,13 @@ class CrmSafetyRegressionTests(unittest.TestCase):
         self.assertIn('if "status" in changes and changes["status"] not in STATUSES:', source)
 
 
+class RlsSchemaConsistencyRegressionTests(unittest.TestCase):
+    def test_invitation_select_policy_is_not_duplicated_in_schema(self):
+        source = (Path(__file__).resolve().parents[1] / "supabase_schema.sql").read_text(encoding="utf-8")
+        self.assertEqual(source.count('create policy "admins or invitees can read invitations"'), 1)
+        self.assertNotIn('create policy "invitees can read own invitations"', source)
+
+
 class RlsRoleSafetyRegressionTests(unittest.TestCase):
     def test_owner_role_cannot_be_changed_by_member_role_rpc(self):
         source = (Path(__file__).resolve().parents[1] / "supabase_schema.sql").read_text(encoding="utf-8")
