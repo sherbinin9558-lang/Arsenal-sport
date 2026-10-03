@@ -408,6 +408,27 @@ st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layou
 if not require_saas_access():
     st.stop()
 
+# Проверка результата оплаты после возврата с ЮKassa.
+try:
+    payment_id=st.query_params.get("payment_id")
+    billing_return=st.query_params.get("billing")
+    if payment_id and billing_return == "return" and not st.session_state.get("billing_verified"):
+        from billing import get_payment
+        payment=get_payment(payment_id)
+        if payment.get("status") == "succeeded" and payment.get("paid"):
+            plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
+            tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
+            if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
+                method_id=(payment.get("payment_method") or {}).get("id")
+                activate_paid_subscription(plan,payment_id,method_id)
+                st.session_state["billing_verified"]=True
+                st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
+        elif payment.get("status") == "canceled":
+            st.warning("Платёж отменён.")
+except Exception as e:
+    st.warning(f"Статус оплаты пока не подтверждён: {e}")
+
+
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
     st.title("AI Agent Content Manager")
