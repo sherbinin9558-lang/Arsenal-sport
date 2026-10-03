@@ -204,6 +204,13 @@ class ModularUiRegressionTests(unittest.TestCase):
 
 
 class RoleBasedUiRegressionTests(unittest.TestCase):
+    def test_product_creation_preserves_price_and_stock(self):
+        root = Path(__file__).resolve().parents[1]
+        app = (root / "app.py").read_text(encoding="utf-8")
+        self.assertIn('price = st.text_input("Цена, ₽")', app)
+        self.assertIn('stock = st.number_input("Остаток"', app)
+        self.assertIn('"price": price.strip(), "stock": int(stock), "total_stock": int(stock)', app)
+
     def test_write_controls_are_gated_in_catalog_and_content(self):
         root = Path(__file__).resolve().parents[1]
         catalog = (root / "ui" / "catalog.py").read_text(encoding="utf-8")
