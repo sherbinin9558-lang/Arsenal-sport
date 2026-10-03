@@ -553,7 +553,7 @@ div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
 .max-header{display:block!important;width:100%!important;padding:6px 52px 14px 0!important;border-bottom:1px solid #e8ebf1!important;margin-bottom:8px!important;}.max-header-title{font-size:clamp(1.25rem,2vw,1.55rem)!important;line-height:1.2!important;font-weight:950!important;letter-spacing:-.02em!important;color:#21164d!important;}.max-header-title span{color:#7cff00!important;text-shadow:0 0 8px rgba(184,255,0,.55)!important;}.max-header-subtitle{margin-top:4px!important;font-size:.82rem!important;color:#687182!important;}
 /* Existing visual styles retained. */
 :root{--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#fff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}.stApp{background:#f6f7fb;}
-.sidebar-ai-agent{font-size:1.02rem;font-weight:900;letter-spacing:.015em;color:#b8a6ff;text-shadow:0 0 7px rgba(169,140,255,.65);margin:0 0 7px;text-align:left;line-height:1.2;}.sidebar-brand{padding:4px 2px 12px;margin:0 0 4px;}.sidebar-brand-kicker{font-size:.64rem;letter-spacing:.16em;font-weight:900;color:#8f80ff;line-height:1.1;}.sidebar-brand-title{font-size:1.42rem;font-weight:950;letter-spacing:-.035em;color:#21164d;line-height:1.05;margin-top:4px;}.sidebar-brand-line{width:42px;height:3px;border-radius:99px;background:linear-gradient(90deg,#b8ff00,#7cff00);box-shadow:0 0 10px rgba(184,255,0,.45);margin-top:10px;}.sidebar-brand-version{font-size:.58rem;letter-spacing:.09em;font-weight:800;color:#7b8190;margin-top:9px;}.sidebar-max{padding:12px 13px 10px;border:1px solid #34304f;border-radius:16px;background:linear-gradient(145deg,#151a24,#211f35);margin:3px 0 9px;box-shadow:0 10px 28px rgba(12,15,25,.16);}.sidebar-max-kicker{font-size:.6rem;letter-spacing:.13em;font-weight:850;color:#a69cff;}.sidebar-max-title{font-size:1.22rem;font-weight:950;color:#fff;margin-top:3px;letter-spacing:-.01em;}.sidebar-max-text{font-size:.72rem;color:#aeb5c2;margin-top:3px;}
+.sidebar-ai-agent{font-size:1.02rem;font-weight:900;letter-spacing:.015em;color:#b8a6ff;text-shadow:0 0 7px rgba(169,140,255,.65);margin:0 0 7px;text-align:left;line-height:1.2;}.dashboard-hero{padding:26px 28px;border:1px solid #e0e4ee;border-radius:22px;background:radial-gradient(circle at 92% 10%,rgba(124,255,0,.18),transparent 28%),linear-gradient(135deg,#ffffff 0%,#f3f1ff 100%);box-shadow:0 14px 36px rgba(30,35,55,.08);margin-bottom:16px;}.dashboard-hero-kicker{font-size:.66rem;letter-spacing:.16em;font-weight:900;color:#5b5ce2;}.dashboard-hero-title{font-size:clamp(1.65rem,3vw,2.45rem);font-weight:950;letter-spacing:-.04em;color:#171a21;margin-top:7px;line-height:1.05;}.dashboard-hero-text{max-width:760px;margin-top:9px;font-size:.96rem;line-height:1.5;color:#596174;}.first-run-card{padding:20px 22px;border:1px solid #cfc6ff;border-radius:20px;background:linear-gradient(135deg,#faf8ff,#f1edff);margin:10px 0 14px;}.first-run-kicker{font-size:.65rem;letter-spacing:.14em;font-weight:900;color:#6d4aff;}.first-run-title{font-size:1.35rem;font-weight:900;color:#21164d;margin-top:5px;}.first-run-text{color:#596174;margin-top:5px;}.stAlert{border-radius:14px!important;}.empty-state{padding:24px;border:1px dashed #cdd3df;border-radius:18px;text-align:center;background:rgba(255,255,255,.55);color:#687182;}.max-ai-plan{padding:16px 18px;border:1px solid #cfc6ff;border-radius:18px;background:linear-gradient(135deg,#fbfaff,#f1edff);margin:8px 0 14px;}.max-ai-plan-title{font-weight:900;color:#32165f;font-size:1.05rem;}.max-ai-plan-item{margin-top:8px;color:#4e5361;font-size:.9rem;line-height:1.4;}.sidebar-brand{padding:4px 2px 12px;margin:0 0 4px;}.sidebar-brand-kicker{font-size:.64rem;letter-spacing:.16em;font-weight:900;color:#8f80ff;line-height:1.1;}.sidebar-brand-title{font-size:1.42rem;font-weight:950;letter-spacing:-.035em;color:#21164d;line-height:1.05;margin-top:4px;}.sidebar-brand-line{width:42px;height:3px;border-radius:99px;background:linear-gradient(90deg,#b8ff00,#7cff00);box-shadow:0 0 10px rgba(184,255,0,.45);margin-top:10px;}.sidebar-brand-version{font-size:.58rem;letter-spacing:.09em;font-weight:800;color:#7b8190;margin-top:9px;}.sidebar-max{padding:12px 13px 10px;border:1px solid #34304f;border-radius:16px;background:linear-gradient(145deg,#151a24,#211f35);margin:3px 0 9px;box-shadow:0 10px 28px rgba(12,15,25,.16);}.sidebar-max-kicker{font-size:.6rem;letter-spacing:.13em;font-weight:850;color:#a69cff;}.sidebar-max-title{font-size:1.22rem;font-weight:950;color:#fff;margin-top:3px;letter-spacing:-.01em;}.sidebar-max-text{font-size:.72rem;color:#aeb5c2;margin-top:3px;}
 .stButton>button{border-radius:12px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:700;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease;}.stButton>button:hover{transform:translateY(-1px);border-color:#5b5ce2;box-shadow:0 8px 20px rgba(30,35,55,.14);}button[kind="primary"]{background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;box-shadow:0 8px 22px rgba(91,92,226,.22)!important;}button[kind="primary"]:hover{box-shadow:0 11px 28px rgba(91,92,226,.30)!important;}
 div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;}button[data-baseweb="tab"]{border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;}button[data-baseweb="tab"] *{color:#252b3a!important;opacity:1!important;}button[data-baseweb="tab"][aria-selected="true"]{background:transparent!important;color:#4c1d95!important;border-color:transparent!important;}button[data-baseweb="tab"][aria-selected="true"] *{color:#4c1d95!important;opacity:1!important;}
 [data-testid="stHorizontalBlock"]{width:100%!important;}[data-testid="stTextInput"],[data-testid="stTextArea"],[data-testid="stSelectbox"],[data-testid="stNumberInput"],[data-testid="stDateInput"],[data-testid="stFileUploader"]{width:100%!important;}.stat-box{background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}.stat-number{font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}.stat-label{font-size:.9rem;color:#aeb5c2;margin:0;}
@@ -601,14 +601,60 @@ with tab_dashboard:
         except Exception:
             pass
 
-    st.markdown('<div class="section-kicker">CONTROL CENTER</div><div class="section-title">Главная</div><div class="section-subtitle">Продажи, заявки, контент и остатки — в одном месте.</div>', unsafe_allow_html=True)
+    store_name = st.session_state.get("saas_tenant_name", "Ваш магазин")
+    first_run = len(products) == 0 and len(leads) == 0 and len(orders) == 0
+    try:
+        ai_next = recommendations(products, leads, orders, plan)
+    except Exception:
+        ai_next = []
 
-    d1, d2, d3, d4, d5 = st.columns(5)
-    d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
-    d2.metric("Заявки", crm.get("total", 0))
-    d3.metric("Заказы", om.get("total", 0))
-    d4.metric("Конверсия", f'{cm["conversion"]:.1f}%')
-    d5.metric("Товаров", len(products))
+    st.markdown(
+        f'<div class="dashboard-hero">'
+        f'<div class="dashboard-hero-kicker">AI BUSINESS COMMAND CENTER</div>'
+        f'<div class="dashboard-hero-title">Добро пожаловать в {store_name}</div>'
+        f'<div class="dashboard-hero-text">MAX смотрит на каталог, контент и продажи и помогает решить следующую задачу — без лишней рутины.</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    if first_run:
+        st.markdown(
+            '<div class="first-run-card"><div class="first-run-kicker">ПЕРВЫЙ ЗАПУСК</div>'
+            '<div class="first-run-title">Запустим магазин за несколько шагов</div>'
+            '<div class="first-run-text">Добавьте первый товар — затем MAX поможет создать контент и подготовить следующий шаг.</div></div>',
+            unsafe_allow_html=True,
+        )
+        fr1, fr2, fr3 = st.columns(3)
+        fr1.metric("Шаг 1", "Магазин ✓")
+        fr2.metric("Шаг 2", "Первый товар", "сейчас")
+        fr3.metric("Шаг 3", "Первый контент", "после товара")
+        if st.button("＋ Добавить первый товар", type="primary", use_container_width=True, key="dash_first_product"):
+            st.session_state["first_run_hint"] = True
+        if st.session_state.get("first_run_hint"):
+            st.info("Откройте вкладку «Товар» сверху — там можно загрузить фото и создать первую карточку.")
+    else:
+        d1, d2, d3, d4, d5 = st.columns(5)
+        d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
+        d2.metric("Заявки", crm.get("total", 0))
+        d3.metric("Заказы", om.get("total", 0))
+        d4.metric("Конверсия", f'{cm["conversion"]:.1f}%')
+        d5.metric("Товаров", len(products))
+
+        q1, q2, q3 = st.columns(3)
+        with q1:
+            st.markdown("### Следующий шаг")
+            if ai_next:
+                st.write(ai_next[0])
+            else:
+                st.write("MAX пока собирает данные.")
+        with q2:
+            st.markdown("### Сегодня")
+            st.write(f"Контент: **{len(due)}** · Просрочено: **{len(overdue)}**")
+            st.write(f"Активные заказы: **{om['active']}**")
+        with q3:
+            st.markdown("### Состояние")
+            st.write(f"Каталог: **{len(products)}** товаров")
+            st.write(f"Заявки: **{crm.get('total',0)}** · Заказы: **{om.get('total',0)}**")
 
     st.markdown("---")
     left, right = st.columns(2)
@@ -1756,7 +1802,18 @@ def render_max():
             '</div>',
             unsafe_allow_html=True,
         )
-        st.caption("Бесплатный центр управления магазином: каталог, контент, заявки, заказы и продажи.")
+        st.caption("MAX не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
+
+        try:
+            max_recs = recommendations(products, leads, orders, plan)
+        except Exception:
+            max_recs = []
+        if max_recs:
+            st.markdown('<div class="max-ai-plan"><div class="max-ai-plan-title">✦ План действий MAX</div>' +
+                        ''.join(f'<div class="max-ai-plan-item">• {x}</div>' for x in max_recs[:4]) +
+                        '</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="empty-state">MAX готов. Добавьте первый товар, чтобы получить персональные рекомендации.</div>', unsafe_allow_html=True)
 
         a, b, c, d, e = st.columns(5)
         a.metric("Товары", len(products))
