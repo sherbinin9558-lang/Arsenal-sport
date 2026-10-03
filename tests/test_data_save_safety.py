@@ -100,3 +100,8 @@ class ContentIdentityRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "content_manager.py").read_text(encoding="utf-8")
         self.assertIn('item.get("_saas_record_id")', source)
         self.assertIn('item.get("content_id")', source)
+
+    def test_existing_content_id_is_preserved(self):
+        from content_manager import content_identity
+        item = {"content_id": "cnt-existing", "date": "2026-10-01", "idea": "old"}
+        self.assertEqual(content_identity(item), "cnt-existing")
