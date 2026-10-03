@@ -212,14 +212,26 @@ def activate_paid_subscription(plan, provider_payment_id, payment_method_id=None
     return True
 
 def set_auto_renew(enabled):
-    token=st.session_state.get("saas_access_token")
     tid=tenant_id()
-    if not saas_enabled() or not token:
+    if not saas_enabled():
         st.session_state["auto_renew"]=bool(enabled)
         return True
     if current_role() not in ("owner","admin"):
         raise PermissionError("Только владелец или администратор может менять автопродление.")
-    _request("PATCH","/rest/v1/subscriptions",token=token,params={"tenant_id":f"eq.{tid}"},json={"auto_renew":bool(enabled),"cancel_at_period_end":not bool(enabled)})
+    key=_service_key()
+    if not key:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
+    headers={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json","Prefer":"return=minimal"}
+    base=f"{SUPABASE_URL}/rest/v1"
+    rr=requests.patch(
+        f"{base}/subscriptions",
+        headers=headers,
+        params={"tenant_id":f"eq.{tid}"},
+        json={"auto_renew":bool(enabled),"cancel_at_period_end":not bool(enabled)},
+        timeout=20,
+    )
+    if not rr.ok:
+        raise RuntimeError(rr.text)
     st.session_state["auto_renew"]=bool(enabled)
     return True
 
