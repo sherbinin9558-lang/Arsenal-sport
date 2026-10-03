@@ -117,7 +117,9 @@ def analytics(products, leads, orders, plan):
 
 def save_uploaded_photo(uploaded_file, product, index=0):
     ensure_dirs()
-    ext = Path(uploaded_file.name or "").suffix.lower() or ".jpg"
+    ext = Path(uploaded_file.name or "").suffix.lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise ValueError("Поддерживаются только JPG, JPEG, PNG и WEBP.")
     path = image_dir() / f"{safe_slug(product_key(product,index))}{ext}"
     path.write_bytes(uploaded_file.getvalue())
     return str(path)
