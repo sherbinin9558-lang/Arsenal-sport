@@ -36,9 +36,6 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn("raise DataConflictError", self.source)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ProductStockRegressionTests(unittest.TestCase):
     def test_product_edit_preserves_stock_and_price_fields(self):
@@ -92,3 +89,7 @@ class InventoryRegressionTests(unittest.TestCase):
         self.assertEqual(stock_info({"stock_by_size": {"42": 2, "43": 3}, "total_stock": 99})[0], 5)
         self.assertEqual(stock_info({"total_stock": 7, "stock": 99})[0], 7)
         self.assertEqual(stock_info({"stock": 4})[0], 4)
+
+
+if __name__ == "__main__":
+    unittest.main()
