@@ -233,7 +233,30 @@ as $
 declare
   new_tenant uuid;
   store_name text;
+  invite_tenant uuid;
+  invite_role text;
+  invite_id uuid;
 begin
+  -- If this email was invited before signup, attach the new account
+  -- directly to that tenant instead of creating an orphan tenant.
+  select id, tenant_id, role
+    into invite_id, invite_tenant, invite_role
+    from public.invitations
+   where status = 'pending'
+     and expires_at > now()
+     and lower(email) = lower(coalesce(new.email, ''))
+   order by created_at desc
+   limit 1;
+
+  if invite_id is not null then
+    insert into public.memberships(user_id, tenant_id, role)
+    values (new.id, invite_tenant, invite_role);
+    update public.invitations
+       set status = 'accepted'
+     where id = invite_id;
+    return new;
+  end if;
+
   store_name := coalesce(nullif(new.raw_user_meta_data->>'store_name',''), 'Новый магазин');
   insert into public.tenants(name, owner_user_id, slug)
   values (
@@ -246,7 +269,7 @@ begin
   insert into public.subscriptions(tenant_id, plan, status) values (new_tenant, 'trial', 'trialing');
   return new;
 end;
-$$;
+$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -368,7 +391,8 @@ begin
      where user_id = uid
        and tenant_id = inv.tenant_id
   ) then
-    raise exception 'ALREADY_A_MEMBER';
+    update public.invitations set status='accepted' where id=invite_id;
+    return inv.tenant_id;
   end if;
 
   insert into public.memberships(user_id, tenant_id, role)
