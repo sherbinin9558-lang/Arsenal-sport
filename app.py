@@ -89,6 +89,7 @@ def update_product(record_id, prod, existing=None):
         merged.update(dict(prod or {}))
         merged.pop("_saas_updated_at", None)
         data_update_record("products", existing["_saas_record_id"], merged, existing["_saas_updated_at"])
+        st.session_state.pop("_app_products_cache", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
@@ -107,6 +108,7 @@ def update_product(record_id, prod, existing=None):
 def delete_product(record_id, existing=None):
     if existing is not None and existing.get("_saas_record_id") and existing.get("_saas_updated_at") and saas_enabled():
         data_delete_record("products", existing["_saas_record_id"], existing["_saas_updated_at"])
+        st.session_state.pop("_app_products_cache", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
