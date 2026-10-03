@@ -42,7 +42,10 @@ def _request(method,path,token=None,**kwargs):
     url, _ = _supabase_config()
     if not url:
         raise SupabaseRequestError("SUPABASE_URL не настроен.")
-    r=requests.request(method,f"{url}{path}",headers=_headers(token),timeout=20,**kwargs)
+    extra_headers=kwargs.pop("headers",None) or {}
+    headers=_headers(token)
+    headers.update(extra_headers)
+    r=requests.request(method,f"{url}{path}",headers=headers,timeout=20,**kwargs)
     try: data=r.json()
     except Exception: data={"message":r.text}
     if not r.ok:
@@ -51,6 +54,11 @@ def _request(method,path,token=None,**kwargs):
             r.status_code,
         )
     return data
+
+
+class DataConflictError(RuntimeError):
+    """Raised when another session changed the same SaaS record first."""
+
 
 _AUTH_COOKIE = "saas_refresh_token"
 
@@ -557,7 +565,7 @@ def data_save(entity,rows):
 
     for row in rows:
         clean=_clean_payload(row)
-        record_id = str(row.get(_INTERNAL_RECORD_KEY) or _new_record_id()) if isinstance(row,dict) else _new_record_id()
+        record_id=str(row.get(_INTERNAL_RECORD_KEY) or _new_record_id()) if isinstance(row,dict) else _new_record_id()
         current_ids.add(record_id)
         item={
             "tenant_id":tenant_id(),
@@ -570,42 +578,76 @@ def data_save(entity,rows):
         else:
             new_payload.append(item)
 
-    # Reordering no longer changes record identity: the ID travels with the row.
+    now=_utc_now_iso()
+
+    # Optimistic concurrency: an existing row is updated only if its version
+    # is still the same version this session loaded. A stale session therefore
+    # gets a conflict instead of silently overwriting another user's change.
     for item in existing_payload:
-        _rest_patch(
+        expected=baseline[item["record_id"]].get("updated_at")
+        if not expected:
+            # Rows saved by an older build may not have a cached version in this
+            # session. Refresh once before writing so we never guess a version.
+            data_load(entity,[])
+            baseline=dict(st.session_state.get(session_key, {}))
+            expected=baseline.get(item["record_id"],{}).get("updated_at")
+            if not expected:
+                raise DataConflictError(
+                    f"Не удалось проверить версию записи {item['record_id']}. Обновите данные и повторите сохранение."
+                )
+
+        result=_rest_patch(
             "/rest/v1/app_data",
             token,
-            {"payload":item["payload"],"updated_at":_utc_now_iso()},
+            {"payload":item["payload"],"updated_at":now},
             params={
                 "tenant_id":f"eq.{tenant_id()}",
                 "entity":f"eq.{entity}",
-                "record_id":f"eq.{item["record_id"]}",
+                "record_id":f"eq.{item['record_id']}",
+                "updated_at":f"eq.{expected}",
             },
+            headers={"Prefer":"return=representation"},
         )
+        if not result:
+            raise DataConflictError(
+                "Запись была изменена в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
+            )
 
     if new_payload:
-        _rest_post("/rest/v1/app_data", token, new_payload)
+        _rest_post(
+            "/rest/v1/app_data",
+            token,
+            [{**item,"updated_at":now} for item in new_payload],
+        )
 
-    # Only records from this session's last snapshot can be considered deleted.
-    # This prevents one stale browser from deleting rows created by another browser.
-    removed_ids=set(baseline) - current_ids
-    if removed_ids:
-        _rest_delete(
+    # Deletions are also protected by the loaded version. Delete one record
+    # at a time because every record can have a different updated_at value.
+    removed_ids=set(baseline)-current_ids
+    for record_id in sorted(removed_ids):
+        expected=baseline[record_id].get("updated_at")
+        if not expected:
+            raise DataConflictError(
+                "Нельзя удалить запись без подтверждения её текущей версии. Обновите данные и повторите."
+            )
+        result=_rest_delete(
             "/rest/v1/app_data",
             token,
             params={
                 "tenant_id":f"eq.{tenant_id()}",
                 "entity":f"eq.{entity}",
-                "record_id":f"in.({",".join(sorted(removed_ids))})",
+                "record_id":f"eq.{record_id}",
+                "updated_at":f"eq.{expected}",
             },
+            headers={"Prefer":"return=representation"},
         )
+        if not result:
+            raise DataConflictError(
+                "Запись была изменена в другой сессии и поэтому не удалена. Обновите данные перед повторной попыткой."
+            )
 
-    st.session_state[session_key] = {
-        item["record_id"]: {"updated_at":None,"created_at":None}
-        for item in existing_payload + new_payload
-    }
-
-
+    # Re-read the entity after a successful save. This refreshes the real
+    # updated_at values and keeps stable IDs attached to their rows.
+    data_load(entity,[])
 
 
 def _service_key():
