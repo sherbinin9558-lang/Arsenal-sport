@@ -1285,26 +1285,26 @@ with tab4:
 
             if source_bytes:
                 with tempfile.TemporaryDirectory() as tmp:
-                src = os.path.join(tmp, "card.png")
-                with open(src, "wb") as f:
-                    f.write(source_bytes)
+                    src = os.path.join(tmp, "card.png")
+                    with open(src, "wb") as f:
+                        f.write(source_bytes)
 
-                out = os.path.join(tmp, "reel.mp4")
-                with st.spinner("Рендерю видео, подожди..."):
-                    make_reel(src, out, duration=8)
+                    out = os.path.join(tmp, "reel.mp4")
+                    with st.spinner("Рендерю видео, подожди..."):
+                        make_reel(src, out, duration=8)
 
-                with open(out, "rb") as f:
-                    video_bytes = f.read()
+                    with open(out, "rb") as f:
+                        video_bytes = f.read()
 
-            # ВАЖНО: сохраняем MP4 в session_state. Streamlit перезапускает
-            # скрипт при нажатии кнопки публикации, поэтому локальная переменная
-            # video_bytes иначе теряется.
-            st.session_state["reel_video_bytes"] = video_bytes
-            st.session_state["reel_caption"] = gen_instagram(reel_product, "Продающий")
-            st.session_state["reel_product_name"] = (
-                f"{reel_product.get('brand','')} {reel_product.get('name','')}".strip()
-            )
-            st.success("✅ Reels создан и сохранён. Теперь можно публиковать.")
+                # ВАЖНО: сохраняем MP4 в session_state. Streamlit перезапускает
+                # скрипт при нажатии кнопки публикации, поэтому локальная переменная
+                # video_bytes иначе теряется.
+                st.session_state["reel_video_bytes"] = video_bytes
+                st.session_state["reel_caption"] = gen_instagram(reel_product, "Продающий")
+                st.session_state["reel_product_name"] = (
+                    f"{reel_product.get('brand','')} {reel_product.get('name','')}".strip()
+                )
+                st.success("✅ Reels создан и сохранён. Теперь можно публиковать.")
 
         # После создания MP4 этот блок остаётся доступным на следующих rerun.
         video_bytes = st.session_state.get("reel_video_bytes")
