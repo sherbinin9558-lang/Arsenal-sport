@@ -1607,6 +1607,6 @@ def save_settings(data):
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
     render_settings(
-        data_load=data_load, data_save=data_save, get_logo=get_logo, save_logo=save_logo,
-        tenant_plan=tenant_plan, can=can, feature_allowed=feature_allowed,
+        load_settings=load_settings, save_settings=save_settings, templates=TEMPLATES,
+        get_logo=get_logo, save_logo=save_logo,
     )
