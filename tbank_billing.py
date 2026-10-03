@@ -12,6 +12,13 @@ PASSWORD=_cfg("TBANK_PASSWORD")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 API_URL="https://securepay.tinkoff.ru/v2"
 
+def _save_checkout(tenant_id, order_id, payment_id, plan):
+    key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
+    url=_cfg("SUPABASE_URL")
+    if not key or not url: return
+    h={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json","Prefer":"return=minimal"}
+    requests.post(f"{url}/rest/v1/billing_checkout_sessions",headers=h,json={"tenant_id":str(tenant_id),"provider":"tbank","provider_order_id":str(order_id),"provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created"},timeout=15)
+
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
 
