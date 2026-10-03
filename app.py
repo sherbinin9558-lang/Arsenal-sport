@@ -64,7 +64,11 @@ def add_product(prod):
         raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
     p.append(prod); save_products(p)
 def _find_record_index(rows, record_id):
-    target = str(record_id or "")
+    if isinstance(record_id, int):
+        return record_id if 0 <= record_id < len(rows) else None
+    target = str(record_id or "").strip()
+    if not target:
+        return None
     for idx, row in enumerate(rows):
         if str(row.get("_saas_record_id", "")) == target:
             return idx
@@ -1193,7 +1197,7 @@ with tab2:
                             updated["original_image"] = base64.b64encode(
                                 original_buf.getvalue()
                             ).decode("ascii")
-                        update_product(p.get("_saas_record_id"), updated)
+                        update_product(p.get("_saas_record_id") or real_i, updated)
                         st.success("Обновлено!")
                         st.rerun()
                 else:
@@ -1204,7 +1208,7 @@ with tab2:
                     st.caption(f"Добавлено: {p.get('date_added','—')}")
 
                 if st.button("🗑️ Удалить", key=f"del_{real_i}"):
-                    delete_product(p.get("_saas_record_id"))
+                    delete_product(p.get("_saas_record_id") or real_i)
                     st.rerun()
 
 # ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
@@ -1639,7 +1643,7 @@ with tab5:
                     ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
                     if ns != cs:
                         updated = change_status(item, ns)
-                        update_plan(item.get("_saas_record_id"), updated)
+                        update_plan(item.get("_saas_record_id") or ri, updated)
                         st.rerun()
                     st.caption(f"Приоритет: {item.get('priority','Обычный')}")
                     if item.get("history"):
@@ -1647,7 +1651,7 @@ with tab5:
                         for h in item["history"][-5:]:
                             st.write(f"{h.get('time','')} · {h.get('from','')} → {h.get('to','')} · {h.get('actor','manager')}")
                     if st.button("🗑️ Удалить", key=f"dp_{ri}"):
-                        delete_plan(item.get("_saas_record_id"))
+                        delete_plan(item.get("_saas_record_id") or ri)
                         st.rerun()
 
     with workflow_tab:
@@ -1662,11 +1666,11 @@ with tab5:
                 a, b = st.columns(2)
                 with a:
                     if st.button("✅ Утвердить", key=f"approve_{i}"):
-                        update_plan(item.get("_saas_record_id"), change_status(item, "Готово"))
+                        update_plan(item.get("_saas_record_id") or i, change_status(item, "Готово"))
                         st.rerun()
                 with b:
                     if st.button("↩️ Вернуть в работу", key=f"return_{i}"):
-                        update_plan(item.get("_saas_record_id"), change_status(item, "В работе"))
+                        update_plan(item.get("_saas_record_id") or i, change_status(item, "В работе"))
                         st.rerun()
         st.markdown("---")
         st.subheader("🤖 AI-рекомендации")
