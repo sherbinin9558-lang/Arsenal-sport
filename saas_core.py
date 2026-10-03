@@ -32,15 +32,24 @@ def _headers(token=None):
     if token: h["Authorization"]=f"Bearer {token}"
     return h
 
+class SupabaseRequestError(RuntimeError):
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def _request(method,path,token=None,**kwargs):
     url, _ = _supabase_config()
     if not url:
-        raise RuntimeError("SUPABASE_URL не настроен.")
+        raise SupabaseRequestError("SUPABASE_URL не настроен.")
     r=requests.request(method,f"{url}{path}",headers=_headers(token),timeout=20,**kwargs)
     try: data=r.json()
     except Exception: data={"message":r.text}
     if not r.ok:
-        raise RuntimeError(data.get("msg") or data.get("message") or data.get("error_description") or str(data))
+        raise SupabaseRequestError(
+            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
+            r.status_code,
+        )
     return data
 
 _AUTH_COOKIE = "saas_refresh_token"
@@ -55,27 +64,98 @@ def _auth_cookies():
     except Exception:
         return None
 
+def _read_refresh_token():
+    try:
+        token = st.context.cookies.get(_AUTH_COOKIE)
+        if token:
+            return str(token)
+    except Exception:
+        pass
+    cookies = _auth_cookies()
+    if cookies is not None:
+        try:
+            token = cookies.get(_AUTH_COOKIE)
+            if token:
+                return str(token)
+        except Exception:
+            pass
+    return None
+
 def _persist_refresh_token(refresh_token):
-    if refresh_token:
-        cookies = _auth_cookies()
-        if cookies is not None:
-            try: cookies.set(_AUTH_COOKIE, refresh_token)
-            except Exception: pass
+    if not refresh_token:
+        return
+    cookies = _auth_cookies()
+    if cookies is not None:
+        try:
+            cookies.set(_AUTH_COOKIE, str(refresh_token))
+        except Exception:
+            pass
 
 def _clear_refresh_token():
     cookies = _auth_cookies()
     if cookies is not None:
-        try: cookies.remove(_AUTH_COOKIE)
-        except Exception: pass
-
-def _read_refresh_token():
-    cookies = _auth_cookies()
-    if cookies is None: return None
-    try: return cookies.get(_AUTH_COOKIE)
-    except Exception: return None
+        try:
+            cookies.remove(_AUTH_COOKIE)
+        except Exception:
+            pass
 
 def refresh_session(refresh_token):
     return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+
+def _establish_session(result):
+    token = result.get("access_token")
+    if not token:
+        raise SupabaseRequestError("Supabase не вернул access token.")
+    user = result.get("user") or get_user(token)
+    tenant = current_tenant(token, user.get("id"))
+    if not tenant:
+        raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
+    st.session_state["saas_access_token"] = token
+    refresh_token = result.get("refresh_token")
+    if refresh_token:
+        _persist_refresh_token(refresh_token)
+    _set_identity(user, tenant)
+    return True
+
+def _restore_session_from_cookie():
+    refresh_token = _read_refresh_token()
+    if not refresh_token:
+        return False
+    try:
+        return _establish_session(refresh_session(refresh_token))
+    except SupabaseRequestError as e:
+        if e.status_code in (400,401,403):
+            _clear_refresh_token()
+            return False
+        st.session_state["saas_auth_error"] = str(e)
+        return False
+    except Exception as e:
+        st.session_state["saas_auth_error"] = str(e)
+        return False
+
+def _restore_session_from_access_token():
+    token = st.session_state.get("saas_access_token")
+    if not token:
+        return False
+    try:
+        user = get_user(token)
+        tenant = current_tenant(token, user.get("id"))
+        if not tenant:
+            raise RuntimeError("Магазин не найден.")
+        _set_identity(user, tenant)
+        return True
+    except SupabaseRequestError as e:
+        if e.status_code in (400,401,403):
+            for k in list(st.session_state):
+                if k.startswith("saas_"):
+                    del st.session_state[k]
+            _clear_refresh_token()
+        else:
+            st.session_state["saas_auth_error"] = str(e)
+        return False
+    except Exception as e:
+        st.session_state["saas_auth_error"] = str(e)
+        return False
 
 def _public_app_url():
     return _cfg("SAAS_PUBLIC_URL","https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app").rstrip("/")
@@ -102,16 +182,7 @@ def request_password_reset(email):
     return _request("POST","/auth/v1/recover",json=payload)
 
 def validate_session():
-    token=st.session_state.get("saas_access_token")
-    if not token: return False
-    try:
-        user=get_user(token); tenant=current_tenant(token,user.get("id"))
-        if not tenant: raise RuntimeError("Магазин не найден.")
-        _set_identity(user,tenant); return True
-    except Exception:
-        for k in list(st.session_state):
-            if k.startswith("saas_"): del st.session_state[k]
-        return False
+    return _restore_session_from_access_token() or _restore_session_from_cookie()
 
 def _rest_get(path,token,params=None): return _request("GET",path,token=token,params=params or {})
 def _rest_post(path,token,payload): return _request("POST",path,token=token,json=payload)
@@ -156,9 +227,7 @@ def login_ui():
             else:
                 try:
                     with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
-                    token=result.get("access_token"); user=result.get("user") or get_user(token); tenant=current_tenant(token,user.get("id"))
-                    if not tenant: raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-                    st.session_state["saas_access_token"]=token; _persist_refresh_token(result.get("refresh_token")); _set_identity(user,tenant); st.rerun()
+                    _establish_session(result); st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
@@ -177,10 +246,7 @@ def login_ui():
                     token=result.get("access_token")
                     if not token: st.success("Аккаунт создан. Проверьте почту и подтвердите email. После подтверждения войдите — магазин и тариф Trial создаются автоматически.")
                     else:
-                        user=result.get("user") or get_user(token); tenant=current_tenant(token,user.get("id"))
-                        if tenant:
-                            st.session_state["saas_access_token"]=token; _set_identity(user,tenant); st.rerun()
-                        else: st.success("Магазин создан. Войдите после подтверждения email.")
+                        _establish_session(result); st.rerun()
                 except Exception as e: st.error(f"Не удалось создать магазин: {e}")
     with tab3:
         email=st.text_input("Email для восстановления",key="saas_recovery_email")
@@ -340,35 +406,36 @@ def require_saas_access():
                 st.session_state["saas_demo"]=True
                 demo={"id":"demo-user","email":"demo@example.com","tenant_id":"demo-tenant","tenant_name":"Demo Store","plan":"pro","status":"active"}
                 _set_identity(demo,{"id":"demo-tenant","name":"Demo Store","plan":"pro","status":"active"})
-            render_account_bar(); return True
+            render_account_bar()
+            return True
         st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">PRODUCTION SETUP</div><div class="dashboard-hero-title">Подключите Supabase, чтобы открыть платформу.</div><div class="dashboard-hero-text">Для коммерческого режима нужны SUPABASE_URL и SUPABASE_ANON_KEY. После подключения пользователи смогут регистрировать магазины, входить по паролю и работать изолированно по tenant.</div></div>',unsafe_allow_html=True)
-        st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit."); return False
-    token=st.session_state.get("saas_access_token")
-    if not token:
-        refresh_token = _read_refresh_token()
-        if refresh_token:
-            try:
-                result = refresh_session(refresh_token)
-                token = result.get("access_token")
-                if token:
-                    st.session_state["saas_access_token"] = token
-                    _persist_refresh_token(result.get("refresh_token") or refresh_token)
-            except Exception:
-                _clear_refresh_token()
-                token = None
-    if not token:
-        login_ui(); return False
-    try:
-        user=get_user(token); tenant=current_tenant(token,user.get("id"))
-        if not tenant: raise RuntimeError("Магазин не найден.")
-        _set_identity(user,tenant)
-        if not onboarding_complete() and not st.session_state.get("saas_onboarding_complete"):
-            render_onboarding(); return False
-        render_account_bar(); return True
-    except Exception:
-        for k in list(st.session_state):
-            if k.startswith("saas_"): del st.session_state[k]
-        login_ui(); return False
+        st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit.")
+        return False
+
+    if not st.session_state.get("saas_access_token"):
+        if not _restore_session_from_cookie():
+            if st.session_state.get("saas_auth_error"):
+                st.error("Не удалось восстановить сессию. Проверьте соединение с сервером аккаунтов и обновите страницу.")
+                st.caption(st.session_state["saas_auth_error"])
+            login_ui()
+            return False
+
+    if not _restore_session_from_access_token():
+        if st.session_state.get("saas_auth_error"):
+            st.error("Сервер аккаунтов временно недоступен. Текущая авторизация не была удалена.")
+            st.caption(st.session_state["saas_auth_error"])
+            return False
+        login_ui()
+        return False
+
+    st.session_state.pop("saas_auth_error", None)
+
+    if not onboarding_complete() and not st.session_state.get("saas_onboarding_complete"):
+        render_onboarding()
+        return False
+
+    render_account_bar()
+    return True
 
 def tenant_id(): return st.session_state.get("saas_tenant_id","demo-tenant")
 def tenant_plan(): return st.session_state.get("saas_plan","trial")
