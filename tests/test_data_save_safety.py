@@ -38,3 +38,17 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProductStockRegressionTests(unittest.TestCase):
+    def test_product_edit_preserves_stock_and_price_fields(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn('"price": p.get("price", "")', source)
+        self.assertIn('"stock": p.get("stock", 0)', source)
+        self.assertIn('"total_stock": p.get("total_stock", p.get("stock", 0))', source)
+
+    def test_stock_helpers_accept_legacy_stock_field(self):
+        source = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
+        self.assertIn('product.get("total_stock", product.get("stock"))', source)
+        source = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
+        self.assertIn('p.get("total_stock", p.get("stock", 0))', source)
