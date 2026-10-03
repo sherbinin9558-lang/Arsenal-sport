@@ -1,6 +1,6 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
-import hashlib, json, os
+import hashlib, json, os, time
 from typing import Optional
 import requests
 import streamlit as st
@@ -65,12 +65,8 @@ def _auth_cookies():
         return None
 
 def _read_refresh_token():
-    try:
-        token = st.context.cookies.get(_AUTH_COOKIE)
-        if token:
-            return str(token)
-    except Exception:
-        pass
+    # Community Cloud filters many cookies from st.context.cookies.
+    # Read through the browser component first; use st.context only as a fallback.
     cookies = _auth_cookies()
     if cookies is not None:
         try:
@@ -79,6 +75,12 @@ def _read_refresh_token():
                 return str(token)
         except Exception:
             pass
+    try:
+        token = st.context.cookies.get(_AUTH_COOKIE)
+        if token:
+            return str(token)
+    except Exception:
+        pass
     return None
 
 def _persist_refresh_token(refresh_token):
@@ -115,10 +117,22 @@ def _establish_session(result):
     if refresh_token:
         _persist_refresh_token(refresh_token)
     _set_identity(user, tenant)
+    st.session_state["saas_last_validated_at"] = time.time()
+    st.session_state.pop("_saas_cookie_probe_attempts", None)
+    st.session_state.pop("saas_auth_error", None)
     return True
 
 def _restore_session_from_cookie():
     refresh_token = _read_refresh_token()
+    # CookieController is asynchronous. On a fresh Streamlit session the first
+    # component read can be empty even when the browser already has the cookie.
+    # Give it one controlled second chance instead of showing the login screen.
+    if not refresh_token:
+        attempts = int(st.session_state.get("_saas_cookie_probe_attempts", 0))
+        if attempts < 1:
+            st.session_state["_saas_cookie_probe_attempts"] = attempts + 1
+            time.sleep(0.9)
+            refresh_token = _read_refresh_token()
     if not refresh_token:
         return False
     try:
@@ -137,12 +151,17 @@ def _restore_session_from_access_token():
     token = st.session_state.get("saas_access_token")
     if not token:
         return False
+    last = float(st.session_state.get("saas_last_validated_at", 0) or 0)
+    if st.session_state.get("saas_user_id") and (time.time() - last) < 60:
+        return True
     try:
         user = get_user(token)
         tenant = current_tenant(token, user.get("id"))
         if not tenant:
             raise RuntimeError("Магазин не найден.")
         _set_identity(user, tenant)
+        st.session_state["saas_last_validated_at"] = time.time()
+        st.session_state.pop("saas_auth_error", None)
         return True
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
