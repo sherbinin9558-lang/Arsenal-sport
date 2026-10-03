@@ -1226,7 +1226,7 @@ with tab4:
                 "из данных товара и сохранена в каталоге."
             )
 
-        if st.button("🎬 Создать видео", key="make_reel_btn"):
+        if can("write_data") and st.button("🎬 Создать видео", key="make_reel_btn"):
             import tempfile, os
             from reels import make_reel
 
