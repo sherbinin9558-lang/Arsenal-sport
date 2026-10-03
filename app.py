@@ -14,7 +14,6 @@ from saas_core import require_saas_access, render_account_bar, data_load, data_s
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
 CONTENT_PLAN_FILE = Path("content_plan.json")
-LOGO_FILE = Path("logo.png")
 CARD_SIZE = (1080, 1350)
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -101,15 +100,21 @@ def delete_plan(i):
     p = load_plan()
     if 0 <= i < len(p): p.pop(i); save_plan(p)
 
+def _tenant_asset_root():
+    root = Path("tenant_assets") / str(st.session_state.get("saas_tenant_id", "unknown"))
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
 def get_logo():
-    if LOGO_FILE.exists():
-        try: return Image.open(LOGO_FILE).convert("RGBA")
+    path = _tenant_asset_root() / "logo.png"
+    if path.exists():
+        try: return Image.open(path).convert("RGBA")
         except Exception: return None
     return None
 
 def save_logo(f):
     img = Image.open(f).convert("RGBA")
-    img.save(LOGO_FILE)
+    img.save(_tenant_asset_root() / "logo.png")
 
 # ==================== КАРТОЧКА ====================
 def get_font(size, bold=False):
@@ -949,6 +954,7 @@ def render_max():
                                     p_now.get("specs",""),
                                     p_now.get("category","Другое"),
                                     "Dark Premium",
+                                    get_logo(),
                                 )
                                 card_buf = io.BytesIO()
                                 card_img.save(card_buf, format="PNG")
@@ -2133,6 +2139,7 @@ with tab4:
                         reel_product.get("specs", ""),
                         reel_product.get("category", "Другое"),
                         "Спортивный",
+                        get_logo(),
                     )
                     card_buf = io.BytesIO()
                     auto_card.save(card_buf, format="PNG")
