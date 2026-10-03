@@ -690,8 +690,10 @@ def data_save(entity,rows):
         raise ValueError("Данные должны передаваться списком записей.")
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Каждая запись данных должна быть объектом.")
-    if saas_enabled() and not can("write_data"): raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
-    if saas_enabled() and entity=="settings" and not can("settings"): raise PermissionError("Только администратор или владелец может менять настройки магазина.")
+    if saas_enabled() and not can("write_data"):
+        raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
+    if saas_enabled() and entity=="settings" and not can("settings"):
+        raise PermissionError("Только администратор или владелец может менять настройки магазина.")
     if not saas_enabled():
         os.makedirs("data",exist_ok=True)
         clean_rows=[_clean_payload(row) for row in rows]
@@ -704,128 +706,80 @@ def data_save(entity,rows):
     baseline=dict(st.session_state.get(session_key, {}))
 
     current_ids=set()
-    existing_payload=[]
-    new_payload=[]
-
+    batch=[]
     for row in rows:
         clean=_clean_payload(row)
-        record_id=str(row.get(_INTERNAL_RECORD_KEY) or _new_record_id()) if isinstance(row,dict) else _new_record_id()
+        record_id=str(row.get(_INTERNAL_RECORD_KEY) or _new_record_id())
         current_ids.add(record_id)
-        item={
-            "tenant_id":tenant_id(),
-            "entity":entity,
-            "record_id":record_id,
-            "payload":clean,
-        }
         if record_id in baseline:
-            # Only send an UPDATE when this session actually changed the row.
-            # This keeps unrelated parallel additions independent and avoids
-            # unnecessary version bumps/conflicts.
-            if item["payload"] != baseline[record_id].get("payload", {}):
-                existing_payload.append(item)
+            if clean != baseline[record_id].get("payload", {}):
+                batch.append({
+                    "record_id":record_id,
+                    "payload":clean,
+                    "expected_updated_at":baseline[record_id].get("updated_at"),
+                    "is_new":False,
+                    "is_deleted":False,
+                })
         else:
-            new_payload.append(item)
+            batch.append({
+                "record_id":record_id,
+                "payload":clean,
+                "is_new":True,
+                "is_deleted":False,
+            })
 
-    now=_utc_now_iso()
-
-    # Preflight every existing/deleted record before the first mutation.
-    # This prevents a known stale batch from partially saving before the
-    # conflict is discovered on a later record. It does not replace a
-    # transactional RPC: a concurrent write can still race after preflight.
-    protected_ids = {item["record_id"] for item in existing_payload}
-    protected_ids.update(set(baseline) - current_ids)
-    if protected_ids:
-        current_rows = _rest_get(
-            "/rest/v1/app_data",
-            token,
-            params={
-                "select":"record_id,updated_at",
-                "tenant_id":f"eq.{tenant_id()}",
-                "entity":f"eq.{entity}",
-                "record_id":f"in.({','.join(sorted(protected_ids))})",
-            },
-        )
-        current_versions = {
-            str(row.get("record_id")): row.get("updated_at")
-            for row in current_rows
-        }
-        for record_id in sorted(protected_ids):
-            expected = baseline.get(record_id, {}).get("updated_at")
-            actual = current_versions.get(record_id)
-            if expected != actual:
-                raise DataConflictError(
-                    "Данные изменились в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
-                )
-
-    # Optimistic concurrency: an existing row is updated only if its version
-    # is still the same version this session loaded. A stale session therefore
-    # gets a conflict instead of silently overwriting another user's change.
-    for item in existing_payload:
-        expected=baseline[item["record_id"]].get("updated_at")
-        if not expected:
-            # Rows saved by an older build may not have a cached version in this
-            # session. Refresh once before writing so we never guess a version.
-            data_load(entity,[])
-            baseline=dict(st.session_state.get(session_key, {}))
-            expected=baseline.get(item["record_id"],{}).get("updated_at")
-            if not expected:
-                raise DataConflictError(
-                    f"Не удалось проверить версию записи {item['record_id']}. Обновите данные и повторите сохранение."
-                )
-
-        result=_rest_patch(
-            "/rest/v1/app_data",
-            token,
-            {"payload":item["payload"],"updated_at":now},
-            params={
-                "tenant_id":f"eq.{tenant_id()}",
-                "entity":f"eq.{entity}",
-                "record_id":f"eq.{item['record_id']}",
-                "updated_at":f"eq.{expected}",
-            },
-            headers={"Prefer":"return=representation"},
-        )
-        if not result:
-            raise DataConflictError(
-                "Запись была изменена в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
-            )
-
-    if new_payload:
-        _rest_post(
-            "/rest/v1/app_data",
-            token,
-            [{**item,"updated_at":now} for item in new_payload],
-        )
-
-    # Deletions are also protected by the loaded version. Delete one record
-    # at a time because every record can have a different updated_at value.
     removed_ids=set(baseline)-current_ids
-    for record_id in sorted(removed_ids):
-        expected=baseline[record_id].get("updated_at")
-        if not expected:
-            raise DataConflictError(
-                "Нельзя удалить запись без подтверждения её текущей версии. Обновите данные и повторите."
-            )
-        result=_rest_delete(
-            "/rest/v1/app_data",
-            token,
-            params={
-                "tenant_id":f"eq.{tenant_id()}",
-                "entity":f"eq.{entity}",
-                "record_id":f"eq.{record_id}",
-                "updated_at":f"eq.{expected}",
-            },
-            headers={"Prefer":"return=representation"},
+    for record_id in removed_ids:
+        batch.append({
+            "record_id":record_id,
+            "expected_updated_at":baseline[record_id].get("updated_at"),
+            "is_new":False,
+            "is_deleted":True,
+        })
+
+    if not batch:
+        return
+
+    if any(
+        not item.get("is_new") and not item.get("expected_updated_at")
+        for item in batch
+    ):
+        raise DataConflictError(
+            "Не удалось проверить версию одной из записей. Обновите данные и повторите сохранение."
         )
-        if not result:
-            raise DataConflictError(
-                "Запись была изменена в другой сессии и поэтому не удалена. Обновите данные перед повторной попыткой."
+
+    # One database transaction now covers all changed/new/deleted rows.
+    # Sort by stable record ID so concurrent sessions acquire row locks in a
+    # deterministic order and are less likely to deadlock.
+    batch.sort(key=lambda item: str(item["record_id"]))
+
+    try:
+        _rest_post(
+            "/rest/v1/rpc/save_app_data_batch",
+            token,
+            {
+                "p_tenant_id":tenant_id(),
+                "p_entity":entity,
+                "p_rows":batch,
+            },
+        )
+    except SupabaseRequestError as e:
+        message=str(e)
+        if e.status_code in (400,409) and any(
+            marker in message for marker in (
+                "DATA_CONFLICT",
+                "RECORD_NOT_FOUND",
+                "RECORD_ALREADY_EXISTS",
             )
+        ):
+            raise DataConflictError(
+                "Данные изменились в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
+            ) from e
+        raise
 
-    # Re-read the entity after a successful save. This refreshes the real
-    # updated_at values and keeps stable IDs attached to their rows.
+    # Refresh the actual database versions only after the whole transaction
+    # succeeds. If any row conflicts, PostgreSQL rolls the entire batch back.
     data_load(entity,[])
-
 
 def _service_key():
     return _cfg("SUPABASE_SERVICE_ROLE_KEY")
