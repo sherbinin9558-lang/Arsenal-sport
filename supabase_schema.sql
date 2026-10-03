@@ -69,7 +69,7 @@ create or replace function public.activate_paid_subscription(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $activate_paid_subscription$
 declare
   current_sub public.subscriptions;
@@ -151,8 +151,8 @@ create or replace function public.is_tenant_member(target_tenant uuid)
 returns boolean
 language sql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid() and tenant_id = target_tenant
@@ -200,8 +200,8 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
 declare
   new_tenant uuid;
   store_name text;
@@ -245,8 +245,8 @@ create or replace function public.is_tenant_writer(target_tenant uuid)
 returns boolean
 language sql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid()
@@ -259,8 +259,8 @@ create or replace function public.is_tenant_admin(target_tenant uuid)
 returns boolean
 language sql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
   select exists (
     select 1 from public.memberships
     where user_id = auth.uid()
@@ -345,8 +345,8 @@ create or replace function public.accept_invitation(invite_id uuid)
 returns uuid
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
 declare
   inv public.invitations;
   uid uuid := auth.uid();
@@ -393,8 +393,8 @@ create or replace function public.set_member_role(target_tenant uuid, target_use
 returns boolean
 language plpgsql
 security definer
-set search_path = public
-as $$
+set search_path = ''
+as $
 declare
   target_current_role text;
 begin
