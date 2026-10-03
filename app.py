@@ -1230,11 +1230,12 @@ with tab4:
             import tempfile, os
             from reels import make_reel
 
+            source_bytes = None
             if replace_reel_photo:
                 if not reel_file:
                     st.error("Выбери изображение для замены.")
-                    st.stop()
-                source_bytes = reel_file.getvalue()
+                else:
+                    source_bytes = reel_file.getvalue()
             else:
                 if not stored_card:
                     source_image = None
@@ -1252,38 +1253,38 @@ with tab4:
                             "❌ Нельзя создать Reels: у товара нет исходного фото. "
                             "Открой «📦 Каталог → ✏️ Редактировать», загрузи фото товара и сохрани."
                         )
-                        st.stop()
+                    else:
+                        auto_card = generate_card(
+                            source_image,
+                            reel_product.get("name", ""),
+                            reel_product.get("brand", ""),
+                            reel_product.get("article", ""),
+                            reel_product.get("sizes", ""),
+                            reel_product.get("color", ""),
+                            reel_product.get("description", ""),
+                            reel_product.get("specs", ""),
+                            reel_product.get("category", "Другое"),
+                            "Спортивный",
+                            get_logo(),
+                        )
+                        card_buf = io.BytesIO()
+                        auto_card.save(card_buf, format="PNG")
+                        source_bytes = card_buf.getvalue()
 
-                    auto_card = generate_card(
-                        source_image,
-                        reel_product.get("name", ""),
-                        reel_product.get("brand", ""),
-                        reel_product.get("article", ""),
-                        reel_product.get("sizes", ""),
-                        reel_product.get("color", ""),
-                        reel_product.get("description", ""),
-                        reel_product.get("specs", ""),
-                        reel_product.get("category", "Другое"),
-                        "Спортивный",
-                        get_logo(),
-                    )
-                    card_buf = io.BytesIO()
-                    auto_card.save(card_buf, format="PNG")
-                    source_bytes = card_buf.getvalue()
+                        updated_product = dict(reel_product)
+                        updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
+                        update_product(reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0), updated_product)
+                        reel_product = updated_product
+                        stored_card = updated_product["card_image"]
 
-                    updated_product = dict(reel_product)
-                    updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
-                    update_product(reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0), updated_product)
-                    reel_product = updated_product
-                    stored_card = updated_product["card_image"]
-
-                    st.success(
-                        "✅ Карточка автоматически создана с исходным фото товара и сохранена."
-                    )
+                        st.success(
+                            "✅ Карточка автоматически создана с исходным фото товара и сохранена."
+                        )
                 else:
                     source_bytes = base64.b64decode(stored_card)
 
-            with tempfile.TemporaryDirectory() as tmp:
+            if source_bytes:
+                with tempfile.TemporaryDirectory() as tmp:
                 src = os.path.join(tmp, "card.png")
                 with open(src, "wb") as f:
                     f.write(source_bytes)
