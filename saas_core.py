@@ -716,6 +716,35 @@ def data_save(entity,rows):
 
     now=_utc_now_iso()
 
+    # Preflight every existing/deleted record before the first mutation.
+    # This prevents a known stale batch from partially saving before the
+    # conflict is discovered on a later record. It does not replace a
+    # transactional RPC: a concurrent write can still race after preflight.
+    protected_ids = {item["record_id"] for item in existing_payload}
+    protected_ids.update(set(baseline) - current_ids)
+    if protected_ids:
+        current_rows = _rest_get(
+            "/rest/v1/app_data",
+            token,
+            params={
+                "select":"record_id,updated_at",
+                "tenant_id":f"eq.{tenant_id()}",
+                "entity":f"eq.{entity}",
+                "record_id":f"in.({','.join(sorted(protected_ids))})",
+            },
+        )
+        current_versions = {
+            str(row.get("record_id")): row.get("updated_at")
+            for row in current_rows
+        }
+        for record_id in sorted(protected_ids):
+            expected = baseline.get(record_id, {}).get("updated_at")
+            actual = current_versions.get(record_id)
+            if expected != actual:
+                raise DataConflictError(
+                    "Данные изменились в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
+                )
+
     # Optimistic concurrency: an existing row is updated only if its version
     # is still the same version this session loaded. A stale session therefore
     # gets a conflict instead of silently overwriting another user's change.
