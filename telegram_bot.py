@@ -1,28 +1,62 @@
-import json
+"""Tenant-scoped Telegram seller.
+
+This bot is intentionally bound to exactly one tenant. It never reads the
+repository-wide products.json file. Configure TELEGRAM_BOT_TOKEN, TENANT_ID,
+SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the bot runtime.
+"""
+
 import os
 import re
 import requests
-from pathlib import Path
 
 from max_features import product_search, knowledge_answer
 
-PRODUCTS_FILE = Path("products.json")
 TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or ""
+TENANT_ID = os.getenv("TENANT_ID") or os.getenv("SAAS_TENANT_ID")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
-
 sessions = {}
 
 
+def validate_config():
+    missing = []
+    if not TOKEN:
+        missing.append("TELEGRAM_BOT_TOKEN")
+    if not ADMIN_CHAT_ID:
+        missing.append("ADMIN_CHAT_ID")
+    if not SUPABASE_URL:
+        missing.append("SUPABASE_URL")
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        missing.append("SUPABASE_SERVICE_ROLE_KEY")
+    if not TENANT_ID:
+        missing.append("TENANT_ID")
+    if missing:
+        raise RuntimeError("Telegram seller не запущен. Не настроены: " + ", ".join(missing))
+
+
 def load_products():
-    try:
-        with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+    validate_config()
+    url = f"{SUPABASE_URL}/rest/v1/app_data"
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+    }
+    params = {
+        "select": "record_id,payload",
+        "tenant_id": f"eq.{TENANT_ID}",
+        "entity": "eq.products",
+        "order": "record_id.asc",
+    }
+    response = requests.get(url, headers=headers, params=params, timeout=20)
+    response.raise_for_status()
+    rows = response.json()
+    return [row.get("payload", {}) for row in rows]
 
 
 def tg(method, payload=None):
+    validate_config()
     r = requests.post(f"{API}/{method}", json=payload or {}, timeout=60)
     r.raise_for_status()
     return r.json()
@@ -105,8 +139,8 @@ def handle_message(message):
         sessions[chat_id] = []
         send(
             chat_id,
-            "🏆 Добро пожаловать в Arsenal Sport!\n\n"
-            "Я бесплатный AI-продавец магазина. Напишите, что ищете — "
+            "🏆 Добро пожаловать!\n\n"
+            "Я AI-продавец магазина. Напишите, что ищете — "
             "например: «бутсы 42 размера для искусственного поля»."
         )
         return
@@ -163,7 +197,7 @@ def handle_callback(callback):
         p = current[idx]
         title = product_title(p)
         notify_admin(
-            "🛒 Новый запрос на заказ Arsenal Sport\n\n"
+            "🛒 Новый запрос на заказ\n\n"
             f"Товар: {title}\n"
             f"Артикул: {p.get('article','уточняется')}\n"
             f"Размеры: {p.get('sizes','уточняются')}\n"
@@ -171,17 +205,14 @@ def handle_callback(callback):
         )
         send(
             chat_id,
-            "🛒 Запрос передан менеджеру Arsenal Sport. "
-            "Для оформления уточним размер и количество."
+            "🛒 Запрос передан менеджеру. Для оформления уточним размер и количество."
         )
 
 
 def main():
-    if not TOKEN:
-        raise RuntimeError("Не задан TELEGRAM_TOKEN или TELEGRAM_BOT_TOKEN.")
-
+    validate_config()
     offset = None
-    print("Arsenal Sport Telegram seller started.")
+    print(f"Tenant-scoped Telegram seller started for tenant {TENANT_ID}.")
 
     while True:
         try:
