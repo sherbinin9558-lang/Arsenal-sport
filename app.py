@@ -1850,6 +1850,29 @@ def render_max():
             if low:
                 st.warning(f"Низкий остаток: {len(low)} товаров (порог ≤ 2).")
 
+            st.markdown("### ⚡ MAX может сделать это сейчас")
+            if not products:
+                st.info("Добавьте первый товар — после этого MAX сможет создать контент и план действий.")
+            else:
+                qa, qb = st.columns(2)
+                with qa:
+                    if can("write_data") and st.button("✨ Создать 7 идей контента", use_container_width=True, key="max_quick_plan"):
+                        with st.spinner("MAX готовит план…"):
+                            suggestions = seven_day_plan(products)
+                            existing = load_plan()
+                            existing_keys = {(x.get("date"), x.get("product")) for x in existing}
+                            added = 0
+                            for item in suggestions:
+                                key = (item.get("date"), item.get("product"))
+                                if key not in existing_keys:
+                                    existing.append(item); added += 1
+                            save_plan(existing)
+                        st.success(f"Готово: добавлено {added} идей.")
+                        st.rerun()
+                with qb:
+                    if st.button("↻ Обновить анализ MAX", use_container_width=True, key="max_refresh"):
+                        st.rerun()
+
         elif section == "Аккаунт":
             st.subheader("🏪 Аккаунт магазина")
             st.write(f"**Магазин:** {st.session_state.get('saas_tenant_name','—')}")
