@@ -143,14 +143,14 @@ def _service_key():
     except Exception: value=os.getenv("SUPABASE_SERVICE_ROLE_KEY","")
     return str(value or "").strip()
 
-def activate_paid_subscription(plan, provider_payment_id, payment_method_id=None):
+def activate_paid_subscription(plan, provider_payment_id, payment_method_id=None, provider="yookassa", tenant=None):
     key=_service_key()
     if not key or not saas_enabled():
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
-    tid=tenant_id()
+    tid=tenant or tenant_id()
     headers={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json","Prefer":"return=minimal"}
     base=f"{SUPABASE_URL}/rest/v1"
-    sub={"plan":plan,"status":"active","provider":"yookassa","provider_payment_id":provider_payment_id}
+    sub={"plan":plan,"status":"active","provider":provider,"provider_payment_id":provider_payment_id}
     if payment_method_id:
         sub["provider_payment_method_id"]=payment_method_id
     rr=requests.patch(f"{base}/subscriptions",headers=headers,params={"tenant_id":f"eq.{tid}"},json=sub,timeout=20)
@@ -291,6 +291,8 @@ def data_load(entity,default):
 
 def data_save(entity,rows):
     rows=rows if isinstance(rows,list) else []
+    if saas_enabled() and current_role() not in ("owner","admin","manager","editor"):
+        raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
     if not saas_enabled():
         os.makedirs("data",exist_ok=True)
         with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f: json.dump(rows,f,ensure_ascii=False,indent=2)
