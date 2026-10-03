@@ -7,9 +7,12 @@ WORKFLOW_STATUSES = ["Идея", "В работе", "На проверке", "Г
 PLATFORM_ORDER = ["Instagram", "Telegram", "VK"]
 
 def content_identity(item):
-    stable_id = str(item.get("_saas_record_id") or item.get("content_id") or "").strip()
-    if stable_id:
-        return "cnt-" + hashlib.sha1(stable_id.encode("utf-8")).hexdigest()[:12]
+    record_id = str(item.get("_saas_record_id") or "").strip()
+    if record_id:
+        return "cnt-" + hashlib.sha1(record_id.encode("utf-8")).hexdigest()[:12]
+    existing_id = str(item.get("content_id") or "").strip()
+    if existing_id:
+        return existing_id
     raw = "|".join(str(item.get(k, "")) for k in ("date", "platform", "product", "type", "idea"))
     return "cnt-" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
