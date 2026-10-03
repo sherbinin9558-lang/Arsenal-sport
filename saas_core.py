@@ -5,7 +5,7 @@ from typing import Optional
 import requests
 import streamlit as st
 
-PLAN_LIMITS={"trial":{"products":100,"users":1},"starter":{"products":1000,"users":3},"pro":{"products":10000,"users":10},"business":{"products":100000,"users":50}}
+PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":1000,"users":3,"content":1000},"pro":{"products":10000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
 
 def _cfg(name, default=""):
     try: value=st.secrets.get(name, os.getenv(name, default))
@@ -42,6 +42,32 @@ def sign_out(token):
     try: _request("POST","/auth/v1/logout",token=token)
     except Exception: pass
 
+def request_password_reset(email):
+    email=str(email or "").strip().lower()
+    if not email:
+        raise ValueError("Укажите email.")
+    redirect=_cfg("SAAS_PUBLIC_URL").rstrip("/")
+    payload={"email":email}
+    if redirect:
+        payload["redirect_to"]=redirect
+    return _request("POST","/auth/v1/recover",json=payload)
+
+def validate_session():
+    token=st.session_state.get("saas_access_token")
+    if not token:
+        return False
+    try:
+        user=get_user(token)
+        tenant=current_tenant(token,user.get("id"))
+        if not tenant:
+            raise RuntimeError("Магазин не найден.")
+        _set_identity(user,tenant)
+        return True
+    except Exception:
+        for k in list(st.session_state):
+            if k.startswith("saas_"): del st.session_state[k]
+        return False
+
 def _rest_get(path,token,params=None): return _request("GET",path,token=token,params=params or {})
 def _rest_post(path,token,payload): return _request("POST",path,token=token,json=payload)
 def _rest_delete(path,token,params=None): return _request("DELETE",path,token=token,params=params or {})
@@ -67,21 +93,24 @@ def _set_identity(user,tenant):
 def login_ui():
     st.markdown("## ⚡ AI Agent Content Manager")
     st.caption("SaaS-платформа для управления магазином: каталог, контент, CRM, заказы и аналитика.")
-    tab1,tab2=st.tabs(["Войти","Создать магазин"])
+    tab1,tab2,tab3=st.tabs(["Войти","Создать магазин","Восстановить пароль"])
     with tab1:
         email=st.text_input("Email",key="saas_login_email")
         password=st.text_input("Пароль",type="password",key="saas_login_password")
         if st.button("Войти",type="primary",use_container_width=True,key="saas_login"):
-            try:
-                result=sign_in(email.strip(),password)
-                token=result.get("access_token")
-                user=result.get("user") or get_user(token)
-                tenant=current_tenant(token,user.get("id"))
-                if not tenant: raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-                st.session_state["saas_access_token"]=token
-                _set_identity(user,tenant)
-                st.rerun()
-            except Exception as e: st.error(f"Не удалось войти: {e}")
+            if not email.strip() or not password:
+                st.error("Введите email и пароль.")
+            else:
+                try:
+                    result=sign_in(email.strip(),password)
+                    token=result.get("access_token")
+                    user=result.get("user") or get_user(token)
+                    tenant=current_tenant(token,user.get("id"))
+                    if not tenant: raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
+                    st.session_state["saas_access_token"]=token
+                    _set_identity(user,tenant)
+                    st.rerun()
+                except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         store=st.text_input("Название магазина",key="saas_signup_store")
         email=st.text_input("Email владельца",key="saas_signup_email")
@@ -106,6 +135,15 @@ def login_ui():
                             st.rerun()
                         else: st.success("Магазин создан. Войдите после подтверждения email.")
                 except Exception as e: st.error(f"Не удалось создать магазин: {e}")
+    with tab3:
+        email=st.text_input("Email для восстановления",key="saas_recovery_email")
+        st.caption("На почту придёт ссылка для смены пароля.")
+        if st.button("Отправить ссылку",type="primary",use_container_width=True,key="saas_recovery"):
+            try:
+                request_password_reset(email)
+                st.success("Если аккаунт существует, письмо для восстановления отправлено.")
+            except Exception as e:
+                st.error(f"Не удалось отправить письмо: {e}")
 
 def usage_snapshot():
     products=len(data_load("products", []))
@@ -120,6 +158,7 @@ def render_account_bar():
         st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
         plan=str(st.session_state.get('saas_plan','trial')).lower()
         st.caption(f"Тариф · {plan.upper()}")
+        st.caption(f"Роль · {current_role().upper()}")
         if plan in PLAN_LIMITS:
             u=usage_snapshot()
             max_products=PLAN_LIMITS[plan]["products"]
@@ -188,7 +227,7 @@ def subscription_snapshot():
     token=st.session_state.get("saas_access_token")
     tid=tenant_id()
     if not saas_enabled() or not token:
-        return {"plan":tenant_plan(),"status":"trialing","provider":None,"current_period_end":None}
+        return {"plan":tenant_plan(),"status":"trialing","provider":None,"current_period_end":None,"auto_renew":False,"cancel_at_period_end":False,"next_billing_at":None}
     try:
         row=subscription(token,tid) or {}
         return {
@@ -201,7 +240,7 @@ def subscription_snapshot():
             "next_billing_at":row.get("next_billing_at"),
         }
     except Exception:
-        return {"plan":tenant_plan(),"status":"unknown","provider":None,"current_period_end":None}
+        return {"plan":tenant_plan(),"status":"unknown","provider":None,"current_period_end":None,"auto_renew":False,"cancel_at_period_end":False,"next_billing_at":None}
 
 def request_plan_change(plan):
     if plan not in ("starter","pro","business"):
@@ -243,11 +282,36 @@ def team_invitations():
         return []
     return _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,created_at,expires_at","tenant_id":f"eq.{tenant_id()}","status":"eq.pending","order":"created_at.desc"})
 
+def can(action):
+    role=current_role()
+    if role=="owner":
+        return True
+    if action in ("read","write_data"):
+        return role in ("admin","manager","editor")
+    if action in ("billing","team","settings"):
+        return role=="admin"
+    if action=="manage_roles":
+        return role in ("owner","admin")
+    return False
+
 def create_team_invitation(email,role):
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token:
         return None
-    payload={"tenant_id":tenant_id(),"email":email.strip().lower(),"role":role,"invited_by":st.session_state.get("saas_user_id")}
+    if not can("team"):
+        raise PermissionError("Только администратор или владелец может приглашать участников.")
+    role=str(role or "viewer").lower()
+    if role not in ("admin","manager","editor","viewer"):
+        raise ValueError("Недопустимая роль.")
+    members=team_members()
+    pending=team_invitations()
+    max_users=limit("users")
+    if max_users and len(members)+len(pending)>=max_users:
+        raise ValueError(f"Лимит участников тарифа {tenant_plan().upper()} достигнут.")
+    email=email.strip().lower()
+    if not email:
+        raise ValueError("Укажите email.")
+    payload={"tenant_id":tenant_id(),"email":email,"role":role,"invited_by":st.session_state.get("saas_user_id")}
     return _rest_post("/rest/v1/invitations",token,payload)
 
 def onboarding_complete():
@@ -310,6 +374,13 @@ def feature_allowed(name,current_count=0):
     maximum=limit(name)
     return maximum<=0 or current_count<maximum
 
+def ensure_can_create(entity,current_count=0):
+    if not can("write_data"):
+        raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
+    if not feature_allowed(entity,current_count):
+        raise ValueError(f"Лимит {entity} тарифа {tenant_plan().upper()} достигнут.")
+    return True
+
 def data_load(entity,default):
     if not saas_enabled():
         path=f"data/{tenant_id()}_{entity}.json"
@@ -328,7 +399,7 @@ def data_load(entity,default):
 
 def data_save(entity,rows):
     rows=rows if isinstance(rows,list) else []
-    if saas_enabled() and current_role() not in ("owner","admin","manager","editor"):
+    if saas_enabled() and not can("write_data"):
         raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
     if not saas_enabled():
         os.makedirs("data",exist_ok=True)
