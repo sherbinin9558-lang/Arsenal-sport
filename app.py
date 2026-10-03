@@ -1837,6 +1837,9 @@ def load_settings():
 
 def save_settings(data):
     payload = {k: data.get(k, "") for k in DEFAULT_SETTINGS}
+    existing = data_load("settings", [])
+    if existing and isinstance(existing[0], dict) and existing[0].get("_saas_record_id"):
+        payload["_saas_record_id"] = existing[0]["_saas_record_id"]
     data_save("settings", [payload])
 
 
