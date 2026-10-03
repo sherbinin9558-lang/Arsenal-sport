@@ -36,7 +36,6 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn("raise DataConflictError", self.source)
 
 
-
 class ProductStockRegressionTests(unittest.TestCase):
     def test_product_edit_preserves_stock_and_price_fields(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
@@ -57,8 +56,13 @@ class OrderSafetyRegressionTests(unittest.TestCase):
     def test_order_identity_and_status_are_validated(self):
         source = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
         self.assertIn("ORDER_STATUSES =", source)
-        self.assertIn('if "id" in changes:', source)
+        self.assertIn("ORDER_IMMUTABLE_FIELDS =", source)
+        self.assertIn("created_at", source)
         self.assertIn('if "status" in changes and changes["status"] not in ORDER_STATUSES:', source)
+
+    def test_order_immutable_fields_are_rejected(self):
+        from free_automation import ORDER_IMMUTABLE_FIELDS
+        self.assertEqual(ORDER_IMMUTABLE_FIELDS, frozenset({"id", "created_at"}))
 
 
 class CrmSafetyRegressionTests(unittest.TestCase):
@@ -80,7 +84,7 @@ class UploadSafetyRegressionTests(unittest.TestCase):
     def test_product_image_extensions_are_whitelisted(self):
         source = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
         self.assertIn('if ext not in {".jpg", ".jpeg", ".png", ".webp"}:', source)
-        self.assertIn('Поддерживаются только JPG, JPEG, PNG и WEBP.', source)
+        self.assertIn("Поддерживаются только JPG, JPEG, PNG и WEBP.", source)
 
 
 class InventoryRegressionTests(unittest.TestCase):
@@ -89,10 +93,6 @@ class InventoryRegressionTests(unittest.TestCase):
         self.assertEqual(stock_info({"stock_by_size": {"42": 2, "43": 3}, "total_stock": 99})[0], 5)
         self.assertEqual(stock_info({"total_stock": 7, "stock": 99})[0], 7)
         self.assertEqual(stock_info({"stock": 4})[0], 4)
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class ContentIdentityRegressionTests(unittest.TestCase):
@@ -114,3 +114,7 @@ class DemoModeRecordRegressionTests(unittest.TestCase):
         self.assertIn('p.get("_saas_record_id") or real_i', source)
         self.assertIn('item.get("_saas_record_id") or ri', source)
         self.assertIn('reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0)', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
