@@ -35,7 +35,7 @@ def _save_checkout(tenant_id, payment_id, plan):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
-        return
+        raise RuntimeError("Supabase checkout storage is not configured.")
     headers={
         "apikey": key,
         "Authorization": f"Bearer {key}",
@@ -77,6 +77,8 @@ def create_checkout(plan, tenant_id):
         raise RuntimeError("Цена тарифа не настроена в Secrets.")
     if not configured():
         raise RuntimeError("ЮKassa не настроена: нужны YOO_KASSA_SHOP_ID, YOO_KASSA_SECRET_KEY и SAAS_PUBLIC_URL.")
+    if not _cfg("SUPABASE_SERVICE_ROLE_KEY") or not _cfg("SUPABASE_URL"):
+        raise RuntimeError("Не настроено серверное сохранение checkout: нужны SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY.")
     payment_id=str(uuid.uuid4())
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
