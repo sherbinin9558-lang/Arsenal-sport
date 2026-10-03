@@ -1857,6 +1857,25 @@ def render_max():
             try:
                 from billing import create_checkout, plan_price
                 from saas_core import plan_catalog
+                st.caption("Доступны ЮKassa и Т‑Банк. Секретные ключи хранятся только в Secrets.")
+                try:
+                    from tbank_billing import create_checkout as tbank_create_checkout, plan_price as tbank_plan_price
+                    if st.button("Оплатить через Т‑Банк", key="pay_tbank", use_container_width=True):
+                        plan_for_payment=st.session_state.get("requested_plan") or tenant_plan()
+                        if plan_for_payment not in ("starter","pro","business"):
+                            plan_for_payment="starter"
+                        try:
+                            payment=tbank_create_checkout(plan_for_payment, st.session_state.get("saas_tenant_id"))
+                            st.session_state["tbank_payment_id"]=payment.get("PaymentId")
+                            st.session_state["tbank_order_id"]=payment.get("OrderId")
+                            st.session_state["tbank_url"]=payment.get("PaymentURL")
+                            st.session_state["tbank_plan"]=plan_for_payment
+                        except Exception as e:
+                            st.error(str(e))
+                    if st.session_state.get("tbank_url"):
+                        st.link_button("Перейти к оплате в Т‑Банке", st.session_state["tbank_url"], use_container_width=True)
+                except Exception as e:
+                    st.info(f"Т‑Банк пока не подключён: {e}")
                 st.caption("Оплата через ЮKassa. Секретный ключ хранится только в Secrets.")
                 bplans=plan_catalog()
                 cols=st.columns(3)
