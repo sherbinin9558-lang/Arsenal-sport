@@ -245,3 +245,11 @@ with check (public.is_tenant_admin(id));
 alter table public.invitations drop constraint if exists invitations_role_check;
 alter table public.invitations add constraint invitations_role_check
 check (role in ('admin','manager','editor','viewer'));
+
+
+-- Subscription renewal foundation (webhook/worker can use these fields later).
+alter table public.subscriptions add column if not exists auto_renew boolean not null default false;
+alter table public.subscriptions add column if not exists cancel_at_period_end boolean not null default false;
+alter table public.subscriptions add column if not exists next_billing_at timestamptz;
+alter table public.subscriptions add column if not exists provider_subscription_id text;
+create index if not exists idx_subscriptions_next_billing on public.subscriptions(next_billing_at);
