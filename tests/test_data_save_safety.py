@@ -105,3 +105,12 @@ class ContentIdentityRegressionTests(unittest.TestCase):
         from content_manager import content_identity
         item = {"content_id": "cnt-existing", "date": "2026-10-01", "idea": "old"}
         self.assertEqual(content_identity(item), "cnt-existing")
+
+
+class DemoModeRecordRegressionTests(unittest.TestCase):
+    def test_record_index_helper_supports_local_mode_indices(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn("if isinstance(record_id, int):", source)
+        self.assertIn('p.get("_saas_record_id") or real_i', source)
+        self.assertIn('item.get("_saas_record_id") or ri', source)
+        self.assertIn('reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0)', source)
