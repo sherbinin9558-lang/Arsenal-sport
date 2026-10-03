@@ -1719,7 +1719,7 @@ def render_max():
         st.markdown("---")
         section = st.radio(
             "Раздел MAX",
-            ["Обзор", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
+            ["Обзор", "Аккаунт", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
             horizontal=True,
             key="max_section",
         )
@@ -1744,6 +1744,32 @@ def render_max():
             if low:
                 st.warning(f"Низкий остаток: {len(low)} товаров (порог ≤ 2).")
 
+        elif section == "Аккаунт":
+            st.subheader("🏪 Аккаунт магазина")
+            st.write(f"**Магазин:** {st.session_state.get('saas_tenant_name','—')}")
+            st.write(f"**Тариф:** {str(tenant_plan()).upper()}")
+            st.write(f"**Статус:** {st.session_state.get('saas_tenant_status','active')}")
+            try:
+                from saas_core import usage_snapshot, PLAN_LIMITS
+                usage=usage_snapshot()
+                limits=PLAN_LIMITS.get(tenant_plan(), PLAN_LIMITS["trial"])
+                st.markdown("### Использование")
+                u1,u2,u3,u4=st.columns(4)
+                u1.metric("Товары", f"{usage['products']} / {limits['products']}")
+                u2.metric("Заявки", usage["leads"])
+                u3.metric("Заказы", usage["orders"])
+                u4.metric("Контент", usage["content"])
+                st.progress(min(1.0, usage["products"]/max(1,limits["products"])), text=f"Лимит каталога: {limits['products']} товаров")
+            except Exception as e:
+                st.info(f"Статистика аккаунта пока недоступна: {e}")
+            st.markdown("---")
+            st.markdown("### Тарифы")
+            st.caption("Тарифы уже заложены в архитектуру. Реальную оплату подключим следующим этапом.")
+            p1,p2,p3=st.columns(3)
+            p1.info("STARTER\n\nдо 1 000 товаров\nдо 3 пользователей")
+            p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
+            p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
+            st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
         elif section == "AI-продавец":
             st.subheader("AI-продавец по каталогу")
             q = st.text_input(
