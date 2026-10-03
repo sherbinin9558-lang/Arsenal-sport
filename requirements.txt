@@ -3,3 +3,5 @@ imageio-ffmpeg
 openpyxl
 Pillow
 requests>=2.32.0
+
+streamlit-cookies-controller==0.0.4
