@@ -628,10 +628,33 @@ with tab_dashboard:
         fr1.metric("Шаг 1", "Магазин ✓")
         fr2.metric("Шаг 2", "Первый товар", "сейчас")
         fr3.metric("Шаг 3", "Первый контент", "после товара")
-        if st.button("＋ Добавить первый товар", type="primary", use_container_width=True, key="dash_first_product"):
-            st.session_state["first_run_hint"] = True
-        if st.session_state.get("first_run_hint"):
-            st.info("Откройте вкладку «Товар» сверху — там можно загрузить фото и создать первую карточку.")
+        with st.expander("Добавить первый товар прямо сейчас", expanded=st.session_state.get("first_run_quick_add", True)):
+            with st.form("first_run_product_form", clear_on_submit=True):
+                q1, q2 = st.columns(2)
+                with q1:
+                    fr_name = st.text_input("Название товара", placeholder="Футбольная форма")
+                    fr_brand = st.text_input("Бренд", placeholder="Nike")
+                    fr_article = st.text_input("Артикул", placeholder="ART-001")
+                with q2:
+                    fr_category = st.selectbox("Категория", CATEGORIES)
+                    fr_price = st.text_input("Цена, ₽", placeholder="4990")
+                    fr_stock = st.number_input("Остаток", min_value=0, value=1, step=1)
+                fr_submit = st.form_submit_button("Создать товар и передать его MAX", type="primary", use_container_width=True)
+            if fr_submit:
+                if not fr_name.strip():
+                    st.error("Укажите название товара.")
+                else:
+                    try:
+                        add_product({
+                            "name": fr_name.strip(), "brand": fr_brand.strip(), "article": fr_article.strip(),
+                            "category": fr_category, "price": fr_price.strip(), "stock": int(fr_stock),
+                            "sizes": "", "color": "", "description": "", "specs": "",
+                            "card_image": "", "date_added": str(datetime.date.today())
+                        })
+                        st.success("Товар создан. MAX уже может использовать его для контента и рекомендаций.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Не удалось создать товар: {e}")
     else:
         d1, d2, d3, d4, d5 = st.columns(5)
         d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
