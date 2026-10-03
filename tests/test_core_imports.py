@@ -10,6 +10,7 @@ MODULES = (
     "commerce_core",
     "inventory_core",
     "content_manager",
+    "growth_engine",
 )
 
 
