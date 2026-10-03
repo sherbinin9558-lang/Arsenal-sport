@@ -2499,7 +2499,7 @@ with tab7:
         telegram = st.text_input("Telegram", value=settings["telegram"], key="settings_telegram")
         vk = st.text_input("VK", value=settings["vk"], key="settings_vk")
         instagram = st.text_input("Instagram", value=settings["instagram"], key="settings_instagram")
-        st.info("Логотип используется из файла logo.png в проекте.")
+        st.info("Логотип хранится отдельно для каждого магазина.")
 
     st.markdown("### 📦 Заказы и доставка")
     o1, o2 = st.columns(2)
