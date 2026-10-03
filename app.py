@@ -181,7 +181,6 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
     return lines
 
 
-
 from card_generator import generate_card
 
 # ==================== ТЕКСТЫ ====================
@@ -537,6 +536,35 @@ def render_platform_admin():
         })
     st.dataframe(account_rows, use_container_width=True, hide_index=True)
     st.caption("Вкладка доступна только владельцу платформы из SAAS_ADMIN_EMAIL. Service-role ключ нужен для загрузки и управления данными.")
+
+
+# ==================== MAX SMART FUNCTIONS ====================
+ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]
+ACTIVE_ORDER_STATUSES = {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
+
+def max_stock(product):
+    by_size = product.get("stock_by_size") or {}
+    qty, _, known = stock_info(product)
+    return qty if known and qty is not None else 0
+
+def max_product_title(product):
+    return f"{product.get('brand','')} {product.get('name','')}".strip() or "Товар"
+
+def max_due_content(plan):
+    today = datetime.date.today()
+    due, overdue = [], []
+    for item in plan:
+        try:
+            d = datetime.date.fromisoformat(str(item.get("date","")))
+        except Exception:
+            continue
+        if item.get("status") == "Опубликовано":
+            continue
+        if d < today:
+            overdue.append(item)
+        elif d == today:
+            due.append(item)
+    return due, overdue
 
 
 @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
@@ -2635,32 +2663,4 @@ def sales_followup(products, message, current):
         return ai_sales_reply(products, message)[0], found
     return "Уточните размер, бюджет, цвет или вид товара — я попробую подобрать подходящий вариант.", current
 
-
-# ==================== MAX SMART FUNCTIONS ====================
-ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]
-ACTIVE_ORDER_STATUSES = {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}
-
-def max_stock(product):
-    by_size = product.get("stock_by_size") or {}
-    qty, _, known = stock_info(product)
-    return qty if known and qty is not None else 0
-
-def max_product_title(product):
-    return f"{product.get('brand','')} {product.get('name','')}".strip() or "Товар"
-
-def max_due_content(plan):
-    today = datetime.date.today()
-    due, overdue = [], []
-    for item in plan:
-        try:
-            d = datetime.date.fromisoformat(str(item.get("date","")))
-        except Exception:
-            continue
-        if item.get("status") == "Опубликовано":
-            continue
-        if d < today:
-            overdue.append(item)
-        elif d == today:
-            due.append(item)
-    return due, overdue
 
