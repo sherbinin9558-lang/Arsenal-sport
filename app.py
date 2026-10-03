@@ -1402,15 +1402,10 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
     unsafe_allow_html=True,
 )
 
-# MAX launcher: isolated fragment so opening MAX does not rerun the whole application.
-@st.fragment(key="max_launcher")
-def _max_launcher_fragment():
-    if st.session_state.get("open_max", False):
-        render_max()
-        return
-    if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
-        st.session_state["open_max"] = True
-        render_max()
+# MAX launcher: direct dialog call. Keep the dialog itself as the only Streamlit fragment.
+if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
+    st.session_state["open_max"] = True
+    render_max()
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
