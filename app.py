@@ -9,7 +9,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance
-from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription
+from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription, can
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -90,7 +90,10 @@ def attribution_metrics(attribution, leads, orders):
     return by_product
 
 def add_plan(item):
-    p = load_plan(); p.append(item); save_plan(p)
+    p = load_plan()
+    if not feature_allowed("content", len(p)):
+        raise ValueError(f"Лимит контента тарифа {tenant_plan().upper()} достигнут.")
+    p.append(item); save_plan(p)
 def update_plan(i, item):
     p = load_plan()
     if 0 <= i < len(p): p[i] = item; save_plan(p)
@@ -780,6 +783,8 @@ def bulk_import_products(uploaded_file, update_existing=False):
     added = updated = skipped = 0
     errors = []
 
+    if not can("write_data"):
+        raise PermissionError("У вашей роли нет прав на импорт товаров.")
     for line_no, row in enumerate(rows, start=2):
         name = _bulk_value(row, "name")
         brand = _bulk_value(row, "brand")
@@ -810,6 +815,8 @@ def bulk_import_products(uploaded_file, update_existing=False):
             products[existing[key]].update(product)
             updated += 1
         else:
+            if not feature_allowed("products", len(products)):
+                raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
             products.append(product)
             if key:
                 existing[key] = len(products) - 1
@@ -1546,14 +1553,15 @@ DEFAULT_SETTINGS = {
 }
 
 def load_settings():
-    data = load_json(SETTINGS_FILE, {})
+    rows = data_load("settings", [])
+    data = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
     result = DEFAULT_SETTINGS.copy()
-    if isinstance(data, dict):
-        result.update({k: data.get(k, "") for k in DEFAULT_SETTINGS})
+    result.update({k: data.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS})
     return result
 
 def save_settings(data):
-    save_json(SETTINGS_FILE, {k: str(data.get(k, "")).strip() for k in DEFAULT_SETTINGS})
+    payload = {k: data.get(k, "") for k in DEFAULT_SETTINGS}
+    data_save("settings", [payload])
 
 
 
