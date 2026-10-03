@@ -113,7 +113,7 @@ begin
       else
         update public.app_data
            set payload = coalesce(item->'payload','{}'::jsonb),
-               updated_at = now()
+               updated_at = clock_timestamp()
          where tenant_id = p_tenant_id
            and entity = p_entity
            and record_id = record_id_value;
