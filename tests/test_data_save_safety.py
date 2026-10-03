@@ -75,3 +75,10 @@ class RlsRoleSafetyRegressionTests(unittest.TestCase):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", source)
         self.assertIn("if target_current_role = 'owner' then", source)
         self.assertIn("for update;", source)
+
+
+class UploadSafetyRegressionTests(unittest.TestCase):
+    def test_product_image_extensions_are_whitelisted(self):
+        source = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
+        self.assertIn('if ext not in {".jpg", ".jpeg", ".png", ".webp"}:', source)
+        self.assertIn('Поддерживаются только JPG, JPEG, PNG и WEBP.', source)
