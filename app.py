@@ -511,7 +511,15 @@ def render_platform_admin():
 def render_max():
     @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
     def dialog():
-        snap = st.session_state.get("max_data_snapshot", {})
+        snap = st.session_state.get("max_data_snapshot")
+        if snap is None:
+            snap = {
+                "products": load_products(),
+                "plan": load_plan(),
+                "leads": load_leads(),
+                "orders": load_orders(),
+            }
+            st.session_state["max_data_snapshot"] = snap
         products = snap.get("products", [])
         plan = snap.get("plan", [])
         leads = snap.get("leads", [])
@@ -594,6 +602,7 @@ def render_max():
                                 if key not in existing_keys:
                                     existing.append(item); added += 1
                             save_plan(existing)
+                        st.session_state.pop("max_data_snapshot", None)
                         st.success(f"Готово: добавлено {added} идей.")
                         st.rerun()
                 with qb:
@@ -1264,7 +1273,7 @@ with st.sidebar:
     )
     if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
         st.session_state["open_max"] = True
-        st.rerun()
+        render_max()
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
