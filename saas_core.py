@@ -384,12 +384,15 @@ def render_onboarding():
         telegram=st.text_input("Telegram магазина", placeholder="@your_store", key="onb_telegram")
         instagram=st.text_input("Instagram", placeholder="@your_store", key="onb_instagram")
         shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"], key="onb_shipping")
+        goal=st.selectbox("Главная цель", ["Больше продаж","Больше заявок","Регулярный контент","Порядок в каталоге"], key="onb_goal")
+        positioning=st.text_area("Чем магазин отличается?", placeholder="Например: большой выбор футбольной экипировки и быстрая доставка.", height=90, key="onb_positioning")
         submitted=st.form_submit_button("Сохранить и открыть MAX", type="primary", use_container_width=True)
     if submitted:
         try:
             data_save("settings", [{
                 "business_type": business, "city": city.strip(), "telegram": telegram.strip(),
-                "instagram": instagram.strip(), "shipping": shipping, "onboarding_complete": True
+                "instagram": instagram.strip(), "shipping": shipping, "goal": goal,
+                "positioning": positioning.strip(), "onboarding_complete": True
             }])
             st.session_state["saas_onboarding_complete"]=True
             st.success("Магазин настроен. MAX готов к работе.")
