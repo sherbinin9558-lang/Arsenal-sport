@@ -118,9 +118,11 @@ def _establish_session(result):
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
     user = result.get("user") or get_user(token)
-    tenant = current_tenant(token, user.get("id"))
+    previous_user_id = st.session_state.get("saas_user_id")
+    selected_tenant_id = st.session_state.get("saas_tenant_id") if previous_user_id == user.get("id") else None
+    tenant = current_tenant(token, user.get("id"), selected_tenant_id)
     if not tenant:
-        raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
+        raise RuntimeError("У аккаунта несколько магазинов. Выберите магазин перед входом.")
     st.session_state["saas_access_token"] = token
     refresh_token = result.get("refresh_token")
     if refresh_token:
@@ -165,9 +167,10 @@ def _restore_session_from_access_token():
         return True
     try:
         user = get_user(token)
-        tenant = current_tenant(token, user.get("id"))
+        selected_tenant_id = st.session_state.get("saas_tenant_id")
+        tenant = current_tenant(token, user.get("id"), selected_tenant_id)
         if not tenant:
-            raise RuntimeError("Магазин не найден.")
+            raise RuntimeError("У аккаунта несколько магазинов. Выберите магазин.")
         _set_identity(user, tenant)
         st.session_state["saas_last_validated_at"] = time.time()
         st.session_state.pop("saas_auth_error", None)
@@ -217,11 +220,21 @@ def _rest_post(path,token,payload,headers=None): return _request("POST",path,tok
 def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
 def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
 
-def current_tenant(token,user_id=None):
+def current_tenant(token,user_id=None,selected_tenant_id=None):
     uid=user_id or st.session_state.get("saas_user_id")
     if not uid: return None
     rows=_rest_get("/rest/v1/memberships",token,params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}"})
-    return rows[0].get("tenants") if rows else None
+    tenants=[row.get("tenants") for row in rows if row.get("tenants")]
+    if not tenants:
+        return None
+    selected=str(selected_tenant_id or st.session_state.get("saas_tenant_id") or "").strip()
+    if selected:
+        for tenant in tenants:
+            if str(tenant.get("id") or "") == selected:
+                return tenant
+    if len(tenants) == 1:
+        return tenants[0]
+    return None
 
 def subscription(token,tenant_id):
     rows=_rest_get("/rest/v1/subscriptions",token,params={"select":"*","tenant_id":f"eq.{tenant_id}","limit":"1"})
