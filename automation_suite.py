@@ -39,10 +39,12 @@ def stock_info(product):
             clean[str(size)] = qty
             total += qty
         return total, clean, True
-    raw = product.get("total_stock")
+    raw = product.get("total_stock", product.get("stock"))
     if raw not in (None, ""):
-        try: return max(0, int(raw)), {}, True
-        except Exception: return None, {}, False
+        try:
+            return max(0, int(raw)), {}, True
+        except Exception:
+            return None, {}, False
     return None, {}, False
 
 def low_stock_products(products, threshold=2):
