@@ -1492,7 +1492,7 @@ with tab4:
 
                     updated_product = dict(reel_product)
                     updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
-                    update_product(reel_product.get("_saas_record_id"), updated_product)
+                    update_product(reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0), updated_product)
                     reel_product = updated_product
                     stored_card = updated_product["card_image"]
 
