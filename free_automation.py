@@ -6,12 +6,15 @@ import uuid
 from saas_core import data_load, data_save, feature_allowed, tenant_plan
 
 ORDERS_FILE = Path("orders.json")
+ORDER_STATUSES = ("Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён")
 
 def load_orders(): return data_load("orders", [])
 
 def save_orders(orders): data_save("orders", orders)
 
 def create_order(customer="", contact="", product="", product_id="", amount="", status="Новая", source="Manual", content_id="", lead_id=""):
+    if status not in ORDER_STATUSES:
+        raise ValueError(f"Недопустимый статус заказа: {status}")
     orders = load_orders()
     if not feature_allowed("orders", len(orders)):
         raise ValueError(f"Лимит заказов тарифа {tenant_plan().upper()} достигнут.")
@@ -28,6 +31,10 @@ def create_order(customer="", contact="", product="", product_id="", amount="", 
     return order
 
 def update_order(order_id, **changes):
+    if "id" in changes:
+        raise ValueError("Идентификатор заказа нельзя изменять.")
+    if "status" in changes and changes["status"] not in ORDER_STATUSES:
+        raise ValueError(f"Недопустимый статус заказа: {changes['status']}")
     orders = load_orders()
     for order in orders:
         if str(order.get("id")) == str(order_id):
