@@ -31,6 +31,33 @@ SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
 SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 
+def _save_checkout(tenant_id, payment_id, plan):
+    key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
+    url=_cfg("SUPABASE_URL").rstrip("/")
+    if not key or not url:
+        return
+    headers={
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    r=requests.post(
+        f"{url}/rest/v1/billing_checkout_sessions",
+        headers=headers,
+        json={
+            "tenant_id": str(tenant_id),
+            "provider": "yookassa",
+            "provider_order_id": str(payment_id),
+            "provider_payment_id": str(payment_id),
+            "plan": plan,
+            "status": "created",
+        },
+        timeout=15,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+
 def configured():
     return bool(SHOP_ID and SECRET_KEY and PUBLIC_URL)
 
@@ -73,6 +100,7 @@ def create_checkout(plan, tenant_id):
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
+    _save_checkout(tenant_id, data.get("id"), plan)
     return data
 
 def get_payment(payment_id):
