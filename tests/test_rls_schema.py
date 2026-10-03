@@ -122,9 +122,19 @@ class RlsSchemaRegressionTests(unittest.TestCase):
         self.assertIn("security invoker", self.sql.lower())
         self.assertIn("grant execute on function public.save_app_data_batch(uuid,text,jsonb) to authenticated;", self.sql)
 
+    def test_invited_signup_does_not_create_orphan_tenant(self):
+        block = self._function_block("handle_new_user").lower()
+        self.assertIn("from public.invitations", block)
+        self.assertIn("if invite_id is not null then", block)
+        self.assertIn("insert into public.memberships(user_id, tenant_id, role)", block)
+        self.assertIn("return new;", block)
+        self.assertIn("create or replace function public.handle_new_user", self.sql.lower())
+
     def test_invitation_acceptance_does_not_overwrite_existing_membership(self):
-        self.assertIn("raise exception 'ALREADY_A_MEMBER';", self.sql)
-        self.assertNotIn("on conflict (user_id, tenant_id) do update set role=excluded.role", self.sql)
+        block = self._function_block("accept_invitation").lower()
+        self.assertIn("update public.invitations set status='accepted' where id=invite_id;", block)
+        self.assertNotIn("raise exception 'already_a_member';", block)
+        self.assertNotIn("on conflict (user_id, tenant_id) do update set role=excluded.role", self.sql.lower())
 
     def test_sensitive_invitation_and_checkout_policies_are_authenticated_only(self):
         required = (
