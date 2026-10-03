@@ -48,10 +48,12 @@ class ProductStockRegressionTests(unittest.TestCase):
         self.assertIn('"total_stock": p.get("total_stock", p.get("stock", 0))', source)
 
     def test_stock_helpers_accept_legacy_stock_field(self):
-        source = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "inventory_core.py").read_text(encoding="utf-8")
         self.assertIn('product.get("total_stock", product.get("stock"))', source)
-        source = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
-        self.assertIn('p.get("total_stock", p.get("stock", 0))', source)
+        automation = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
+        self.assertIn("from inventory_core import stock_info as _stock_info", automation)
+        free = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
+        self.assertIn("from inventory_core import stock_info", free)
 
 
 class OrderSafetyRegressionTests(unittest.TestCase):
@@ -82,3 +84,11 @@ class UploadSafetyRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "automation_suite.py").read_text(encoding="utf-8")
         self.assertIn('if ext not in {".jpg", ".jpeg", ".png", ".webp"}:', source)
         self.assertIn('Поддерживаются только JPG, JPEG, PNG и WEBP.', source)
+
+
+class InventoryRegressionTests(unittest.TestCase):
+    def test_stock_source_prefers_size_breakdown_then_total_stock(self):
+        from inventory_core import stock_info
+        self.assertEqual(stock_info({"stock_by_size": {"42": 2, "43": 3}, "total_stock": 99})[0], 5)
+        self.assertEqual(stock_info({"total_stock": 7, "stock": 99})[0], 7)
+        self.assertEqual(stock_info({"stock": 4})[0], 4)
