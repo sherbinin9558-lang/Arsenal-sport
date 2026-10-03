@@ -1,0 +1,90 @@
+"""YooKassa checkout integration for SaaS subscriptions.
+
+Secrets:
+YOO_KASSA_SHOP_ID
+YOO_KASSA_SECRET_KEY
+SAAS_PUBLIC_URL
+SAAS_STARTER_PRICE
+SAAS_PRO_PRICE
+SAAS_BUSINESS_PRICE
+
+The app creates a redirect checkout. Subscription activation is performed only
+after YooKassa reports a successful payment.
+"""
+import os, uuid, requests
+import streamlit as st
+
+PLANS = {
+    "starter": {"name":"STARTER", "secret":"SAAS_STARTER_PRICE"},
+    "pro": {"name":"PRO", "secret":"SAAS_PRO_PRICE"},
+    "business": {"name":"BUSINESS", "secret":"SAAS_BUSINESS_PRICE"},
+}
+
+def _cfg(name, default=""):
+    try:
+        value=st.secrets.get(name, os.getenv(name, default))
+    except Exception:
+        value=os.getenv(name, default)
+    return str(value or "").strip()
+
+SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
+SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
+PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
+
+def configured():
+    return bool(SHOP_ID and SECRET_KEY and PUBLIC_URL)
+
+def plan_price(plan):
+    if plan not in PLANS:
+        raise ValueError("Недопустимый тариф.")
+    raw=_cfg(PLANS[plan]["secret"])
+    try:
+        value=float(raw.replace(",", "."))
+    except Exception:
+        value=0.0
+    return value
+
+def create_checkout(plan, tenant_id):
+    price=plan_price(plan)
+    if price <= 0:
+        raise RuntimeError("Цена тарифа не настроена в Secrets.")
+    if not configured():
+        raise RuntimeError("ЮKassa не настроена: нужны YOO_KASSA_SHOP_ID, YOO_KASSA_SECRET_KEY и SAAS_PUBLIC_URL.")
+    payment_id=str(uuid.uuid4())
+    payload={
+        "amount":{"value":f"{price:.2f}","currency":"RUB"},
+        "capture":True,
+        "save_payment_method":True,
+        "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&payment_id={payment_id}"},
+        "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
+        "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":payment_id},
+    }
+    r=requests.post(
+        "https://api.yookassa.ru/v3/payments",
+        auth=(SHOP_ID,SECRET_KEY),
+        headers={"Idempotence-Key":payment_id,"Content-Type":"application/json"},
+        json=payload,
+        timeout=20,
+    )
+    try: data=r.json()
+    except Exception: data={"description":r.text}
+    if not r.ok:
+        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+    confirmation=(data.get("confirmation") or {}).get("confirmation_url")
+    if not confirmation:
+        raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
+    return data
+
+def get_payment(payment_id):
+    if not configured():
+        raise RuntimeError("ЮKassa не настроена.")
+    r=requests.get(
+        f"https://api.yookassa.ru/v3/payments/{payment_id}",
+        auth=(SHOP_ID,SECRET_KEY),
+        timeout=20,
+    )
+    try: data=r.json()
+    except Exception: data={"description":r.text}
+    if not r.ok:
+        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+    return data
