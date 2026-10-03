@@ -42,6 +42,14 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn("raise DataConflictError", self.source)
 
 
+class SettingsRecordSafetyTests(unittest.TestCase):
+    def test_settings_preserve_saas_record_identity(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn('if data.get("_saas_record_id"):', source)
+        self.assertIn('record_id = data.get("_saas_record_id")', source)
+        self.assertIn('payload["_saas_record_id"] = record_id', source)
+
+
 class ProductStockRegressionTests(unittest.TestCase):
     def test_product_edit_preserves_stock_and_price_fields(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
