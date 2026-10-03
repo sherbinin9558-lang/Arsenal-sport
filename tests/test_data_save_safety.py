@@ -209,7 +209,7 @@ class RoleBasedUiRegressionTests(unittest.TestCase):
         catalog = (root / "ui" / "catalog.py").read_text(encoding="utf-8")
         app = (root / "app.py").read_text(encoding="utf-8")
         self.assertIn("can_write", catalog)
-        self.assertIn('if can_write and st.button("📦 Импортировать товары"', catalog)
+        self.assertIn('if can_write and bulk_file and st.button("📦 Импортировать товары"', catalog)
         self.assertIn('if can_write and st.button("🗑️ Удалить"', catalog)
         self.assertIn('if can("write_data") and st.form_submit_button("📌 Добавить в workflow")', app)
         self.assertIn('disabled=not can("write_data")', app)
