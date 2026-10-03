@@ -360,6 +360,9 @@ def data_save(entity,rows):
     if payload: _rest_post("/rest/v1/app_data",token,payload)
 
 
+def _service_key():
+    return _cfg("SUPABASE_SERVICE_ROLE_KEY")
+
 # ==================== PLATFORM OWNER CONSOLE ====================
 def platform_admin_enabled():
     email = _cfg("SAAS_ADMIN_EMAIL").lower()
