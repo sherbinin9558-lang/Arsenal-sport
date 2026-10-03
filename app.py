@@ -564,6 +564,7 @@ if not require_saas_access():
 # Проверка результата оплаты после возврата с ЮKassa.
 try:
     payment_id=st.query_params.get("payment_id")
+    checkout_id=st.query_params.get("checkout_id")
     billing_return=st.query_params.get("billing")
     if billing_return == "tbank_return" and not st.session_state.get("tbank_verified"):
         from tbank_billing import get_state
@@ -578,8 +579,13 @@ try:
                 st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
             elif status:
                 st.info(f"Статус платежа Т‑Банк: {status}.")
-    elif payment_id and billing_return == "return" and not st.session_state.get("billing_verified"):
-        from billing import get_payment
+    elif (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
+        from billing import get_checkout_by_order, get_payment
+        if checkout_id:
+            checkout=get_checkout_by_order(str(checkout_id))
+            if not checkout or not checkout.get("provider_payment_id"):
+                raise RuntimeError("Checkout-сессия не найдена или не содержит ID платежа.")
+            payment_id=str(checkout["provider_payment_id"])
         payment=get_payment(payment_id)
         if payment.get("status") == "succeeded" and payment.get("paid"):
             plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
