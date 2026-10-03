@@ -62,22 +62,30 @@ class DataConflictError(RuntimeError):
 
 
 _AUTH_COOKIE = "saas_refresh_token"
+_AUTH_COOKIE_DAYS = 30
 
 def _auth_cookies():
     if CookieController is None:
         return None
     try:
         if "_saas_cookie_controller" not in st.session_state:
-            st.session_state["_saas_cookie_controller"] = CookieController()
+            st.session_state["_saas_cookie_controller"] = CookieController(key="saas_auth_cookie")
         return st.session_state["_saas_cookie_controller"]
     except Exception:
         return None
 
 def _read_refresh_token():
-    # Community Cloud filters many cookies from st.context.cookies.
-    # Read through the browser component first; use st.context only as a fallback.
+    # CookieController is browser-backed and may need one render cycle after a hard reload.
+    # getAll() is more reliable than a single-key read on a fresh Streamlit session.
     cookies = _auth_cookies()
     if cookies is not None:
+        try:
+            all_cookies = cookies.getAll() or {}
+            token = all_cookies.get(_AUTH_COOKIE)
+            if token:
+                return str(token)
+        except Exception:
+            pass
         try:
             token = cookies.get(_AUTH_COOKIE)
             if token:
@@ -98,9 +106,15 @@ def _persist_refresh_token(refresh_token):
     cookies = _auth_cookies()
     if cookies is not None:
         try:
-            cookies.set(_AUTH_COOKIE, str(refresh_token))
+            expiry = (datetime.now(timezone.utc) + timedelta(days=_AUTH_COOKIE_DAYS)).isoformat()
+            cookies.set(_AUTH_COOKIE, {"value": str(refresh_token), "expiry_date": expiry})
+            return
         except Exception:
-            pass
+            try:
+                cookies.set(_AUTH_COOKIE, str(refresh_token))
+                return
+            except Exception:
+                pass
 
 def _clear_refresh_token():
     cookies = _auth_cookies()
@@ -147,9 +161,9 @@ def _restore_session_from_cookie():
     # Give it one controlled second chance instead of showing the login screen.
     if not refresh_token:
         attempts = int(st.session_state.get("_saas_cookie_probe_attempts", 0))
-        if attempts < 1:
+        if attempts < 3:
             st.session_state["_saas_cookie_probe_attempts"] = attempts + 1
-            time.sleep(0.9)
+            time.sleep(0.6)
             refresh_token = _read_refresh_token()
     if not refresh_token:
         return False
