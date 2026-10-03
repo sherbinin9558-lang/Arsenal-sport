@@ -85,17 +85,20 @@ create policy "tenant members can read app data" on public.app_data
 for select using (public.is_tenant_member(tenant_id));
 
 drop policy if exists "tenant members can insert app data" on public.app_data;
-create policy "tenant members can insert app data" on public.app_data
-for insert with check (public.is_tenant_member(tenant_id));
+drop policy if exists "tenant writers can insert app data" on public.app_data;
+create policy "tenant writers can insert app data" on public.app_data
+for insert with check (public.is_tenant_writer(tenant_id));
 
 drop policy if exists "tenant members can update app data" on public.app_data;
-create policy "tenant members can update app data" on public.app_data
-for update using (public.is_tenant_member(tenant_id))
-with check (public.is_tenant_member(tenant_id));
+drop policy if exists "tenant writers can update app data" on public.app_data;
+create policy "tenant writers can update app data" on public.app_data
+for update using (public.is_tenant_writer(tenant_id))
+with check (public.is_tenant_writer(tenant_id));
 
 drop policy if exists "tenant members can delete app data" on public.app_data;
-create policy "tenant members can delete app data" on public.app_data
-for delete using (public.is_tenant_member(tenant_id));
+drop policy if exists "tenant writers can delete app data" on public.app_data;
+create policy "tenant writers can delete app data" on public.app_data
+for delete using (public.is_tenant_writer(tenant_id));
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -140,6 +143,20 @@ create table if not exists public.invitations (
 
 create index if not exists idx_invitations_tenant on public.invitations(tenant_id);
 create index if not exists idx_invitations_email on public.invitations(lower(email));
+
+create or replace function public.is_tenant_writer(target_tenant uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.memberships
+    where user_id = auth.uid()
+      and tenant_id = target_tenant
+      and role in ('owner','admin','manager','editor')
+  );
+$$;
 
 create or replace function public.is_tenant_admin(target_tenant uuid)
 returns boolean
