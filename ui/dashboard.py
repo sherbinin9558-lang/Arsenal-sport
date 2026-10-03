@@ -152,7 +152,7 @@ def render_dashboard(
         st.write(f'Отменённых заказов: **{om["cancelled"]}**')
         st.write(f'Сумма неотменённых заказов: **{om["amount"]:,.0f} ₽**'.replace(",", " "))
     with st.expander("🔗 Контент → продажи", expanded=True):
-        attribution = load_attribution()
+        attribution = attribution_loader()
         st.caption("Новый слой атрибуции не меняет существующие заказы и CRM. Он готовит связь публикация → товар → лид → заказ.")
         if not attribution:
             st.info("Пока нет событий атрибуции. Существующий контент и продажи продолжают работать без изменений.")
