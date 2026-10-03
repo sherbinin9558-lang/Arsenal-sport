@@ -112,6 +112,24 @@ class RlsSchemaRegressionTests(unittest.TestCase):
                 self.assertIn("set search_path = ''", block, rel)
                 pos += len("security definer")
 
+    def test_fresh_schema_contains_atomic_save_rpc(self):
+        self.assertIn("create or replace function public.save_app_data_batch", self.sql)
+        self.assertIn("security invoker", self.sql.lower())
+        self.assertIn("grant execute on function public.save_app_data_batch(uuid,text,jsonb) to authenticated;", self.sql)
+
+    def test_invitation_acceptance_does_not_overwrite_existing_membership(self):
+        self.assertIn("raise exception 'ALREADY_A_MEMBER';", self.sql)
+        self.assertNotIn("on conflict (user_id, tenant_id) do update set role=excluded.role", self.sql)
+
+    def test_sensitive_invitation_and_checkout_policies_are_authenticated_only(self):
+        required = (
+            'create policy "admins can cancel invitations" on public.invitations\nfor update to authenticated',
+            'create policy "admins can delete invitations" on public.invitations\nfor delete to authenticated',
+            'on public.billing_checkout_sessions for select to authenticated',
+        )
+        for fragment in required:
+            self.assertIn(fragment, self.sql)
+
     def test_member_role_rpc_cannot_demote_owner(self):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
         self.assertIn("if target_current_role = 'owner' then", self.sql)
