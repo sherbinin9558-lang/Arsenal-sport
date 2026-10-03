@@ -692,10 +692,20 @@ if tab_admin is not None:
         render_platform_admin()
 
 with tab_dashboard:
-    products = load_products()
-    plan = load_plan()
-    leads = load_leads()
-    orders = load_orders()
+    # Reuse one dashboard snapshot so opening MAX does not trigger another
+    # round of Supabase reads.
+    if "max_data_snapshot" not in st.session_state:
+        st.session_state["max_data_snapshot"] = {
+            "products": load_products(),
+            "plan": load_plan(),
+            "leads": load_leads(),
+            "orders": load_orders(),
+        }
+    snap = st.session_state["max_data_snapshot"]
+    products = snap["products"]
+    plan = snap["plan"]
+    leads = snap["leads"]
+    orders = snap["orders"]
     crm = crm_metrics(leads)
     om = order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"})
     cm = conversion_metrics(leads, orders)
@@ -1918,10 +1928,11 @@ def max_due_content(plan):
 def render_max():
     @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
     def dialog():
-        products = load_products()
-        plan = load_plan()
-        leads = load_leads()
-        orders = load_orders()
+        snap = st.session_state.get("max_data_snapshot", {})
+        products = snap.get("products", [])
+        plan = snap.get("plan", [])
+        leads = snap.get("leads", [])
+        orders = snap.get("orders", [])
         due, overdue = max_due_content(plan)
         crm = crm_metrics(leads)
         om = order_metrics(orders, ACTIVE_ORDER_STATUSES)
