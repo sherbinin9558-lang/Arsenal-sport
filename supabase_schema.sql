@@ -49,6 +49,10 @@ create index if not exists idx_app_data_tenant_entity on public.app_data(tenant_
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
 alter table public.subscriptions add column if not exists provider_payment_id text;
 alter table public.subscriptions add column if not exists provider_payment_method_id text;
+alter table public.subscriptions add column if not exists next_billing_at timestamptz;
+alter table public.subscriptions add column if not exists auto_renew boolean not null default false;
+alter table public.subscriptions add column if not exists cancel_at_period_end boolean not null default false;
+alter table public.subscriptions add column if not exists provider_subscription_id text;
 create index if not exists idx_subscriptions_provider_payment on public.subscriptions(provider_payment_id);
 create unique index if not exists idx_subscriptions_provider_payment_unique
 on public.subscriptions(provider, provider_payment_id)
@@ -356,10 +360,6 @@ check (role in ('admin','manager','editor','viewer'));
 
 
 -- Subscription renewal foundation (webhook/worker can use these fields later).
-alter table public.subscriptions add column if not exists auto_renew boolean not null default false;
-alter table public.subscriptions add column if not exists cancel_at_period_end boolean not null default false;
-alter table public.subscriptions add column if not exists next_billing_at timestamptz;
-alter table public.subscriptions add column if not exists provider_subscription_id text;
 create index if not exists idx_subscriptions_next_billing on public.subscriptions(next_billing_at);
 
 
