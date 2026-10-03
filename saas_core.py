@@ -467,6 +467,12 @@ def ensure_can_create(entity,current_count=0):
     if not feature_allowed(entity,current_count): raise ValueError(f"Лимит {entity} тарифа {tenant_plan().upper()} достигнут.")
     return True
 
+def _data_session_key(entity):
+    return f"_saas_data_record_ids_{entity}"
+
+def _new_record_id():
+    return hashlib.sha256(f"{time.time_ns()}:{os.urandom(16).hex()}".encode("utf-8")).hexdigest()[:24]
+
 def data_load(entity,default):
     if not saas_enabled():
         path=f"data/{tenant_id()}_{entity}.json"
@@ -476,9 +482,25 @@ def data_load(entity,default):
             # Production/demo tenants must never fall back to shared legacy files.
             # A tenant-specific local file is the only non-Supabase fallback.
             return default
+
     token=st.session_state.get("saas_access_token")
-    rows=_rest_get("/rest/v1/app_data",token,params={"select":"record_id,payload","tenant_id":f"eq.{tenant_id()}","entity":f"eq.{entity}"})
-    return [x.get("payload",{}) for x in rows] if rows else default
+    rows=_rest_get(
+        "/rest/v1/app_data",
+        token,
+        params={
+            "select":"record_id,payload,created_at",
+            "tenant_id":f"eq.{tenant_id()}",
+            "entity":f"eq.{entity}",
+            "order":"created_at.asc,record_id.asc",
+        },
+    )
+    if not rows:
+        st.session_state[_data_session_key(entity)] = []
+        return default
+
+    record_ids=[str(row.get("record_id")) for row in rows]
+    st.session_state[_data_session_key(entity)] = record_ids
+    return [row.get("payload",{}) for row in rows]
 
 def data_save(entity,rows):
     rows=rows if isinstance(rows,list) else []
@@ -488,10 +510,61 @@ def data_save(entity,rows):
         os.makedirs("data",exist_ok=True)
         with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f: json.dump(rows,f,ensure_ascii=False,indent=2)
         return
+
     token=st.session_state.get("saas_access_token")
-    _rest_delete("/rest/v1/app_data",token,params={"tenant_id":f"eq.{tenant_id()}","entity":f"eq.{entity}"})
-    payload=[{"tenant_id":tenant_id(),"entity":entity,"record_id":str(i),"payload":row} for i,row in enumerate(rows)]
-    if payload: _rest_post("/rest/v1/app_data",token,payload)
+    session_key=_data_session_key(entity)
+    baseline_ids=list(st.session_state.get(session_key, []))
+
+    # The old implementation deleted every row for the entity and then reinserted
+    # the whole list. That creates a destructive write window and allows one browser
+    # session to erase another session's changes. Keep stable record IDs instead:
+    # update/insert only the rows being saved and delete only rows that belonged to
+    # this session's last loaded snapshot.
+    if rows:
+        record_ids=baseline_ids[:len(rows)]
+        while len(record_ids)<len(rows):
+            record_ids.append(_new_record_id())
+
+        payload=[
+            {
+                "tenant_id":tenant_id(),
+                "entity":entity,
+                "record_id":record_ids[i],
+                "payload":row,
+            }
+            for i,row in enumerate(rows)
+        ]
+        _rest_post(
+            "/rest/v1/app_data",
+            token,
+            payload,
+        )
+
+        removed_ids=baseline_ids[len(rows):]
+        if removed_ids:
+            # Delete only records that were present in this session's previous
+            # snapshot and are no longer present in the saved list.
+            _rest_delete(
+                "/rest/v1/app_data",
+                token,
+                params={
+                    "tenant_id":f"eq.{tenant_id()}",
+                    "entity":f"eq.{entity}",
+                    "record_id":f"in.({','.join(removed_ids)})",
+                },
+            )
+        st.session_state[session_key]=record_ids
+        return
+
+    # Emptying an entity is an explicit "delete everything" operation. This is
+    # intentionally kept as a full delete because there are no surviving rows to
+    # preserve and it matches the caller's requested final state.
+    _rest_delete(
+        "/rest/v1/app_data",
+        token,
+        params={"tenant_id":f"eq.{tenant_id()}","entity":f"eq.{entity}"},
+    )
+    st.session_state[session_key]=[]
 
 
 def _service_key():
