@@ -38,7 +38,7 @@ from free_automation import (
     seven_day_plan,
     update_order,
 )
-from growth_engine import ai_summary
+from growth_engine import ai_summary, recommendations as growth_recommendations
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
 from saas_core import (
@@ -164,7 +164,7 @@ def render_max():
     st.caption("MAX не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
 
     try:
-        max_recs = recommendations(products, leads, orders, plan)
+        max_recs = growth_recommendations(products, leads, orders, plan)
     except Exception:
         max_recs = []
     if max_recs:
@@ -639,7 +639,7 @@ def render_max():
                 else:
                     value = st.text_input("Новое значение", key="auto_bulk_value_text")
                 if can("write_data") and st.button("✏️ Применить к выбранным", type="primary", key="auto_bulk_apply"):
-                    if not indexes:
+                    if not selected_indexes:
                         st.warning("Выберите хотя бы один товар.")
                     elif not str(value).strip():
                         st.warning("Значение не должно быть пустым.")
