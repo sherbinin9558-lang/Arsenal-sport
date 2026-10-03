@@ -10,7 +10,7 @@ try:
 except Exception:
     CookieController = None
 
-PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":1000,"users":3,"content":1000},"pro":{"products":10000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
+PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":10000,"users":3,"content":1000},"pro":{"products":10000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
 
 def _cfg(name, default=""):
     try: value=st.secrets.get(name, os.getenv(name, default))
@@ -402,7 +402,7 @@ def render_account_bar():
             st.rerun()
 
 def plan_catalog():
-    return {"starter":{"name":"STARTER","products":1000,"users":3,"description":"Для небольшого магазина"},"pro":{"name":"PRO","products":10000,"users":10,"description":"Для растущего бизнеса"},"business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"}}
+    return {"starter":{"name":"STARTER","products":10000,"users":3,"description":"Для небольшого магазина"},"pro":{"name":"PRO","products":10000,"users":10,"description":"Для растущего бизнеса"},"business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"}}
 
 def _service_key():
     try: value=st.secrets.get("SUPABASE_SERVICE_ROLE_KEY",os.getenv("SUPABASE_SERVICE_ROLE_KEY",""))
