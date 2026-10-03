@@ -321,64 +321,35 @@ def activate_paid_subscription(plan,provider_payment_id,payment_method_id=None,p
     key=_service_key()
     if not key or not saas_enabled():
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
+    if plan not in ("starter","pro","business"):
+        raise ValueError("Недопустимый тариф.")
+    if not provider_payment_id:
+        raise ValueError("provider_payment_id обязателен.")
     tid=str(tenant or tenant_id())
+    base=f"{_supabase_config()[0]}/rest/v1"
     headers={
         "apikey": key,
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
         "Prefer": "return=minimal",
     }
-    base=f"{_supabase_config()[0]}/rest/v1"
-
-    # Idempotency: the same provider payment must never extend a subscription twice.
-    existing=requests.get(
-        f"{base}/subscriptions",
+    response=requests.post(
+        f"{base}/rpc/activate_paid_subscription",
         headers=headers,
-        params={"tenant_id":f"eq.{tid}","provider":f"eq.{provider}","provider_payment_id":f"eq.{provider_payment_id}","limit":"1"},
+        json={
+            "p_tenant_id": tid,
+            "p_plan": plan,
+            "p_provider": str(provider),
+            "p_provider_payment_id": str(provider_payment_id),
+            "p_provider_payment_method_id": str(payment_method_id) if payment_method_id else None,
+        },
         timeout=20,
     )
-    if not existing.ok:
-        raise RuntimeError(existing.text)
-    if existing.json():
-        row=existing.json()[0]
-        st.session_state["saas_plan"]=row.get("plan",plan)
-        st.session_state["saas_tenant_status"]="active"
-        return True
-
-    now=datetime.now(timezone.utc)
-    period_end=now + timedelta(days=30)
-    sub={
-        "plan":plan,
-        "status":"active",
-        "provider":provider,
-        "provider_payment_id":str(provider_payment_id),
-        "current_period_end":period_end.isoformat().replace("+00:00","Z"),
-        "next_billing_at":period_end.isoformat().replace("+00:00","Z"),
-    }
-    if payment_method_id:
-        sub["provider_payment_method_id"]=payment_method_id
-    rr=requests.patch(
-        f"{base}/subscriptions",
-        headers=headers,
-        params={"tenant_id":f"eq.{tid}"},
-        json=sub,
-        timeout=20,
-    )
-    if not rr.ok:
-        raise RuntimeError(rr.text)
-    rr=requests.patch(
-        f"{base}/tenants",
-        headers=headers,
-        params={"id":f"eq.{tid}"},
-        json={"plan":plan,"status":"active"},
-        timeout=20,
-    )
-    if not rr.ok:
-        raise RuntimeError(rr.text)
+    if not response.ok:
+        raise RuntimeError(response.text)
     st.session_state["saas_plan"]=plan
     st.session_state["saas_tenant_status"]="active"
     return True
-
 
 def set_auto_renew(enabled):
     tid=tenant_id()
