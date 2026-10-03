@@ -469,10 +469,33 @@ def ensure_can_create(entity,current_count=0):
     return True
 
 def _data_session_key(entity):
-    return f"_saas_data_record_ids_{entity}"
+    return f"_saas_data_records_{entity}"
+
 
 def _new_record_id():
-    return hashlib.sha256(f"{time.time_ns()}:{os.urandom(16).hex()}".encode("utf-8")).hexdigest()[:24]
+    return hashlib.sha256(
+        f"{time.time_ns()}:{os.urandom(16).hex()}".encode("utf-8")
+    ).hexdigest()[:24]
+
+
+_INTERNAL_RECORD_KEY = "_saas_record_id"
+
+
+def _clean_payload(row):
+    if not isinstance(row, dict):
+        return row
+    return {k: v for k, v in row.items() if k != _INTERNAL_RECORD_KEY}
+
+
+def _prepare_loaded_payload(row):
+    payload = dict(row.get("payload") or {})
+    payload[_INTERNAL_RECORD_KEY] = str(row.get("record_id"))
+    return payload
+
+
+def _utc_now_iso():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
 
 def data_load(entity,default):
     if not saas_enabled():
@@ -489,19 +512,29 @@ def data_load(entity,default):
         "/rest/v1/app_data",
         token,
         params={
-            "select":"record_id,payload,created_at",
+            "select":"record_id,payload,created_at,updated_at",
             "tenant_id":f"eq.{tenant_id()}",
             "entity":f"eq.{entity}",
             "order":"created_at.asc,record_id.asc",
         },
     )
     if not rows:
-        st.session_state[_data_session_key(entity)] = []
+        st.session_state[_data_session_key(entity)] = {}
         return default
 
-    record_ids=[str(row.get("record_id")) for row in rows]
-    st.session_state[_data_session_key(entity)] = record_ids
-    return [row.get("payload",{}) for row in rows]
+    baseline = {}
+    loaded = []
+    for row in rows:
+        record_id = str(row.get("record_id"))
+        baseline[record_id] = {
+            "updated_at": row.get("updated_at"),
+            "created_at": row.get("created_at"),
+        }
+        loaded.append(_prepare_loaded_payload(row))
+
+    st.session_state[_data_session_key(entity)] = baseline
+    return loaded
+
 
 def data_save(entity,rows):
     rows=rows if isinstance(rows,list) else []
@@ -509,83 +542,70 @@ def data_save(entity,rows):
     if saas_enabled() and entity=="settings" and not can("settings"): raise PermissionError("Только администратор или владелец может менять настройки магазина.")
     if not saas_enabled():
         os.makedirs("data",exist_ok=True)
-        with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f: json.dump(rows,f,ensure_ascii=False,indent=2)
+        clean_rows=[_clean_payload(row) for row in rows]
+        with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f:
+            json.dump(clean_rows,f,ensure_ascii=False,indent=2)
         return
 
     token=st.session_state.get("saas_access_token")
     session_key=_data_session_key(entity)
-    baseline_ids=list(st.session_state.get(session_key, []))
+    baseline=dict(st.session_state.get(session_key, {}))
 
-    # The old implementation deleted every row for the entity and then reinserted
-    # the whole list. That creates a destructive write window and allows one browser
-    # session to erase another session's changes. Keep stable record IDs instead:
-    # update/insert only the rows being saved and delete only rows that belonged to
-    # this session's last loaded snapshot.
-    if rows:
-        record_ids=baseline_ids[:len(rows)]
-        while len(record_ids)<len(rows):
-            record_ids.append(_new_record_id())
+    current_ids=set()
+    existing_payload=[]
+    new_payload=[]
 
-        payload=[
-            {
-                "tenant_id":tenant_id(),
-                "entity":entity,
-                "record_id":record_ids[i],
-                "payload":row,
-            }
-            for i,row in enumerate(rows)
-        ]
-        existing_payload=[]
-        new_payload=[]
-        baseline_set=set(baseline_ids)
-        for item in payload:
-            if item["record_id"] in baseline_set:
-                existing_payload.append(item)
-            else:
-                new_payload.append(item)
+    for row in rows:
+        clean=_clean_payload(row)
+        record_id = str(row.get(_INTERNAL_RECORD_KEY) or _new_record_id()) if isinstance(row,dict) else _new_record_id()
+        current_ids.add(record_id)
+        item={
+            "tenant_id":tenant_id(),
+            "entity":entity,
+            "record_id":record_id,
+            "payload":clean,
+        }
+        if record_id in baseline:
+            existing_payload.append(item)
+        else:
+            new_payload.append(item)
 
-        # Existing records are patched individually because each row has its own JSON payload.
-        for item in existing_payload:
-            _rest_patch(
-                "/rest/v1/app_data",
-                token,
-                {"payload":item["payload"]},
-                params={
-                    "tenant_id":f"eq.{tenant_id()}",
-                    "entity":f"eq.{entity}",
-                    "record_id":f"eq.{item["record_id"]}",
-                },
-            )
+    # Reordering no longer changes record identity: the ID travels with the row.
+    for item in existing_payload:
+        _rest_patch(
+            "/rest/v1/app_data",
+            token,
+            {"payload":item["payload"],"updated_at":_utc_now_iso()},
+            params={
+                "tenant_id":f"eq.{tenant_id()}",
+                "entity":f"eq.{entity}",
+                "record_id":f"eq.{item["record_id"]}",
+            },
+        )
 
-        # New records use INSERT and therefore cannot collide with existing primary keys.
-        if new_payload:
-            _rest_post("/rest/v1/app_data", token, new_payload)
+    if new_payload:
+        _rest_post("/rest/v1/app_data", token, new_payload)
 
-        removed_ids=baseline_ids[len(rows):]
-        if removed_ids:
-            # Delete only records that were present in this session's previous
-            # snapshot and are no longer present in the saved list.
-            _rest_delete(
-                "/rest/v1/app_data",
-                token,
-                params={
-                    "tenant_id":f"eq.{tenant_id()}",
-                    "entity":f"eq.{entity}",
-                    "record_id":f"in.({','.join(removed_ids)})",
-                },
-            )
-        st.session_state[session_key]=record_ids
-        return
+    # Only records from this session's last snapshot can be considered deleted.
+    # This prevents one stale browser from deleting rows created by another browser.
+    removed_ids=set(baseline) - current_ids
+    if removed_ids:
+        _rest_delete(
+            "/rest/v1/app_data",
+            token,
+            params={
+                "tenant_id":f"eq.{tenant_id()}",
+                "entity":f"eq.{entity}",
+                "record_id":f"in.({",".join(sorted(removed_ids))})",
+            },
+        )
 
-    # Emptying an entity is an explicit "delete everything" operation. This is
-    # intentionally kept as a full delete because there are no surviving rows to
-    # preserve and it matches the caller's requested final state.
-    _rest_delete(
-        "/rest/v1/app_data",
-        token,
-        params={"tenant_id":f"eq.{tenant_id()}","entity":f"eq.{entity}"},
-    )
-    st.session_state[session_key]=[]
+    st.session_state[session_key] = {
+        item["record_id"]: {"updated_at":None,"created_at":None}
+        for item in existing_payload + new_payload
+    }
+
+
 
 
 def _service_key():
