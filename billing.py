@@ -101,7 +101,7 @@ def create_checkout(plan, tenant_id):
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
         "save_payment_method":True,
-        "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&payment_id={payment_id}"},
+        "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
         "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
     }
