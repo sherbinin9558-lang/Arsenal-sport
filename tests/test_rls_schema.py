@@ -72,7 +72,7 @@ class RlsSchemaRegressionTests(unittest.TestCase):
             self.sql,
         )
         self.assertIn(
-            'with check (public.is_tenant_admin(id));',
+            'with check ((select public.is_tenant_admin(id)));',
             self.sql,
         )
 
@@ -95,9 +95,22 @@ class RlsSchemaRegressionTests(unittest.TestCase):
         ]
         for rel in files:
             sql = (Path(__file__).resolve().parents[1] / rel).read_text(encoding="utf-8")
-            parts = sql.lower().split("security definer")
-            for part in parts[1:]:
-                self.assertIn("set search_path = ''", part[:120], rel)
+            lower = sql.lower()
+            pos = 0
+            while True:
+                pos = lower.find("security definer", pos)
+                if pos == -1:
+                    break
+                line_start = lower.rfind("\n", 0, pos) + 1
+                if lower[line_start:pos].lstrip().startswith("--"):
+                    pos += len("security definer")
+                    continue
+                fn_start = lower.rfind("create or replace function public.", 0, pos)
+                self.assertGreaterEqual(fn_start, 0, rel)
+                fn_end = lower.find("create or replace function public.", pos + len("security definer"))
+                block = lower[fn_start:] if fn_end == -1 else lower[fn_start:fn_end]
+                self.assertIn("set search_path = ''", block, rel)
+                pos += len("security definer")
 
     def test_member_role_rpc_cannot_demote_owner(self):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
