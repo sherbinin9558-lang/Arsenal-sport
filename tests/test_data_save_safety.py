@@ -52,3 +52,11 @@ class ProductStockRegressionTests(unittest.TestCase):
         self.assertIn('product.get("total_stock", product.get("stock"))', source)
         source = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
         self.assertIn('p.get("total_stock", p.get("stock", 0))', source)
+
+
+class OrderSafetyRegressionTests(unittest.TestCase):
+    def test_order_identity_and_status_are_validated(self):
+        source = (Path(__file__).resolve().parents[1] / "free_automation.py").read_text(encoding="utf-8")
+        self.assertIn("ORDER_STATUSES =", source)
+        self.assertIn('if "id" in changes:', source)
+        self.assertIn('if "status" in changes and changes["status"] not in ORDER_STATUSES:', source)
