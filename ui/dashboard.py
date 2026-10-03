@@ -94,7 +94,7 @@ def render_dashboard(
                             st.rerun()
                         except Exception as e:
                             st.error(f"Не удалось создать товар: {e}")
-        else:
+    else:
         d1, d2, d3, d4, d5 = st.columns(5)
         d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
         d2.metric("Заявки", crm.get("total", 0))
