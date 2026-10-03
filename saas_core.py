@@ -1,6 +1,6 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
-import hashlib, json, os, time
+import copy, hashlib, json, os, time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
@@ -606,6 +606,25 @@ def _data_session_key(entity):
     return f"_saas_data_records_{entity}"
 
 
+# Streamlit re-runs the whole script on every click and the page asks for the same
+# table many times per run. A very short per-session cache keeps those repeated
+# reads to one request. It is cleared on every save, so a user always sees their
+# own changes; the optimistic-concurrency check in data_save still compares against
+# the version loaded from the database, so other people's edits are never overwritten.
+_LOAD_CACHE_KEY = "_saas_data_load_cache"
+_LOAD_CACHE_TTL = 3.0
+
+
+def _invalidate_data_cache(entity=None):
+    cache = st.session_state.get(_LOAD_CACHE_KEY)
+    if not cache:
+        return
+    if entity is None:
+        cache.clear()
+    else:
+        cache.pop((tenant_id(), entity), None)
+
+
 def _new_record_id():
     return hashlib.sha256(
         f"{time.time_ns()}:{os.urandom(16).hex()}".encode("utf-8")
@@ -641,6 +660,12 @@ def data_load(entity,default):
             # A tenant-specific local file is the only non-Supabase fallback.
             return default
 
+    cache = st.session_state.setdefault(_LOAD_CACHE_KEY, {})
+    cache_key = (tenant_id(), entity)
+    hit = cache.get(cache_key)
+    if hit and time.monotonic() - hit[0] < _LOAD_CACHE_TTL:
+        return default if hit[1] is None else copy.deepcopy(hit[1])
+
     token=st.session_state.get("saas_access_token")
     rows=_rest_get(
         "/rest/v1/app_data",
@@ -654,6 +679,7 @@ def data_load(entity,default):
     )
     if not rows:
         st.session_state[_data_session_key(entity)] = {}
+        cache[cache_key] = (time.monotonic(), None)
         return default
 
     baseline = {}
@@ -668,6 +694,7 @@ def data_load(entity,default):
         loaded.append(_prepare_loaded_payload(row))
 
     st.session_state[_data_session_key(entity)] = baseline
+    cache[cache_key] = (time.monotonic(), copy.deepcopy(loaded))
     return loaded
 
 
@@ -682,6 +709,7 @@ def data_save(entity,rows):
             json.dump(clean_rows,f,ensure_ascii=False,indent=2)
         return
 
+    _invalidate_data_cache(entity)
     token=st.session_state.get("saas_access_token")
     session_key=_data_session_key(entity)
     baseline=dict(st.session_state.get(session_key, {}))
@@ -807,6 +835,7 @@ def data_save(entity,rows):
 
     # Re-read the entity after a successful save. This refreshes the real
     # updated_at values and keeps stable IDs attached to their rows.
+    _invalidate_data_cache(entity)
     data_load(entity,[])
 
 
