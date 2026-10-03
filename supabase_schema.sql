@@ -45,6 +45,8 @@ create table if not exists public.app_data (
 );
 
 create index if not exists idx_memberships_tenant on public.memberships(tenant_id);
+create index if not exists idx_invitations_invited_by on public.invitations(invited_by);
+create index if not exists idx_tenants_owner_user on public.tenants(owner_user_id);
 create index if not exists idx_app_data_tenant_entity on public.app_data(tenant_id, entity);
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
 alter table public.subscriptions add column if not exists provider_payment_id text;
@@ -165,35 +167,35 @@ alter table public.app_data enable row level security;
 
 drop policy if exists "tenant members can read tenants" on public.tenants;
 create policy "tenant members can read tenants" on public.tenants
-for select using (public.is_tenant_member(id));
+for select to authenticated using ((select public.is_tenant_member(id)));
 
 drop policy if exists "users can read own memberships" on public.memberships;
 create policy "users can read own memberships" on public.memberships
-for select using (user_id = auth.uid());
+for select to authenticated using (user_id = (select auth.uid()));
 
 drop policy if exists "tenant members can read subscription" on public.subscriptions;
 create policy "tenant members can read subscription" on public.subscriptions
-for select using (public.is_tenant_member(tenant_id));
+for select to authenticated using ((select public.is_tenant_member(tenant_id)));
 
 drop policy if exists "tenant members can read app data" on public.app_data;
 create policy "tenant members can read app data" on public.app_data
-for select using (public.is_tenant_member(tenant_id));
+for select to authenticated using ((select public.is_tenant_member(tenant_id)));
 
 drop policy if exists "tenant members can insert app data" on public.app_data;
 drop policy if exists "tenant writers can insert app data" on public.app_data;
 create policy "tenant writers can insert app data" on public.app_data
-for insert with check (public.is_tenant_writer(tenant_id));
+for insert to authenticated with check ((select public.is_tenant_writer(tenant_id)));
 
 drop policy if exists "tenant members can update app data" on public.app_data;
 drop policy if exists "tenant writers can update app data" on public.app_data;
 create policy "tenant writers can update app data" on public.app_data
-for update using (public.is_tenant_writer(tenant_id))
-with check (public.is_tenant_writer(tenant_id));
+for update to authenticated using ((select public.is_tenant_writer(tenant_id)))
+with check ((select public.is_tenant_writer(tenant_id)));
 
 drop policy if exists "tenant members can delete app data" on public.app_data;
 drop policy if exists "tenant writers can delete app data" on public.app_data;
 create policy "tenant writers can delete app data" on public.app_data
-for delete using (public.is_tenant_writer(tenant_id));
+for delete to authenticated using ((select public.is_tenant_writer(tenant_id)));
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -279,7 +281,7 @@ alter table public.invitations enable row level security;
 
 drop policy if exists "members can read team memberships" on public.memberships;
 create policy "members can read team memberships" on public.memberships
-for select using (public.is_tenant_member(tenant_id));
+for select to authenticated using ((select public.is_tenant_member(tenant_id)));
 
 drop policy if exists "admins can read invitations" on public.invitations;
 create policy "admins can read invitations" on public.invitations
