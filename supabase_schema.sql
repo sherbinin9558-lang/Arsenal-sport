@@ -182,3 +182,23 @@ drop policy if exists "admins can delete invitations" on public.invitations;
 create policy "admins can delete invitations" on public.invitations
 for delete using (public.is_tenant_admin(tenant_id));
 
+
+
+create table if not exists public.billing_checkout_sessions (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  provider text not null,
+  provider_order_id text not null,
+  provider_payment_id text,
+  plan text not null,
+  status text not null default 'created',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(provider, provider_order_id)
+);
+create index if not exists idx_billing_checkout_tenant on public.billing_checkout_sessions(tenant_id);
+create index if not exists idx_billing_checkout_payment on public.billing_checkout_sessions(provider_payment_id);
+alter table public.billing_checkout_sessions enable row level security;
+create policy "tenant members can read own checkout sessions"
+on public.billing_checkout_sessions for select
+using (public.is_tenant_member(tenant_id));
