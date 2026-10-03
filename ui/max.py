@@ -38,6 +38,7 @@ from free_automation import (
 )
 from growth_engine import ai_summary
 from max_features import product_search
+from ai_seller import ai_sales_reply, sales_followup
 from saas_core import (
     activate_paid_subscription,
     can,
