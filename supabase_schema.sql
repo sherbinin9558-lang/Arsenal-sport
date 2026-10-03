@@ -69,7 +69,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path = public
-as $
+as $activate_paid_subscription$
 declare
   current_sub public.subscriptions;
 begin
@@ -137,7 +137,7 @@ begin
 
   return true;
 end;
-$;
+$activate_paid_subscription$;
 
 revoke all on function public.activate_paid_subscription(
   uuid,text,text,text,text
