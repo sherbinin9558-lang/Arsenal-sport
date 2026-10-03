@@ -1,0 +1,40 @@
+import ast
+import unittest
+from pathlib import Path
+
+
+SAAS_CORE = Path(__file__).resolve().parents[1] / "saas_core.py"
+
+
+class DataSaveSafetyRegressionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = SAAS_CORE.read_text(encoding="utf-8")
+        cls.tree = ast.parse(cls.source)
+
+    def test_data_save_preflights_versions_before_mutations(self):
+        fn = next(
+            node for node in self.tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "data_save"
+        )
+        calls = []
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                calls.append((node.func.id, node.lineno))
+        get_lines = [line for name, line in calls if name == "_rest_get"]
+        mutation_lines = [
+            line for name, line in calls
+            if name in {"_rest_patch", "_rest_post", "_rest_delete"}
+        ]
+        self.assertTrue(get_lines, "data_save must preflight current versions")
+        self.assertTrue(mutation_lines, "data_save must contain protected mutations")
+        self.assertLess(min(get_lines), min(mutation_lines))
+
+    def test_preflight_raises_conflict_on_version_mismatch(self):
+        self.assertIn("current_versions", self.source)
+        self.assertIn("expected != actual", self.source)
+        self.assertIn("raise DataConflictError", self.source)
+
+
+if __name__ == "__main__":
+    unittest.main()
