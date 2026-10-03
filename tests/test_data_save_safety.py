@@ -77,9 +77,14 @@ class OrderSafetyRegressionTests(unittest.TestCase):
 
 
 class CrmSafetyRegressionTests(unittest.TestCase):
+    def test_lead_immutable_fields_are_rejected(self):
+        from crm_core import LEAD_IMMUTABLE_FIELDS
+        self.assertEqual(LEAD_IMMUTABLE_FIELDS, frozenset({"id", "created_at"}))
+
     def test_lead_identity_and_status_are_validated(self):
         source = (Path(__file__).resolve().parents[1] / "crm_core.py").read_text(encoding="utf-8")
-        self.assertIn('if "id" in changes:', source)
+        self.assertIn("LEAD_IMMUTABLE_FIELDS =", source)
+        self.assertIn("created_at", source)
         self.assertIn('if "status" in changes and changes["status"] not in STATUSES:', source)
 
 
