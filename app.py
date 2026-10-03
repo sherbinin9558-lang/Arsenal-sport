@@ -1844,7 +1844,7 @@ def render_max():
                     col.caption(f"Каталог: до {info['products']:,} · команда: до {info['users']}".replace(",", " "))
                     if key == tenant_plan():
                         col.success("Текущий тариф")
-                    elif st.button(f"Выбрать {info['name']}", key=f"choose_plan_{key}", use_container_width=True):
+                    elif can("billing") and st.button(f"Выбрать {info['name']}", key=f"choose_plan_{key}", use_container_width=True):
                         request_plan_change(key)
                         st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
             requested=st.session_state.get("requested_plan")
@@ -1856,14 +1856,33 @@ def render_max():
 
             st.markdown("---")
             st.markdown("### 👥 Команда магазина")
-            from saas_core import current_role, team_members, team_invitations, create_team_invitation, limit
+            from saas_core import current_role, team_members, team_invitations, create_team_invitation, set_member_role, limit
             role=current_role()
             role_names={"owner":"Владелец","admin":"Администратор","manager":"Менеджер","editor":"Редактор","viewer":"Наблюдатель"}
             st.write(f"**Ваша роль:** {role_names.get(role, role)}")
             members=team_members()
             st.caption(f"Участников: {len(members)} / {limit('users')}")
             for member in members:
-                st.write(f"• {member.get('user_id','—')} · **{role_names.get(member.get('role','viewer'), member.get('role','viewer'))}**")
+                member_id=str(member.get("user_id",""))
+                member_role=member.get("role","viewer")
+                if role in ("owner","admin") and member_id != str(st.session_state.get("saas_user_id","")) and member_role != "owner":
+                    rc1,rc2,rc3=st.columns([2,1,1])
+                    with rc1:
+                        st.write(f"• {member_id}")
+                    with rc2:
+                        new_role=st.selectbox("Роль",["admin","manager","editor","viewer"],
+                                              index=["admin","manager","editor","viewer"].index(member_role) if member_role in ["admin","manager","editor","viewer"] else 3,
+                                              format_func=lambda x: role_names[x],key=f"member_role_{member_id}")
+                    with rc3:
+                        if st.button("Сохранить",key=f"member_role_save_{member_id}"):
+                            try:
+                                set_member_role(member_id,new_role)
+                                st.success("Роль обновлена.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Не удалось изменить роль: {e}")
+                else:
+                    st.write(f"• {member_id} · **{role_names.get(member_role, member_role)}**")
             if role in ("owner","admin"):
                 with st.expander("➕ Пригласить сотрудника"):
                     invite_email=st.text_input("Email сотрудника", key="team_invite_email")
@@ -1895,7 +1914,7 @@ def render_max():
                 st.caption("Доступны ЮKassa и Т‑Банк. Секретные ключи хранятся только в Secrets.")
                 try:
                     from tbank_billing import create_checkout as tbank_create_checkout, plan_price as tbank_plan_price
-                    if st.button("Оплатить через Т‑Банк", key="pay_tbank", use_container_width=True):
+                    if can("billing") and st.button("Оплатить через Т‑Банк", key="pay_tbank", use_container_width=True):
                         plan_for_payment=st.session_state.get("requested_plan") or tenant_plan()
                         if plan_for_payment not in ("starter","pro","business"):
                             plan_for_payment="starter"
@@ -1919,7 +1938,7 @@ def render_max():
                         price=plan_price(pkey)
                         st.markdown(f"**{pinfo['name']}**")
                         st.caption(f"{price:.2f} ₽ / месяц" if price else "Цена не настроена")
-                        if st.button(f"Оплатить {pinfo['name']}", key=f"pay_{pkey}", use_container_width=True):
+                        if can("billing") and st.button(f"Оплатить {pinfo['name']}", key=f"pay_{pkey}", use_container_width=True):
                             try:
                                 payment=create_checkout(pkey, st.session_state.get("saas_tenant_id"))
                                 st.session_state["billing_payment_id"]=payment.get("id")
