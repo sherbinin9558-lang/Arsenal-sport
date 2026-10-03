@@ -1719,7 +1719,7 @@ def render_max():
         st.markdown("---")
         section = st.radio(
             "Раздел MAX",
-            ["Обзор", "Аккаунт", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
+            ["Обзор", "Аккаунт", "Настройки", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
             horizontal=True,
             key="max_section",
         )
@@ -1770,6 +1770,31 @@ def render_max():
             p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
             p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
             st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
+        elif section == "Настройки":
+            st.subheader("⚙️ Настройки магазина")
+            from saas_core import data_load, data_save
+            settings=data_load("settings", [])
+            current=settings[0] if settings and isinstance(settings[0], dict) else {}
+            with st.form("max_store_settings"):
+                business=st.selectbox("Тип бизнеса", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"],
+                                      index=["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"].index(current.get("business_type","Спортивный магазин"))
+                                      if current.get("business_type","Спортивный магазин") in ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"] else 0)
+                city=st.text_input("Город / регион", value=current.get("city",""))
+                telegram=st.text_input("Telegram магазина", value=current.get("telegram",""))
+                instagram=st.text_input("Instagram", value=current.get("instagram",""))
+                shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"],
+                                      index=["По России","По региону","Самовывоз","Другое"].index(current.get("shipping","По России"))
+                                      if current.get("shipping","По России") in ["По России","По региону","Самовывоз","Другое"] else 0)
+                if st.form_submit_button("💾 Сохранить настройки", type="primary"):
+                    data_save("settings",[{"business_type":business,"city":city.strip(),"telegram":telegram.strip(),
+                                           "instagram":instagram.strip(),"shipping":shipping,"onboarding_complete":True}])
+                    st.success("Настройки сохранены.")
+                    st.rerun()
+
+            st.markdown("---")
+            st.markdown("### Подключения")
+            st.info("Telegram, Instagram и VK подключаются отдельными интеграциями. Секретные токены хранятся в Secrets, а не в коде.")
+
         elif section == "AI-продавец":
             st.subheader("AI-продавец по каталогу")
             q = st.text_input(
