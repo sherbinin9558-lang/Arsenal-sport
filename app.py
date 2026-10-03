@@ -506,7 +506,7 @@ def render_platform_admin():
             "Создан": str(u.get("created_at",""))[:10],
         })
     st.dataframe(account_rows, use_container_width=True, hide_index=True)
-    st.caption("Доступ к этой панели определяется секретом SAAS_ADMIN_EMAIL и service-role ключом. Обычные владельцы магазинов её не видят.")
+    st.caption("Вкладка доступна только владельцу платформы из SAAS_ADMIN_EMAIL. Service-role ключ нужен для загрузки и управления данными.")
 
 def render_max():
     @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
@@ -1385,15 +1385,19 @@ def _max_launcher_fragment():
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
-tab_labels = [
+base_tab_labels = [
     "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
     "◷ План", "◉ Аналитика", "⚙ Настройки"
 ]
-if platform_admin_enabled():
-    tab_labels.append("♛ Админ")
+_is_platform_admin = platform_admin_enabled()
+tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
 _tabs = st.tabs(tab_labels)
-tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[:8]
-tab_admin = _tabs[8] if len(_tabs) > 8 else None
+if _is_platform_admin:
+    tab_admin = _tabs[0]
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[1:9]
+else:
+    tab_admin = None
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[:8]
 
 # ========== DASHBOARD ==========
 if tab_admin is not None:
