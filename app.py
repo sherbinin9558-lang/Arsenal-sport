@@ -433,7 +433,6 @@ with st.sidebar:
         st.info("📡 Telegram не настроен")
     st.markdown("---")
     st.caption(f"Сегодня · {datetime.date.today().strftime('%d.%m.%Y')}")
-    render_account_bar()
 
 if dark_mode:
     bg_css = "body {background:#0b0e13;}"
