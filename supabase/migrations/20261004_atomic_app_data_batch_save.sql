@@ -10,7 +10,7 @@ create or replace function public.save_app_data_batch(
 )
 returns boolean
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $save_app_data_batch$
 declare
