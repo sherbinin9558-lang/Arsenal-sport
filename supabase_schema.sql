@@ -45,7 +45,6 @@ create table if not exists public.app_data (
 );
 
 create index if not exists idx_memberships_tenant on public.memberships(tenant_id);
-create index if not exists idx_invitations_invited_by on public.invitations(invited_by);
 create index if not exists idx_tenants_owner_user on public.tenants(owner_user_id);
 create index if not exists idx_app_data_tenant_entity on public.app_data(tenant_id, entity);
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
@@ -240,6 +239,7 @@ create table if not exists public.invitations (
 
 create index if not exists idx_invitations_tenant on public.invitations(tenant_id);
 create index if not exists idx_invitations_email on public.invitations(lower(email));
+create index if not exists idx_invitations_invited_by on public.invitations(invited_by);
 
 create or replace function public.is_tenant_writer(target_tenant uuid)
 returns boolean
