@@ -7,6 +7,7 @@ from saas_core import data_load, data_save
 
 LEADS_FILE = Path("leads.json")
 STATUSES = ["Новый", "В работе", "Ожидает ответа", "Заказ оформлен", "Завершён", "Отменён"]
+LEAD_IMMUTABLE_FIELDS = frozenset({"id", "created_at"})
 
 def load_leads(): return data_load("leads", [])
 
@@ -24,8 +25,10 @@ def create_lead(name="", contact="", source="Website", message="", product="", p
     return lead
 
 def update_lead(lead_id, **changes):
-    if "id" in changes:
-        raise ValueError("Идентификатор лида нельзя изменять.")
+    protected = LEAD_IMMUTABLE_FIELDS.intersection(changes)
+    if protected:
+        field = sorted(protected)[0]
+        raise ValueError(f"Поле лида нельзя изменять: {field}.")
     if "status" in changes and changes["status"] not in STATUSES:
         raise ValueError(f"Недопустимый статус лида: {changes['status']}")
     leads = load_leads()
