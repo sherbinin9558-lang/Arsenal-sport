@@ -374,8 +374,9 @@ $$;
 -- Owners/admins may update their tenant profile; ordinary members remain read-only.
 drop policy if exists "tenant admins can update tenant" on public.tenants;
 create policy "tenant admins can update tenant" on public.tenants
-for update using (public.is_tenant_admin(id))
-with check (public.is_tenant_admin(id));
+for update to authenticated
+using ((select public.is_tenant_admin(id)))
+with check ((select public.is_tenant_admin(id)));
 
 -- Keep invitation roles constrained at database level.
 alter table public.invitations drop constraint if exists invitations_role_check;
