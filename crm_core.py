@@ -2,21 +2,14 @@
 import json
 from pathlib import Path
 from datetime import datetime
+from saas_core import data_load, data_save
 
 LEADS_FILE = Path("leads.json")
 STATUSES = ["Новый", "В работе", "Ожидает ответа", "Заказ оформлен", "Завершён", "Отменён"]
 
-def load_leads():
-    if not LEADS_FILE.exists():
-        return []
-    try:
-        data = json.loads(LEADS_FILE.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
+def load_leads(): return data_load("leads", [])
 
-def save_leads(leads):
-    LEADS_FILE.write_text(json.dumps(leads, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_leads(leads): data_save("leads", leads)
 
 def create_lead(name="", contact="", source="Website", message="", product="", product_id="", content_id="", order_id=""):
     leads = load_leads()
