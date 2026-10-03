@@ -636,7 +636,15 @@ def _utc_now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00","Z")
 
 
+def _validate_data_entity(entity):
+    entity = str(entity or "").strip()
+    if not entity or not entity.replace("_", "").replace("-", "").isalnum():
+        raise ValueError("Недопустимое имя сущности данных.")
+    return entity
+
+
 def data_load(entity,default):
+    entity = _validate_data_entity(entity)
     if not saas_enabled():
         path=f"data/{tenant_id()}_{entity}.json"
         try:
@@ -677,7 +685,11 @@ def data_load(entity,default):
 
 
 def data_save(entity,rows):
-    rows=rows if isinstance(rows,list) else []
+    entity = _validate_data_entity(entity)
+    if not isinstance(rows, list):
+        raise ValueError("Данные должны передаваться списком записей.")
+    if any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Каждая запись данных должна быть объектом.")
     if saas_enabled() and not can("write_data"): raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
     if saas_enabled() and entity=="settings" and not can("settings"): raise PermissionError("Только администратор или владелец может менять настройки магазина.")
     if not saas_enabled():
