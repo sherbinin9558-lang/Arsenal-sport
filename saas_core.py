@@ -246,7 +246,7 @@ def login_ui():
             else:
                 try:
                     with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
-                    _establish_session(result); st.rerun()
+                    _establish_session(result); time.sleep(0.8); st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
