@@ -33,14 +33,9 @@ def _match(text, product):
                 (name and name in hay) or (title and title in hay))
 
 def _stock(product):
-    stock = product.get("stock_by_size") or {}
-    try:
-        return sum(max(0, int(v or 0)) for v in stock.values())
-    except Exception:
-        try:
-            return max(0, int(product.get("total_stock") or 0))
-        except Exception:
-            return 0
+    from inventory_core import stock_info
+    qty, _, known = stock_info(product)
+    return qty if known and qty is not None else 0
 
 def funnel(leads, orders, plan, products):
     published = sum(1 for x in plan if x.get("status") == "Опубликовано")
