@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from datetime import datetime
+import uuid
 from saas_core import data_load, data_save
 
 LEADS_FILE = Path("leads.json")
@@ -13,9 +14,8 @@ def save_leads(leads): data_save("leads", leads)
 
 def create_lead(name="", contact="", source="Website", message="", product="", product_id="", content_id="", order_id=""):
     leads = load_leads()
-    next_id = max([int(x.get("id", 0)) for x in leads if str(x.get("id", "")).isdigit()] or [0]) + 1
     lead = {
-        "id": next_id, "name": name, "contact": contact, "source": source,
+        "id": uuid.uuid4().hex, "name": name, "contact": contact, "source": source,
         "message": message, "product": product, "product_id": product_id,
         "status": "Новый", "content_id": str(content_id or ""), "order_id": str(order_id or ""), "created_at": datetime.now().isoformat(timespec="minutes")
     }
