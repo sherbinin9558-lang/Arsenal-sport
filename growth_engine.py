@@ -7,6 +7,7 @@ when the available data is insufficient.
 """
 from collections import Counter, defaultdict
 import re
+from inventory_core import stock_info
 
 CHANNELS = ("Instagram", "Telegram", "VK")
 FORMATS = ("Reels", "Пост", "Stories", "Карусель")
@@ -33,7 +34,6 @@ def _match(text, product):
                 (name and name in hay) or (title and title in hay))
 
 def _stock(product):
-    from inventory_core import stock_info
     qty, _, known = stock_info(product)
     return qty if known and qty is not None else 0
 
