@@ -412,7 +412,20 @@ if not require_saas_access():
 try:
     payment_id=st.query_params.get("payment_id")
     billing_return=st.query_params.get("billing")
-    if payment_id and billing_return == "return" and not st.session_state.get("billing_verified"):
+    if billing_return == "tbank_return" and not st.session_state.get("tbank_verified"):
+        from tbank_billing import get_state
+        pid=st.session_state.get("tbank_payment_id")
+        if pid:
+            payment=get_state(pid)
+            status=payment.get("Status")
+            plan=st.session_state.get("tbank_plan")
+            if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business"):
+                activate_paid_subscription(plan,str(pid),None,provider="tbank",tenant=st.session_state.get("saas_tenant_id"))
+                st.session_state["tbank_verified"]=True
+                st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
+            elif status:
+                st.info(f"Статус платежа Т‑Банк: {status}.")
+    elif payment_id and billing_return == "return" and not st.session_state.get("billing_verified"):
         from billing import get_payment
         payment=get_payment(payment_id)
         if payment.get("status") == "succeeded" and payment.get("paid"):
@@ -420,7 +433,7 @@ try:
             tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
             if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
                 method_id=(payment.get("payment_method") or {}).get("id")
-                activate_paid_subscription(plan,payment_id,method_id)
+                activate_paid_subscription(plan,payment_id,method_id,provider="yookassa",tenant=tenant)
                 st.session_state["billing_verified"]=True
                 st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
         elif payment.get("status") == "canceled":
@@ -1799,7 +1812,7 @@ def render_max():
             st.write(f"**Провайдер оплаты:** {sub.get('provider') or 'не подключён'}")
             if sub.get("current_period_end"):
                 st.write(f"**Период до:** {sub['current_period_end']}")
-            st.caption("Оплата пока не списывается. Кнопки ниже фиксируют выбранный тариф и подготовлены для подключения платёжного провайдера.")
+            st.caption("Оплата проводится через подключённый платёжный провайдер. Тариф активируется только после подтверждения платежа.")
             plans=plan_catalog()
             b1,b2,b3=st.columns(3)
             for col,(key,info) in zip((b1,b2,b3),plans.items()):
