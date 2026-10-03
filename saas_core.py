@@ -17,6 +17,9 @@ SUPABASE_ANON_KEY=_cfg("SUPABASE_ANON_KEY")
 
 def saas_enabled(): return bool(SUPABASE_URL and SUPABASE_ANON_KEY)
 
+def demo_mode_enabled():
+    return _cfg("DEMO_MODE","false").lower() in ("1","true","yes","on")
+
 def _headers(token=None):
     h={"apikey":SUPABASE_ANON_KEY,"Content-Type":"application/json"}
     if token: h["Authorization"]=f"Bearer {token}"
@@ -119,7 +122,8 @@ def login_ui():
                 st.error("Введите email и пароль.")
             else:
                 try:
-                    result=sign_in(email.strip(),password)
+                    with st.spinner("Проверяем аккаунт…"):
+                        result=sign_in(email.strip(),password)
                     token=result.get("access_token")
                     user=result.get("user") or get_user(token)
                     tenant=current_tenant(token,user.get("id"))
@@ -141,7 +145,8 @@ def login_ui():
             elif not store.strip(): st.error("Укажите название магазина.")
             else:
                 try:
-                    result=sign_up(email.strip(),password,store.strip())
+                    with st.spinner("Создаём магазин…"):
+                        result=sign_up(email.strip(),password,store.strip())
                     token=result.get("access_token")
                     if not token:
                         st.success("Аккаунт создан. Проверьте почту и подтвердите email. После подтверждения войдите — магазин и тариф Trial создаются автоматически.")
@@ -159,7 +164,8 @@ def login_ui():
         st.caption("На почту придёт ссылка для смены пароля.")
         if st.button("Отправить ссылку",type="primary",use_container_width=True,key="saas_recovery"):
             try:
-                request_password_reset(email)
+                with st.spinner("Отправляем письмо…"):
+                    request_password_reset(email)
                 st.success("Если аккаунт существует, письмо для восстановления отправлено.")
             except Exception as e:
                 st.error(f"Не удалось отправить письмо: {e}")
@@ -393,12 +399,21 @@ def render_onboarding():
 
 def require_saas_access():
     if not saas_enabled():
-        if not st.session_state.get("saas_demo"):
-            st.session_state["saas_demo"]=True
-            demo={"id":"demo-user","email":"demo@example.com","tenant_id":"demo-tenant","tenant_name":"Demo Store","plan":"pro","status":"active"}
-            _set_identity(demo,{"id":"demo-tenant","name":"Demo Store","plan":"pro","status":"active"})
-        render_account_bar()
-        return True
+        if demo_mode_enabled():
+            if not st.session_state.get("saas_demo"):
+                st.session_state["saas_demo"]=True
+                demo={"id":"demo-user","email":"demo@example.com","tenant_id":"demo-tenant","tenant_name":"Demo Store","plan":"pro","status":"active"}
+                _set_identity(demo,{"id":"demo-tenant","name":"Demo Store","plan":"pro","status":"active"})
+            render_account_bar()
+            return True
+        st.markdown(
+            '<div class="dashboard-hero"><div class="dashboard-hero-kicker">PRODUCTION SETUP</div>'
+            '<div class="dashboard-hero-title">Подключите Supabase, чтобы открыть платформу.</div>'
+            '<div class="dashboard-hero-text">Для коммерческого режима нужны SUPABASE_URL и SUPABASE_ANON_KEY. После подключения пользователи смогут регистрировать магазины, входить по паролю и работать изолированно по tenant.</div></div>',
+            unsafe_allow_html=True,
+        )
+        st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit.")
+        return False
     token=st.session_state.get("saas_access_token")
     if not token:
         login_ui()
