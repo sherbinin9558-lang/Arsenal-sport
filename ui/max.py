@@ -402,25 +402,31 @@ def render_max():
         st.markdown("---")
     elif section == "Настройки":
         st.subheader("⚙️ Настройки магазина")
+        can_settings = can("settings")
         from saas_core import data_load, data_save
         settings=data_load("settings", [])
         current=settings[0] if settings and isinstance(settings[0], dict) else {}
         with st.form("max_store_settings"):
-            business=st.selectbox("Тип бизнеса", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"],
+            business=st.selectbox("Тип бизнеса", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"], disabled=not can_settings,
                                   index=["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"].index(current.get("business_type","Спортивный магазин"))
                                   if current.get("business_type","Спортивный магазин") in ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"] else 0)
-            city=st.text_input("Город / регион", value=current.get("city",""))
-            telegram=st.text_input("Telegram магазина", value=current.get("telegram",""))
-            instagram=st.text_input("Instagram", value=current.get("instagram",""))
-            shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"],
+            city=st.text_input("Город / регион", value=current.get("city",""), disabled=not can_settings)
+            telegram=st.text_input("Telegram магазина", value=current.get("telegram",""), disabled=not can_settings)
+            instagram=st.text_input("Instagram", value=current.get("instagram",""), disabled=not can_settings)
+            shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"], disabled=not can_settings,
                                   index=["По России","По региону","Самовывоз","Другое"].index(current.get("shipping","По России"))
                                   if current.get("shipping","По России") in ["По России","По региону","Самовывоз","Другое"] else 0)
-            if st.form_submit_button("💾 Сохранить настройки", type="primary"):
-                data_save("settings",[{"business_type":business,"city":city.strip(),"telegram":telegram.strip(),
-                                       "instagram":instagram.strip(),"shipping":shipping,"onboarding_complete":True}])
+            if st.form_submit_button("💾 Сохранить настройки", type="primary", disabled=not can_settings):
+                payload = {"business_type":business,"city":city.strip(),"telegram":telegram.strip(),
+                           "instagram":instagram.strip(),"shipping":shipping,"onboarding_complete":True}
+                if current.get("_saas_record_id"):
+                    payload["_saas_record_id"] = current["_saas_record_id"]
+                data_save("settings",[payload])
                 st.success("Настройки сохранены.")
                 st.rerun()
 
+        if not can_settings:
+            st.info("Изменять настройки магазина может только владелец или администратор.")
         st.markdown("---")
         st.markdown("### Подключения")
         st.info("Telegram, Instagram и VK подключаются отдельными интеграциями. Секретные токены хранятся в Secrets, а не в коде.")
@@ -467,12 +473,13 @@ def render_max():
                     "Статус", CRM_STATUSES,
                     index=CRM_STATUSES.index(current_status) if current_status in CRM_STATUSES else 0,
                     key=f"max_lead_status_{lead.get('id')}",
+                    disabled=not can("write_data"),
                 )
                 if ns != current_status:
                     update_lead(lead.get("id"), status=ns)
                     st.rerun()
-                note = st.text_input("Добавить заметку/контакт", key=f"max_note_{lead.get('id')}")
-                if st.button("💾 Сохранить заметку", key=f"max_note_btn_{lead.get('id')}"):
+                note = st.text_input("Добавить заметку/контакт", key=f"max_note_{lead.get('id')}", disabled=not can("write_data"))
+                if can("write_data") and st.button("💾 Сохранить заметку", key=f"max_note_btn_{lead.get('id')}"):
                     if note.strip():
                         add_lead_interaction(lead.get("id"), note.strip(), "manager")
                         st.rerun()
@@ -500,7 +507,7 @@ def render_max():
                 attribution_items = [x for x in load_plan() if x.get("status") == "Опубликовано" and x.get("content_id")]
                 content_choices = ["Не привязывать"] + [f'{x.get("date","")} · {x.get("platform","")} · {x.get("type","")} · {x.get("product","")}' for x in attribution_items[-50:]]
                 selected_content = st.selectbox("Контент / публикация", content_choices, key="max_order_content")
-            if st.form_submit_button("➕ Создать заказ"):
+            if st.form_submit_button("➕ Создать заказ", disabled=not can("write_data")):
                 content_id = ""
                 if selected_content != "Не привязывать":
                     idx = content_choices.index(selected_content) - 1
@@ -518,7 +525,8 @@ def render_max():
                 current = order.get("status", "Новая")
                 ns = st.selectbox("Статус заказа", ORDER_STATUSES,
                                   index=ORDER_STATUSES.index(current) if current in ORDER_STATUSES else 0,
-                                  key=f"max_order_status_{order.get('id')}")
+                                  key=f"max_order_status_{order.get('id')}",
+                                  disabled=not can("write_data"))
                 if ns != current:
                     update_order(order.get("id"), status=ns)
                     st.rerun()
