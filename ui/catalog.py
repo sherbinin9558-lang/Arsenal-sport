@@ -12,6 +12,7 @@ def render_catalog(
     delete_product,
     bulk_import_products,
     data_conflict_error,
+    can_write,
     page_size=50,
 ):
     st = __import__("streamlit")
@@ -35,7 +36,7 @@ def render_catalog(
         value=False,
         key="bulk_update_existing",
     )
-    if bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
+    if can_write and bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
         try:
             added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
             st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
@@ -107,7 +108,7 @@ def render_catalog(
             f"{category_emoji.get(p.get('category',''),'📦')} "
             f"{p.get('brand','')} {p.get('name','')} — {p.get('article','')}"
         ):
-            edit = st.toggle("✏️ Редактировать", key=f"edit_{key_suffix}")
+            edit = st.toggle("✏️ Редактировать", key=f"edit_{key_suffix}") if can_write else False
             if edit:
                 ec1, ec2 = st.columns(2)
                 with ec1:
@@ -165,7 +166,7 @@ def render_catalog(
                 st.write(f"**Характеристики:** {p.get('specs','—')}")
                 st.caption(f"Добавлено: {p.get('date_added','—')}")
 
-            if st.button("🗑️ Удалить", key=f"del_{key_suffix}"):
+            if can_write and st.button("🗑️ Удалить", key=f"del_{key_suffix}"):
                 try:
                     delete_product(record_id, existing=p)
                     st.rerun()
