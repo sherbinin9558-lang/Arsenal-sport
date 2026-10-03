@@ -12,23 +12,28 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         cls.source = SAAS_CORE.read_text(encoding="utf-8")
         cls.tree = ast.parse(cls.source)
 
-    def test_data_save_preflights_versions_before_mutations(self):
+    def test_data_save_uses_atomic_batch_rpc(self):
         fn = next(
             node for node in self.tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "data_save"
         )
-        calls = []
+        rpc_calls = []
+        direct_mutations = []
         for node in ast.walk(fn):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                calls.append((node.func.id, node.lineno))
-        get_lines = [line for name, line in calls if name == "_rest_get"]
-        mutation_lines = [
-            line for name, line in calls
-            if name in {"_rest_patch", "_rest_post", "_rest_delete"}
-        ]
-        self.assertTrue(get_lines, "data_save must preflight current versions")
-        self.assertTrue(mutation_lines, "data_save must contain protected mutations")
-        self.assertLess(min(get_lines), min(mutation_lines))
+                if node.func.id == "_rest_post":
+                    rpc_calls.append(node)
+                if node.func.id in {"_rest_patch", "_rest_delete"}:
+                    direct_mutations.append(node)
+        self.assertTrue(rpc_calls, "data_save must persist SaaS changes through the atomic RPC")
+        self.assertFalse(direct_mutations, "data_save must not perform partial direct mutations")
+        self.assertIn("save_app_data_batch", self.source)
+
+    def test_data_save_builds_new_update_and_delete_items(self):
+        self.assertIn('"is_new":True', self.source)
+        self.assertIn('"is_deleted":True', self.source)
+        self.assertIn('"expected_updated_at":baseline[record_id].get("updated_at")', self.source)
+        self.assertIn('data_load(entity,[])', self.source)
 
     def test_preflight_raises_conflict_on_version_mismatch(self):
         self.assertIn("current_versions", self.source)
