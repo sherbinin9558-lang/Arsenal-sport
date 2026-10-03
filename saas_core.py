@@ -200,6 +200,17 @@ def team_members():
         return [{"user_id":st.session_state.get("saas_user_id","demo-user"),"role":"owner"}]
     return _rest_get("/rest/v1/memberships",token,params={"select":"user_id,role,created_at","tenant_id":f"eq.{tenant_id()}","order":"created_at.asc"})
 
+def my_invitations():
+    token=st.session_state.get("saas_access_token")
+    if not saas_enabled() or not token or not st.session_state.get("saas_email"):
+        return []
+    return _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,expires_at","email":f"eq.{st.session_state.get('saas_email').lower()}","status":"eq.pending","order":"created_at.desc"})
+
+def accept_invitation(invite_id):
+    token=st.session_state.get("saas_access_token")
+    if not token: raise RuntimeError("Нужно войти в аккаунт.")
+    return _request("POST","/rest/v1/rpc/accept_invitation",token=token,json={"invite_id":invite_id})
+
 def team_invitations():
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token:
