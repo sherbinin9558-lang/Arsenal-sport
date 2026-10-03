@@ -833,6 +833,8 @@ with tab1:
         category = st.selectbox("Категория", CATEGORIES)
     with c3:
         description = st.text_area("Описание", height=100)
+        price = st.text_input("Цена, ₽")
+        stock = st.number_input("Остаток", min_value=0, value=0, step=1)
         template = st.selectbox("🎨 Шаблон", list(TEMPLATES.keys()))
     specs = st.text_input("Характеристики через запятую")
 
@@ -857,6 +859,7 @@ with tab1:
                     "name": name, "brand": brand, "article": article,
                     "sizes": sizes, "color": color, "description": description,
                     "specs": specs, "category": category,
+                    "price": price.strip(), "stock": int(stock), "total_stock": int(stock),
                     "card_image": card_b64,
                     "date_added": str(datetime.date.today())
                 }
