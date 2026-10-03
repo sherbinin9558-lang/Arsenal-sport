@@ -106,6 +106,10 @@ def login_ui():
         '<div class="dashboard-hero-text">Каталог, контент, заявки, заказы и AI-помощник MAX — в одном месте.</div></div>',
         unsafe_allow_html=True,
     )
+    if saas_enabled():
+        ok, message = supabase_health()
+        if not ok:
+            st.error("Не удалось связаться с сервером аккаунтов. Проверьте настройки Supabase.")
     tab1,tab2,tab3=st.tabs(["Войти","Создать магазин","Восстановить пароль"])
     with tab1:
         email=st.text_input("Email",key="saas_login_email")
