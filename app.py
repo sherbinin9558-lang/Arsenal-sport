@@ -813,12 +813,14 @@ with tab_dashboard:
         workflow_metrics=workflow_metrics, low_stock_products=low_stock_products,
         growth_recommendations=growth_recommendations, max_product_title=max_product_title,
         attribution_loader=load_attribution, attribution_metrics=attribution_metrics,
-        add_product=add_product, categories=CATEGORIES,
+        add_product=add_product, categories=CATEGORIES, can_write=can("write_data"),
     )
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
 with tab1:
     st.markdown('<div class="section-kicker">CONTENT STUDIO</div><div class="section-title">Создать товар</div><div class="section-subtitle">Загрузите фото, заполните данные и сразу получите готовую карточку.</div>', unsafe_allow_html=True)
+    if not can("write_data"):
+        st.info("Ваша роль доступна только для просмотра. Создание товаров доступно пользователям с правом записи.")
     up = st.file_uploader("📷 Фото товара", type=["jpg","jpeg","png","webp"])
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -834,7 +836,7 @@ with tab1:
         template = st.selectbox("🎨 Шаблон", list(TEMPLATES.keys()))
     specs = st.text_input("Характеристики через запятую")
 
-    if st.button("🎨 Создать карточку", type="primary"):
+    if can("write_data") and st.button("🎨 Создать карточку", type="primary"):
         if not name or not brand:
             st.error("Заполните: Название и Бренд")
         else:
@@ -984,6 +986,7 @@ with tab2:
         delete_product=delete_product,
         bulk_import_products=bulk_import_products,
         data_conflict_error=DataConflictError,
+        can_write=can("write_data"),
     )
 
 # ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
@@ -1384,7 +1387,7 @@ with tab5:
                     sts = st.selectbox("Статус", STATUSES)
                     pr = st.selectbox("Приоритет", PRIORITIES)
                 idea = st.text_area("Идея / текст")
-                if st.form_submit_button("📌 Добавить в workflow"):
+                if can("write_data") and st.form_submit_button("📌 Добавить в workflow"):
                     add_plan(ensure_workflow({"date": str(pd), "platform": pl, "product": sp,
                                               "type": ct, "idea": idea, "status": sts, "priority": pr}))
                     st.success("Материал добавлен.")
@@ -1416,7 +1419,7 @@ with tab5:
                     st.write(f"**Идея:** {item.get('idea','')}")
                     cs = item.get("status", "Идея")
                     ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
-                    if ns != cs:
+                    if can("write_data") and ns != cs:
                         updated = change_status(item, ns)
                         update_plan(item.get("_saas_record_id") or ri, updated)
                         st.rerun()
@@ -1425,7 +1428,7 @@ with tab5:
                         st.caption("История изменений")
                         for h in item["history"][-5:]:
                             st.write(f"{h.get('time','')} · {h.get('from','')} → {h.get('to','')} · {h.get('actor','manager')}")
-                    if st.button("🗑️ Удалить", key=f"dp_{ri}"):
+                    if can("write_data") and st.button("🗑️ Удалить", key=f"dp_{ri}"):
                         delete_plan(item.get("_saas_record_id") or ri)
                         st.rerun()
 
@@ -1440,11 +1443,11 @@ with tab5:
                 st.write(item.get("idea", ""))
                 a, b = st.columns(2)
                 with a:
-                    if st.button("✅ Утвердить", key=f"approve_{i}"):
+                    if can("write_data") and st.button("✅ Утвердить", key=f"approve_{i}"):
                         update_plan(item.get("_saas_record_id") or i, change_status(item, "Готово"))
                         st.rerun()
                 with b:
-                    if st.button("↩️ Вернуть в работу", key=f"return_{i}"):
+                    if can("write_data") and st.button("↩️ Вернуть в работу", key=f"return_{i}"):
                         update_plan(item.get("_saas_record_id") or i, change_status(item, "В работе"))
                         st.rerun()
         st.markdown("---")
@@ -1606,7 +1609,8 @@ def save_settings(data):
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
-    render_settings(
+    if can("settings"):
+        render_settings(
         load_settings=load_settings, save_settings=save_settings, templates=TEMPLATES,
         get_logo=get_logo, save_logo=save_logo,
     )
