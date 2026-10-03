@@ -9,7 +9,7 @@ from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
-from growth_engine import ai_summary, attribution_performance
+from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 
@@ -799,7 +799,7 @@ with tab_dashboard:
     store_name = st.session_state.get("saas_tenant_name", "Ваш магазин")
     first_run = len(products) == 0 and len(leads) == 0 and len(orders) == 0
     try:
-        ai_next = recommendations(products, leads, orders, plan)
+        ai_next = growth_recommendations(products, leads, orders, plan)
     except Exception:
         ai_next = []
 
