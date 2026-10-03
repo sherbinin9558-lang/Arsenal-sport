@@ -4,7 +4,6 @@ from pathlib import Path
 CARD_SIZE = (1080, 1350)
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-LOGO_FILE = Path("logo.png")
 
 TEMPLATES = {
     "Dark Premium":       {"bg": (9,12,18), "text": (248,249,252), "sec": (148,157,175), "accent": (105,120,255)},
@@ -15,18 +14,6 @@ TEMPLATES = {
     "Премиум":            {"bg": (18,20,27), "text": (239,242,247), "sec": (177,184,198), "accent": (137,125,255)},
 }
 
-
-def get_logo():
-    if LOGO_FILE.exists():
-        try:
-            return Image.open(LOGO_FILE).convert("RGBA")
-        except Exception:
-            return None
-    return None
-
-def save_logo(f):
-    img = Image.open(f).convert("RGBA")
-    img.save(LOGO_FILE)
 
 def get_font(size, bold=False):
     try:
@@ -75,7 +62,7 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
         lines[-1] = (last + " …").strip()
     return lines
 
-def generate_card(image, name, brand, article, sizes, color, description, specs, category, template):
+def generate_card(image, name, brand, article, sizes, color, description, specs, category, template, logo_image=None):
     # Единая профессиональная система AI Agent Content Manager с четырьмя визуальными направлениями.
     t = TEMPLATES.get(template, TEMPLATES["Dark Premium"])
     W, H = CARD_SIZE
@@ -120,7 +107,7 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
             draw.line([(55, 190), (240, 5)], fill=accent, width=4)
 
     # Брендинг.
-    logo_img = get_logo()
+    logo_img = logo_image.convert("RGBA") if logo_image is not None else None
     logo_w = 235 if light else 255
     if logo_img:
         ratio = logo_w / max(1, logo_img.width)
