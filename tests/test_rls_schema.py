@@ -75,6 +75,11 @@ class RlsSchemaRegressionTests(unittest.TestCase):
         index_pos = self.sql.index("create index if not exists idx_invitations_invited_by")
         self.assertGreater(index_pos, table_pos)
 
+    def test_atomic_save_migration_has_no_invalid_signature_revoke(self):
+        migration = (Path(__file__).resolve().parents[1] / "supabase/migrations/20261004_atomic_app_data_batch_save.sql").read_text(encoding="utf-8")
+        self.assertNotIn("save_app_data_batch(uuid,text,jsonb,text[])", migration)
+        self.assertIn("grant execute on function public.save_app_data_batch(uuid,text,jsonb) to authenticated;", migration)
+
     def test_member_role_rpc_cannot_demote_owner(self):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
         self.assertIn("if target_current_role = 'owner' then", self.sql)
