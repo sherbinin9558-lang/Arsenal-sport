@@ -128,4 +128,6 @@ $save_app_data_batch$;
 
 revoke all on function public.save_app_data_batch(uuid,text,jsonb) from public;
 revoke all on function public.save_app_data_batch(uuid,text,jsonb) from anon;
+revoke all on function public.save_app_data_batch(uuid,text,jsonb,text[]) from public;
+revoke all on function public.save_app_data_batch(uuid,text,jsonb,text[]) from anon, authenticated;
 grant execute on function public.save_app_data_batch(uuid,text,jsonb) to authenticated;
