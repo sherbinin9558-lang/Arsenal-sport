@@ -844,7 +844,7 @@ with tab1:
         else:
             with st.spinner("Генерация..."):
                 img = Image.open(up).convert("RGB") if up else None
-                card = generate_card(img, name, brand, article, sizes, color, description, specs, category, template)
+                card = generate_card(img, name, brand, article, sizes, color, description, specs, category, template, get_logo())
                 card_buf = io.BytesIO()
                 card.save(card_buf, format="PNG")
                 card_b64 = base64.b64encode(card_buf.getvalue()).decode("ascii")
