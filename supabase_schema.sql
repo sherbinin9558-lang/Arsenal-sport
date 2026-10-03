@@ -382,6 +382,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  target_current_role text;
 begin
   if not public.is_tenant_admin(target_tenant) then
     raise exception 'NOT_AUTHORIZED';
@@ -392,11 +394,15 @@ begin
   if target_user = auth.uid() then
     raise exception 'CANNOT_CHANGE_OWN_ROLE';
   end if;
-  if not exists (
-    select 1 from public.memberships
-    where user_id = target_user and tenant_id = target_tenant
-  ) then
+  select role into target_current_role
+    from public.memberships
+   where user_id = target_user and tenant_id = target_tenant
+   for update;
+  if not found then
     raise exception 'MEMBER_NOT_FOUND';
+  end if;
+  if target_current_role = 'owner' then
+    raise exception 'CANNOT_CHANGE_OWNER_ROLE';
   end if;
   update public.memberships
      set role = new_role
