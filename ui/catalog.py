@@ -87,7 +87,7 @@ def render_catalog(
                 st.session_state[page_key] = page - 1
                 st.rerun()
         with nav2:
-            chosen_page = st.number_input("Страница", min_value=1, max_value=pages, value=page, step=1, key="catalog_page_number")
+            chosen_page = st.selectbox("Страница", range(1, pages + 1), index=page - 1, key="catalog_page_number")
             if int(chosen_page) != page:
                 st.session_state[page_key] = int(chosen_page)
                 st.rerun()
