@@ -158,14 +158,6 @@ as $$
   );
 $$;
 
--- Restrict SECURITY DEFINER tenant helpers to authenticated callers.
-revoke all on function public.is_tenant_member(uuid) from public;
-grant execute on function public.is_tenant_member(uuid) to authenticated;
-revoke all on function public.is_tenant_writer(uuid) from public;
-grant execute on function public.is_tenant_writer(uuid) to authenticated;
-revoke all on function public.is_tenant_admin(uuid) from public;
-grant execute on function public.is_tenant_admin(uuid) to authenticated;
-
 alter table public.tenants enable row level security;
 alter table public.memberships enable row level security;
 alter table public.subscriptions enable row level security;
@@ -274,6 +266,14 @@ as $$
       and role in ('owner','admin')
   );
 $$;
+
+-- Restrict SECURITY DEFINER tenant helpers to authenticated callers.
+revoke all on function public.is_tenant_member(uuid) from public;
+grant execute on function public.is_tenant_member(uuid) to authenticated;
+revoke all on function public.is_tenant_writer(uuid) from public;
+grant execute on function public.is_tenant_writer(uuid) to authenticated;
+revoke all on function public.is_tenant_admin(uuid) from public;
+grant execute on function public.is_tenant_admin(uuid) to authenticated;
 
 alter table public.invitations enable row level security;
 
