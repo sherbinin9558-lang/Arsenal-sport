@@ -70,6 +70,11 @@ class RlsSchemaRegressionTests(unittest.TestCase):
             self.sql,
         )
 
+    def test_invitation_indexes_are_created_after_table(self):
+        table_pos = self.sql.index("create table if not exists public.invitations")
+        index_pos = self.sql.index("create index if not exists idx_invitations_invited_by")
+        self.assertGreater(index_pos, table_pos)
+
     def test_member_role_rpc_cannot_demote_owner(self):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
         self.assertIn("if target_current_role = 'owner' then", self.sql)
