@@ -47,6 +47,9 @@ create table if not exists public.app_data (
 create index if not exists idx_memberships_tenant on public.memberships(tenant_id);
 create index if not exists idx_app_data_tenant_entity on public.app_data(tenant_id, entity);
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
+alter table public.subscriptions add column if not exists provider_payment_id text;
+alter table public.subscriptions add column if not exists provider_payment_method_id text;
+create index if not exists idx_subscriptions_provider_payment on public.subscriptions(provider_payment_id);
 
 create or replace function public.is_tenant_member(target_tenant uuid)
 returns boolean
