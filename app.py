@@ -2094,7 +2094,7 @@ def render_max():
                 if photo_files:
                     names = [f.name for f in photo_files]
                     st.write("Файлов загружено:", len(names))
-                    if st.button("📸 Привязать фото к товарам", type="primary", key="auto_match_photos"):
+                    if can("write_data") and st.button("📸 Привязать фото к товарам", type="primary", key="auto_match_photos"):
                         products_now = load_products()
                         matched = 0
                         skipped = []
@@ -2148,7 +2148,7 @@ def render_max():
                     st.info("Сначала добавьте товары в каталог.")
                 else:
                     limit = st.slider("Сколько товаров обработать", 1, min(100, len(products)), min(30, len(products)), key="auto_content_limit")
-                    if st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
+                    if can("write_data") and st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
                         bundles = {}
                         for i,p in enumerate(products[:limit]):
                             bundles[str(i)] = {"product": max_product_title(p), "content": content_for_product(p)}
@@ -2164,7 +2164,7 @@ def render_max():
 
                 st.markdown("---")
                 st.markdown("### 📅 План на 30 дней")
-                if st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
+                if can("write_data") and st.button("📅 Создать 30-дневный контент-план", type="primary", key="auto_30_plan"):
                     generated = make_30_day_plan(products)
                     existing = load_plan()
                     existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
@@ -2189,7 +2189,7 @@ def render_max():
                         value = st.selectbox("Новое значение", CATEGORIES, key="auto_bulk_value_cat")
                     else:
                         value = st.text_input("Новое значение", key="auto_bulk_value_text")
-                    if st.button("✏️ Применить к выбранным", type="primary", key="auto_bulk_apply"):
+                    if can("write_data") and st.button("✏️ Применить к выбранным", type="primary", key="auto_bulk_apply"):
                         if not indexes:
                             st.warning("Выберите хотя бы один товар.")
                         elif not str(value).strip():
@@ -2219,7 +2219,7 @@ def render_max():
                         sizes_list = ["S", "M", "L", "XL"]
                     st.caption("Введите количество через запятую в порядке размеров: " + ", ".join(sizes_list))
                     qty_text = st.text_input("Количество", value=", ".join(str(current_stock.get(s, 0)) for s in sizes_list), key="auto_stock_qty")
-                    if st.button("💾 Сохранить остатки", key="auto_stock_save"):
+                    if can("write_data") and st.button("💾 Сохранить остатки", key="auto_stock_save"):
                         parts = [x.strip() for x in qty_text.split(",")]
                         stock = {}
                         for i,size in enumerate(sizes_list):
@@ -2272,7 +2272,7 @@ def render_max():
                 st.markdown("---")
                 st.markdown("### ⚡ Быстрый запуск")
                 st.caption("Запускает бесплатный контент-конвейер для всего каталога: тексты + план на 30 дней. Фото остаются отдельным шагом, чтобы не перезаписывать исходные файлы.")
-                if st.button("⚡ Запустить автоматизацию", type="primary", key="auto_run_all"):
+                if can("write_data") and st.button("⚡ Запустить автоматизацию", type="primary", key="auto_run_all"):
                     generated = make_30_day_plan(products)
                     existing = load_plan()
                     existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
@@ -2315,7 +2315,7 @@ def render_max():
                 for channel, text_value in bundle.items():
                     st.markdown(f"**{channel}**")
                     st.text_area(channel, text_value, height=110, key=f"max_bundle_{channel}")
-                if st.button("✨ Создать 7 идей и добавить в план", type="primary", key="max_plan_suggest"):
+                if can("write_data") and st.button("✨ Создать 7 идей и добавить в план", type="primary", key="max_plan_suggest"):
                     suggestions = seven_day_plan(products)
                     existing = load_plan()
                     for item in suggestions:
