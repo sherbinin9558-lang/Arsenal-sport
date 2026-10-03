@@ -1770,6 +1770,40 @@ def render_max():
             p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
             p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
             st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
+            st.markdown("---")
+            st.markdown("### 👥 Команда магазина")
+            from saas_core import current_role, team_members, team_invitations, create_team_invitation, limit
+            role=current_role()
+            role_names={"owner":"Владелец","admin":"Администратор","manager":"Менеджер","editor":"Редактор","viewer":"Наблюдатель"}
+            st.write(f"**Ваша роль:** {role_names.get(role, role)}")
+            members=team_members()
+            st.caption(f"Участников: {len(members)} / {limit('users')}")
+            for member in members:
+                st.write(f"• {member.get('user_id','—')} · **{role_names.get(member.get('role','viewer'), member.get('role','viewer'))}**")
+            if role in ("owner","admin"):
+                with st.expander("➕ Пригласить сотрудника"):
+                    invite_email=st.text_input("Email сотрудника", key="team_invite_email")
+                    invite_role=st.selectbox("Роль", ["manager","admin","editor","viewer"], format_func=lambda x: role_names[x], key="team_invite_role")
+                    if st.button("Создать приглашение", type="primary", key="team_invite_create"):
+                        if len(members) >= limit("users"):
+                            st.error("Лимит пользователей текущего тарифа достигнут.")
+                        elif not invite_email.strip() or "@" not in invite_email:
+                            st.warning("Укажите корректный email.")
+                        else:
+                            try:
+                                create_team_invitation(invite_email, invite_role)
+                                st.success("Приглашение создано. Отправка письма подключается через серверный invite-механизм.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Не удалось создать приглашение: {e}")
+                    invites=team_invitations()
+                    if invites:
+                        st.markdown("**Ожидают приглашения:**")
+                        for inv in invites:
+                            st.write(f"• {inv.get('email')} · {role_names.get(inv.get('role'), inv.get('role'))}")
+                    else:
+                        st.caption("Ожидающих приглашений нет.")
+
         elif section == "Настройки":
             st.subheader("⚙️ Настройки магазина")
             from saas_core import data_load, data_save
