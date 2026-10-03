@@ -1,6 +1,7 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
 import hashlib, json, os, time
+from datetime import datetime, timezone
 from typing import Optional
 import requests
 import streamlit as st
@@ -211,10 +212,10 @@ def request_password_reset(email):
 def validate_session():
     return _restore_session_from_access_token() or _restore_session_from_cookie()
 
-def _rest_get(path,token,params=None): return _request("GET",path,token=token,params=params or {})
-def _rest_post(path,token,payload): return _request("POST",path,token=token,json=payload)
-def _rest_patch(path,token,payload,params=None): return _request("PATCH",path,token=token,params=params or {},json=payload)
-def _rest_delete(path,token,params=None): return _request("DELETE",path,token=token,params=params or {})
+def _rest_get(path,token,params=None,headers=None): return _request("GET",path,token=token,headers=headers,params=params or {})
+def _rest_post(path,token,payload,headers=None): return _request("POST",path,token=token,headers=headers,json=payload)
+def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
+def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
 
 def current_tenant(token,user_id=None):
     uid=user_id or st.session_state.get("saas_user_id")
@@ -502,7 +503,7 @@ def _prepare_loaded_payload(row):
 
 
 def _utc_now_iso():
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00","Z")
 
 
 def data_load(entity,default):
