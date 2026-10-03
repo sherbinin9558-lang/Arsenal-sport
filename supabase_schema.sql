@@ -280,12 +280,26 @@ grant execute on function public.is_tenant_admin(uuid) to authenticated;
 alter table public.invitations enable row level security;
 
 drop policy if exists "members can read team memberships" on public.memberships;
-create policy "members can read team memberships" on public.memberships
-for select to authenticated using ((select public.is_tenant_member(tenant_id)));
+drop policy if exists "users can read own memberships" on public.memberships;
+drop policy if exists "members or users can read memberships" on public.memberships;
+create policy "members or users can read memberships" on public.memberships
+for select to authenticated using (
+  (select public.is_tenant_member(tenant_id))
+  or user_id = (select auth.uid())
+);
 
 drop policy if exists "admins can read invitations" on public.invitations;
-create policy "admins can read invitations" on public.invitations
-for select using (public.is_tenant_admin(tenant_id));
+drop policy if exists "invitees can read own invitations" on public.invitations;
+drop policy if exists "admins or invitees can read invitations" on public.invitations;
+create policy "admins or invitees can read invitations" on public.invitations
+for select to authenticated using (
+  (select public.is_tenant_admin(tenant_id))
+  or (
+    lower(email) = lower(coalesce((select auth.jwt()->>'email'), ''))
+    and status = 'pending'
+    and expires_at > now()
+  )
+);
 
 drop policy if exists "admins can create invitations" on public.invitations;
 create policy "admins can create invitations" on public.invitations
