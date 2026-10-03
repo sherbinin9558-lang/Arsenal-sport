@@ -47,7 +47,7 @@ class RlsSchemaRegressionTests(unittest.TestCase):
             )
             block = self.sql[fn_pos:] if next_fn == -1 else self.sql[fn_pos:next_fn]
             self.assertIn("security definer", block.lower(), name)
-            self.assertIn("set search_path = public", block, name)
+            self.assertIn("set search_path = ''", block, name)
 
     def test_app_data_policy_matrix_is_present(self):
         required = (
