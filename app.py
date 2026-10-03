@@ -9,7 +9,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance
-from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed
+from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1832,6 +1832,32 @@ def render_max():
                     else:
                         st.caption("Ожидающих приглашений нет.")
 
+            st.markdown("### 💳 Реальная оплата")
+            try:
+                from billing import create_checkout, plan_price
+                from saas_core import plan_catalog
+                st.caption("Оплата через ЮKassa. Секретный ключ хранится только в Secrets.")
+                bplans=plan_catalog()
+                cols=st.columns(3)
+                for col,(pkey,pinfo) in zip(cols,bplans.items()):
+                    with col:
+                        price=plan_price(pkey)
+                        st.markdown(f"**{pinfo['name']}**")
+                        st.caption(f"{price:.2f} ₽ / месяц" if price else "Цена не настроена")
+                        if st.button(f"Оплатить {pinfo['name']}", key=f"pay_{pkey}", use_container_width=True):
+                            try:
+                                payment=create_checkout(pkey, st.session_state.get("saas_tenant_id"))
+                                st.session_state["billing_payment_id"]=payment.get("id")
+                                st.session_state["billing_plan"]=pkey
+                                st.session_state["billing_url"]=payment["confirmation"]["confirmation_url"]
+                                st.success("Платёж создан.")
+                            except Exception as e:
+                                st.error(str(e))
+                if st.session_state.get("billing_url"):
+                    st.link_button("Перейти к оплате", st.session_state["billing_url"], use_container_width=True)
+            except Exception as e:
+                st.info(f"ЮKassa пока не подключена: {e}")
+            st.markdown("---")
         elif section == "Настройки":
             st.subheader("⚙️ Настройки магазина")
             from saas_core import data_load, data_save
