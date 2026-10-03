@@ -205,6 +205,7 @@ def validate_session():
 
 def _rest_get(path,token,params=None): return _request("GET",path,token=token,params=params or {})
 def _rest_post(path,token,payload): return _request("POST",path,token=token,json=payload)
+def _rest_patch(path,token,payload,params=None): return _request("PATCH",path,token=token,params=params or {},json=payload)
 def _rest_delete(path,token,params=None): return _request("DELETE",path,token=token,params=params or {})
 
 def current_tenant(token,user_id=None):
@@ -534,11 +535,31 @@ def data_save(entity,rows):
             }
             for i,row in enumerate(rows)
         ]
-        _rest_post(
-            "/rest/v1/app_data",
-            token,
-            payload,
-        )
+        existing_payload=[]
+        new_payload=[]
+        baseline_set=set(baseline_ids)
+        for item in payload:
+            if item["record_id"] in baseline_set:
+                existing_payload.append(item)
+            else:
+                new_payload.append(item)
+
+        # Existing records are patched individually because each row has its own JSON payload.
+        for item in existing_payload:
+            _rest_patch(
+                "/rest/v1/app_data",
+                token,
+                {"payload":item["payload"]},
+                params={
+                    "tenant_id":f"eq.{tenant_id()}",
+                    "entity":f"eq.{entity}",
+                    "record_id":f"eq.{item["record_id"]}",
+                },
+            )
+
+        # New records use INSERT and therefore cannot collide with existing primary keys.
+        if new_payload:
+            _rest_post("/rest/v1/app_data", token, new_payload)
 
         removed_ids=baseline_ids[len(rows):]
         if removed_ids:
