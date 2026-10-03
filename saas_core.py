@@ -138,6 +138,29 @@ def plan_catalog():
         "business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"},
     }
 
+def _service_key():
+    try: value=st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY",""))
+    except Exception: value=os.getenv("SUPABASE_SERVICE_ROLE_KEY","")
+    return str(value or "").strip()
+
+def activate_paid_subscription(plan, provider_payment_id, payment_method_id=None):
+    key=_service_key()
+    if not key or not saas_enabled():
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
+    tid=tenant_id()
+    headers={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json","Prefer":"return=minimal"}
+    base=f"{SUPABASE_URL}/rest/v1"
+    sub={"plan":plan,"status":"active","provider":"yookassa","provider_payment_id":provider_payment_id}
+    if payment_method_id:
+        sub["provider_payment_method_id"]=payment_method_id
+    rr=requests.patch(f"{base}/subscriptions",headers=headers,params={"tenant_id":f"eq.{tid}"},json=sub,timeout=20)
+    if not rr.ok: raise RuntimeError(rr.text)
+    rr=requests.patch(f"{base}/tenants",headers=headers,params={"id":f"eq.{tid}"},json={"plan":plan,"status":"active"},timeout=20)
+    if not rr.ok: raise RuntimeError(rr.text)
+    st.session_state["saas_plan"]=plan
+    st.session_state["saas_tenant_status"]="active"
+    return True
+
 def subscription_snapshot():
     token=st.session_state.get("saas_access_token")
     tid=tenant_id()
