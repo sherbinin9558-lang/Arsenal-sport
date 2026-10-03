@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re, tempfile, os
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
+from ai_seller import ai_sales_reply, sales_followup
 from crm_core import create_lead, crm_metrics, load_leads, update_lead, add_lead_interaction, set_customer_profile, STATUSES as CRM_STATUSES
 from free_automation import load_orders, create_order, update_order, order_metrics, low_stock, customer_history, content_bundle, seven_day_plan, conversion_metrics
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
@@ -1899,51 +1900,4 @@ with tab7:
             "ai_escalation_reply": ai_escalation_reply,
             "faq": [{"question": line.split("|",1)[0].strip(), "answer": line.split("|",1)[1].strip()} for line in faq_input.splitlines() if "|" in line and line.split("|",1)[0].strip() and line.split("|",1)[1].strip()],
         })
-        st.success("Настройки сохранены.")
-        st.rerun()
-
-
-def ai_sales_reply(products, message):
-    q = (message or "").strip()
-    if not q:
-        return "Напишите, что ищете — например: «бутсы 42 размера до 10000».", []
-    found = product_search(products, q)
-    lower = q.lower()
-    if any(k in lower for k in ("достав", "оплат", "возврат", "налич", "размер")) and not found:
-        return knowledge_answer(q), []
-    if found:
-        top = found[:5]
-        lines = ["Нашёл подходящие варианты:"]
-        for i, p in enumerate(top, 1):
-            title = f"{p.get('brand','')} {p.get('name','')}".strip()
-            details = []
-            if p.get("sizes"): details.append(f"размеры: {p.get('sizes')}")
-            if p.get("color"): details.append(f"цвет: {p.get('color')}")
-            if p.get("article"): details.append(f"арт.: {p.get('article')}")
-            lines.append(f"{i}. {title}" + (f" — {', '.join(details)}" if details else ""))
-        lines.append("Выберите номер товара — помогу с деталями и следующим шагом.")
-        return "\n".join(lines), top
-    return "Пока не нашёл точного совпадения. Напишите категорию, размер, цвет или бюджет — попробую подобрать из каталога.", []
-
-def sales_followup(products, message, current):
-    q = (message or "").strip().lower()
-    if not q:
-        return "Напишите, что хотите уточнить.", current
-    if current:
-        nums = [int(x) for x in re.findall(r"\b([1-5])\b", q)]
-        if nums:
-            idx = nums[0] - 1
-            if idx < len(current):
-                p = current[idx]
-                title = f"{p.get('brand','')} {p.get('name','')}".strip()
-                return (f"{title}. {p.get('description','Описание пока не заполнено.') or 'Описание пока не заполнено.'} "
-                        f"Размеры: {p.get('sizes','уточняйте')}. Цвет: {p.get('color','уточняйте')}. "
-                        f"Артикул: {p.get('article','уточняйте')}. Наличие подтверждается перед заказом."), [p]
-    if any(k in q for k in ("достав", "оплат", "возврат", "налич", "размер")):
-        return knowledge_answer(q), current
-    found = product_search(products, q)
-    if found:
-        return ai_sales_reply(products, message)[0], found
-    return "Уточните размер, бюджет, цвет или вид товара — я попробую подобрать подходящий вариант.", current
-
-
+        st
