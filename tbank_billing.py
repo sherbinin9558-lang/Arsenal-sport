@@ -55,6 +55,7 @@ def create_checkout(plan, tenant_id):
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
         raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+    _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan)
     return data
 
 def get_state(payment_id):
