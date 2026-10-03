@@ -9,6 +9,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance
+from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -55,10 +56,13 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def load_products(): return load_json(PRODUCTS_FILE, [])
-def save_products(p): save_json(PRODUCTS_FILE, p)
+def load_products(): return data_load("products", [])
+def save_products(p): data_save("products", p)
 def add_product(prod):
-    p = load_products(); p.append(prod); save_products(p)
+    p = load_products()
+    if not feature_allowed("products", len(p)):
+        raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
+    p.append(prod); save_products(p)
 def update_product(i, prod):
     p = load_products()
     if 0 <= i < len(p): p[i] = prod; save_products(p)
@@ -66,16 +70,12 @@ def delete_product(i):
     p = load_products()
     if 0 <= i < len(p): p.pop(i); save_products(p)
 
-def load_plan(): return load_json(CONTENT_PLAN_FILE, [])
-def save_plan(pl): save_json(CONTENT_PLAN_FILE, pl)
+def load_plan(): return data_load("content_plan", [])
+def save_plan(pl): data_save("content_plan", pl)
 
 ATTRIBUTION_FILE = Path("content_attribution.json")
-
-def load_attribution():
-    return load_json(ATTRIBUTION_FILE, [])
-
-def save_attribution(items):
-    save_json(ATTRIBUTION_FILE, items)
+def load_attribution(): return data_load("content_attribution", [])
+def save_attribution(items): data_save("content_attribution", items)
 
 def attribution_metrics(attribution, leads, orders):
     by_product = {}
@@ -405,6 +405,9 @@ def publish_reel_to_vk(video_bytes, caption):
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
+if not require_saas_access():
+    st.stop()
+
 with st.sidebar:
     st.markdown('<div class="sidebar-ai-agent">AI агент контент менеджер</div>', unsafe_allow_html=True)
     st.title("AI Agent Content Manager")
@@ -430,6 +433,7 @@ with st.sidebar:
         st.info("📡 Telegram не настроен")
     st.markdown("---")
     st.caption(f"Сегодня · {datetime.date.today().strftime('%d.%m.%Y')}")
+    render_account_bar()
 
 if dark_mode:
     bg_css = "body {background:#0b0e13;}"
