@@ -131,6 +131,36 @@ def render_account_bar():
                 if k.startswith("saas_"): del st.session_state[k]
             st.rerun()
 
+def current_role(token=None):
+    if not saas_enabled():
+        return "owner"
+    token=token or st.session_state.get("saas_access_token")
+    uid=st.session_state.get("saas_user_id")
+    tid=tenant_id()
+    if not token or not uid or not tid:
+        return "viewer"
+    rows=_rest_get("/rest/v1/memberships",token,params={"select":"role","tenant_id":f"eq.{tid}","user_id":f"eq.{uid}","limit":"1"})
+    return rows[0].get("role","viewer") if rows else "viewer"
+
+def team_members():
+    token=st.session_state.get("saas_access_token")
+    if not saas_enabled() or not token:
+        return [{"user_id":st.session_state.get("saas_user_id","demo-user"),"role":"owner"}]
+    return _rest_get("/rest/v1/memberships",token,params={"select":"user_id,role,created_at","tenant_id":f"eq.{tenant_id()}","order":"created_at.asc"})
+
+def team_invitations():
+    token=st.session_state.get("saas_access_token")
+    if not saas_enabled() or not token:
+        return []
+    return _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,created_at,expires_at","tenant_id":f"eq.{tenant_id()}","status":"eq.pending","order":"created_at.desc"})
+
+def create_team_invitation(email,role):
+    token=st.session_state.get("saas_access_token")
+    if not saas_enabled() or not token:
+        return None
+    payload={"tenant_id":tenant_id(),"email":email.strip().lower(),"role":role,"invited_by":st.session_state.get("saas_user_id")}
+    return _rest_post("/rest/v1/invitations",token,payload)
+
 def onboarding_complete():
     if not saas_enabled():
         return True
