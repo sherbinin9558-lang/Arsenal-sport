@@ -4,6 +4,10 @@ import hashlib, json, os
 from typing import Optional
 import requests
 import streamlit as st
+try:
+    from streamlit_cookies_controller import CookieController
+except Exception:
+    CookieController = None
 
 PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":1000,"users":3,"content":1000},"pro":{"products":10000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
 
@@ -39,6 +43,40 @@ def _request(method,path,token=None,**kwargs):
         raise RuntimeError(data.get("msg") or data.get("message") or data.get("error_description") or str(data))
     return data
 
+_AUTH_COOKIE = "saas_refresh_token"
+
+def _auth_cookies():
+    if CookieController is None:
+        return None
+    try:
+        if "_saas_cookie_controller" not in st.session_state:
+            st.session_state["_saas_cookie_controller"] = CookieController()
+        return st.session_state["_saas_cookie_controller"]
+    except Exception:
+        return None
+
+def _persist_refresh_token(refresh_token):
+    if refresh_token:
+        cookies = _auth_cookies()
+        if cookies is not None:
+            try: cookies.set(_AUTH_COOKIE, refresh_token)
+            except Exception: pass
+
+def _clear_refresh_token():
+    cookies = _auth_cookies()
+    if cookies is not None:
+        try: cookies.remove(_AUTH_COOKIE)
+        except Exception: pass
+
+def _read_refresh_token():
+    cookies = _auth_cookies()
+    if cookies is None: return None
+    try: return cookies.get(_AUTH_COOKIE)
+    except Exception: return None
+
+def refresh_session(refresh_token):
+    return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+
 def _public_app_url():
     return _cfg("SAAS_PUBLIC_URL","https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app").rstrip("/")
 
@@ -54,6 +92,7 @@ def get_user(token): return _request("GET","/auth/v1/user",token=token)
 def sign_out(token):
     try: _request("POST","/auth/v1/logout",token=token)
     except Exception: pass
+    _clear_refresh_token()
 
 def request_password_reset(email):
     email=str(email or "").strip().lower()
@@ -119,7 +158,7 @@ def login_ui():
                     with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
                     token=result.get("access_token"); user=result.get("user") or get_user(token); tenant=current_tenant(token,user.get("id"))
                     if not tenant: raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-                    st.session_state["saas_access_token"]=token; _set_identity(user,tenant); st.rerun()
+                    st.session_state["saas_access_token"]=token; _persist_refresh_token(result.get("refresh_token")); _set_identity(user,tenant); st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
@@ -305,6 +344,18 @@ def require_saas_access():
         st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">PRODUCTION SETUP</div><div class="dashboard-hero-title">Подключите Supabase, чтобы открыть платформу.</div><div class="dashboard-hero-text">Для коммерческого режима нужны SUPABASE_URL и SUPABASE_ANON_KEY. После подключения пользователи смогут регистрировать магазины, входить по паролю и работать изолированно по tenant.</div></div>',unsafe_allow_html=True)
         st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit."); return False
     token=st.session_state.get("saas_access_token")
+    if not token:
+        refresh_token = _read_refresh_token()
+        if refresh_token:
+            try:
+                result = refresh_session(refresh_token)
+                token = result.get("access_token")
+                if token:
+                    st.session_state["saas_access_token"] = token
+                    _persist_refresh_token(result.get("refresh_token") or refresh_token)
+            except Exception:
+                _clear_refresh_token()
+                token = None
     if not token:
         login_ui(); return False
     try:
