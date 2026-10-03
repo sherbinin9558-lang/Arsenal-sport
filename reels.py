@@ -21,11 +21,24 @@ def _frame_at(card, bg, t, kind, duration):
         dx = 0
 
     w, h = int(card.width * k), int(card.height * k)
-    img = card.resize((w, h), Image.Resampling.LANCZOS)
-    frame = bg.copy()
     x = (W - w) // 2 + dx
     y = (H - h) // 2
-    frame.paste(img, (x, y))
+
+    # Scale only the part of the card that is visible in the frame instead of the
+    # whole enlarged card. The pixel grid is identical to resizing everything and
+    # cropping afterwards, so the picture is the same but renders much faster.
+    vx0, vy0 = max(x, 0), max(y, 0)
+    vx1, vy1 = min(x + w, W), min(y + h, H)
+    frame = bg.copy()
+    if vx1 > vx0 and vy1 > vy0:
+        box = (
+            (vx0 - x) * card.width / w,
+            (vy0 - y) * card.height / h,
+            (vx1 - x) * card.width / w,
+            (vy1 - y) * card.height / h,
+        )
+        part = card.resize((vx1 - vx0, vy1 - vy0), Image.Resampling.LANCZOS, box=box)
+        frame.paste(part, (vx0, vy0))
     return np.asarray(frame, dtype=np.uint8)
 
 
@@ -79,7 +92,7 @@ def make_reel(card_path, out_path, duration=8, music_path=None, caption=None):
                     local_dur = (t1 - t0) * duration
                     break
             frame = _frame_at(fg, bg, local_t, scene_name, max(local_dur, 0.01))
-            process.stdin.write(frame.tobytes())
+            process.stdin.write(frame)
         process.stdin.close()
         stderr = process.stderr.read().decode("utf-8", errors="replace")
         return_code = process.wait()
