@@ -51,11 +51,11 @@ class RlsSchemaRegressionTests(unittest.TestCase):
 
     def test_app_data_policy_matrix_is_present(self):
         required = (
-            'for select using (public.is_tenant_member(tenant_id));',
-            'for insert with check (public.is_tenant_writer(tenant_id));',
-            'for update using (public.is_tenant_writer(tenant_id))',
-            'with check (public.is_tenant_writer(tenant_id));',
-            'for delete using (public.is_tenant_writer(tenant_id));',
+            'for select to authenticated using ((select public.is_tenant_member(tenant_id)));',
+            'for insert to authenticated with check ((select public.is_tenant_writer(tenant_id)));',
+            'for update to authenticated using ((select public.is_tenant_writer(tenant_id)))',
+            'with check ((select public.is_tenant_writer(tenant_id)));',
+            'for delete to authenticated using ((select public.is_tenant_writer(tenant_id)));',
         )
         for fragment in required:
             self.assertIn(fragment, self.sql)
