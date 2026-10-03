@@ -8,6 +8,7 @@ from inventory_core import stock_info
 
 ORDERS_FILE = Path("orders.json")
 ORDER_STATUSES = ("Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён")
+ORDER_IMMUTABLE_FIELDS = frozenset({"id", "created_at"})
 
 def load_orders(): return data_load("orders", [])
 
@@ -32,8 +33,10 @@ def create_order(customer="", contact="", product="", product_id="", amount="", 
     return order
 
 def update_order(order_id, **changes):
-    if "id" in changes:
-        raise ValueError("Идентификатор заказа нельзя изменять.")
+    protected = ORDER_IMMUTABLE_FIELDS.intersection(changes)
+    if protected:
+        field = sorted(protected)[0]
+        raise ValueError(f"Поле заказа нельзя изменять: {field}.")
     if "status" in changes and changes["status"] not in ORDER_STATUSES:
         raise ValueError(f"Недопустимый статус заказа: {changes['status']}")
     orders = load_orders()
