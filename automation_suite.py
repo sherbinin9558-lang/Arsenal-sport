@@ -2,9 +2,19 @@
 import re
 from datetime import date, timedelta
 from pathlib import Path
+from saas_core import tenant_id
 
-IMAGE_DIR = Path("product_images")
-CARD_DIR = Path("generated_cards")
+ASSET_ROOT = Path("tenant_assets")
+
+def tenant_asset_dir() -> Path:
+    # Never share uploaded media between tenants.
+    return ASSET_ROOT / str(tenant_id())
+
+def image_dir() -> Path:
+    return tenant_asset_dir() / "product_images"
+
+def card_dir() -> Path:
+    return tenant_asset_dir() / "generated_cards"
 
 def safe_slug(value):
     value = re.sub(r"[^a-zA-Zа-яА-ЯёЁ0-9_-]+", "_", str(value or "").strip())
@@ -15,8 +25,8 @@ def product_key(product, index=0):
     return article or safe_slug(f"{product.get('brand','')}_{product.get('name','')}") or f"product_{index+1}"
 
 def ensure_dirs():
-    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    CARD_DIR.mkdir(parents=True, exist_ok=True)
+    image_dir().mkdir(parents=True, exist_ok=True)
+    card_dir().mkdir(parents=True, exist_ok=True)
 
 def stock_info(product):
     by_size = product.get("stock_by_size")
@@ -106,6 +116,6 @@ def analytics(products, leads, orders, plan):
 def save_uploaded_photo(uploaded_file, product, index=0):
     ensure_dirs()
     ext = Path(uploaded_file.name or "").suffix.lower() or ".jpg"
-    path = IMAGE_DIR / f"{safe_slug(product_key(product,index))}{ext}"
+    path = image_dir() / f"{safe_slug(product_key(product,index))}{ext}"
     path.write_bytes(uploaded_file.getvalue())
     return str(path)
