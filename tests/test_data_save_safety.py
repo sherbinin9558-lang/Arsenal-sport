@@ -179,5 +179,26 @@ class GrowthEnginePerformanceRegressionTests(unittest.TestCase):
         self.assertIn("O(products × leads/orders/content)", source)
 
 
+class ModularUiRegressionTests(unittest.TestCase):
+    def test_ui_modules_exist_and_app_routes_dashboard_settings(self):
+        root = Path(__file__).resolve().parents[1]
+        dashboard = (root / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        settings = (root / "ui" / "settings.py").read_text(encoding="utf-8")
+        app = (root / "app.py").read_text(encoding="utf-8")
+        self.assertIn("def render_dashboard(", dashboard)
+        self.assertIn("def render_settings(", settings)
+        self.assertIn("from ui.dashboard import render_dashboard", app)
+        self.assertIn("from ui.settings import render_settings", app)
+        self.assertNotIn("with tab_dashboard:\n    # Reuse one dashboard snapshot", app)
+        self.assertNotIn("with tab7:\n    st.markdown", app)
+
+    def test_auth_cookie_has_reload_recovery(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('CookieController(key="saas_auth_cookie")', source)
+        self.assertIn("getAll()", source)
+        self.assertIn("_AUTH_COOKIE_DAYS = 30", source)
+        self.assertIn("attempts < 3", source)
+
+
 if __name__ == "__main__":
     unittest.main()
