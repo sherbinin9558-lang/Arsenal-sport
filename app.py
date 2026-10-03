@@ -62,12 +62,28 @@ def add_product(prod):
     if not feature_allowed("products", len(p)):
         raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
     p.append(prod); save_products(p)
-def update_product(i, prod):
+def _find_record_index(rows, record_id):
+    target = str(record_id or "")
+    for idx, row in enumerate(rows):
+        if str(row.get("_saas_record_id", "")) == target:
+            return idx
+    return None
+
+def update_product(record_id, prod):
     p = load_products()
-    if 0 <= i < len(p): p[i] = prod; save_products(p)
-def delete_product(i):
+    idx = _find_record_index(p, record_id)
+    if idx is not None:
+        prod = dict(prod or {})
+        prod["_saas_record_id"] = p[idx].get("_saas_record_id")
+        p[idx] = prod
+        save_products(p)
+
+def delete_product(record_id):
     p = load_products()
-    if 0 <= i < len(p): p.pop(i); save_products(p)
+    idx = _find_record_index(p, record_id)
+    if idx is not None:
+        p.pop(idx)
+        save_products(p)
 
 def load_plan(): return data_load("content_plan", [])
 def save_plan(pl): data_save("content_plan", pl)
@@ -93,12 +109,21 @@ def add_plan(item):
     if not feature_allowed("content", len(p)):
         raise ValueError(f"Лимит контента тарифа {tenant_plan().upper()} достигнут.")
     p.append(item); save_plan(p)
-def update_plan(i, item):
+def update_plan(record_id, item):
     p = load_plan()
-    if 0 <= i < len(p): p[i] = item; save_plan(p)
-def delete_plan(i):
+    idx = _find_record_index(p, record_id)
+    if idx is not None:
+        item = dict(item or {})
+        item["_saas_record_id"] = p[idx].get("_saas_record_id")
+        p[idx] = item
+        save_plan(p)
+
+def delete_plan(record_id):
     p = load_plan()
-    if 0 <= i < len(p): p.pop(i); save_plan(p)
+    idx = _find_record_index(p, record_id)
+    if idx is not None:
+        p.pop(idx)
+        save_plan(p)
 
 def _tenant_asset_root():
     root = Path("tenant_assets") / str(st.session_state.get("saas_tenant_id", "unknown"))
@@ -1852,7 +1877,7 @@ with tab2:
                             updated["original_image"] = base64.b64encode(
                                 original_buf.getvalue()
                             ).decode("ascii")
-                        update_product(real_i, updated)
+                        update_product(p.get("_saas_record_id"), updated)
                         st.success("Обновлено!")
                         st.rerun()
                 else:
@@ -1863,7 +1888,7 @@ with tab2:
                     st.caption(f"Добавлено: {p.get('date_added','—')}")
 
                 if st.button("🗑️ Удалить", key=f"del_{real_i}"):
-                    delete_product(real_i)
+                    delete_product(p.get("_saas_record_id"))
                     st.rerun()
 
 # ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
@@ -2147,7 +2172,7 @@ with tab4:
 
                     updated_product = dict(reel_product)
                     updated_product["card_image"] = base64.b64encode(source_bytes).decode("ascii")
-                    update_product(st.session_state.get("r_sel", 0), updated_product)
+                    update_product(reel_product.get("_saas_record_id"), updated_product)
                     reel_product = updated_product
                     stored_card = updated_product["card_image"]
 
@@ -2298,7 +2323,7 @@ with tab5:
                     ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
                     if ns != cs:
                         updated = change_status(item, ns)
-                        update_plan(ri, updated)
+                        update_plan(item.get("_saas_record_id"), updated)
                         st.rerun()
                     st.caption(f"Приоритет: {item.get('priority','Обычный')}")
                     if item.get("history"):
@@ -2306,7 +2331,7 @@ with tab5:
                         for h in item["history"][-5:]:
                             st.write(f"{h.get('time','')} · {h.get('from','')} → {h.get('to','')} · {h.get('actor','manager')}")
                     if st.button("🗑️ Удалить", key=f"dp_{ri}"):
-                        delete_plan(ri)
+                        delete_plan(item.get("_saas_record_id"))
                         st.rerun()
 
     with workflow_tab:
@@ -2321,11 +2346,11 @@ with tab5:
                 a, b = st.columns(2)
                 with a:
                     if st.button("✅ Утвердить", key=f"approve_{i}"):
-                        update_plan(i, change_status(item, "Готово"))
+                        update_plan(item.get("_saas_record_id"), change_status(item, "Готово"))
                         st.rerun()
                 with b:
                     if st.button("↩️ Вернуть в работу", key=f"return_{i}"):
-                        update_plan(i, change_status(item, "В работе"))
+                        update_plan(item.get("_saas_record_id"), change_status(item, "В работе"))
                         st.rerun()
         st.markdown("---")
         st.subheader("🤖 AI-рекомендации")
