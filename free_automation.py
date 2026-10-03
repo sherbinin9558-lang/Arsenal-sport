@@ -2,23 +2,18 @@
 import json
 from pathlib import Path
 from datetime import datetime, date, timedelta
+from saas_core import data_load, data_save, feature_allowed, tenant_plan
 
 ORDERS_FILE = Path("orders.json")
 
-def load_orders():
-    if not ORDERS_FILE.exists():
-        return []
-    try:
-        data = json.loads(ORDERS_FILE.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
+def load_orders(): return data_load("orders", [])
 
-def save_orders(orders):
-    ORDERS_FILE.write_text(json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_orders(orders): data_save("orders", orders)
 
 def create_order(customer="", contact="", product="", product_id="", amount="", status="Новая", source="Manual", content_id="", lead_id=""):
     orders = load_orders()
+    if not feature_allowed("orders", len(orders)):
+        raise ValueError(f"Лимит заказов тарифа {tenant_plan().upper()} достигнут.")
     nums = [int(o.get("id", 0)) for o in orders if str(o.get("id", "")).isdigit()]
     order = {
         "id": max(nums or [0]) + 1,
