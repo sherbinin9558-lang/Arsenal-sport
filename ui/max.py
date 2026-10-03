@@ -8,6 +8,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
+from asset_store import load_logo_bytes
 from card_generator import generate_card
 
 from automation_suite import (
@@ -27,8 +28,10 @@ from crm_core import (
     load_leads,
     update_lead,
     create_lead,
+    STATUSES as CRM_STATUSES,
 )
 from free_automation import (
+    content_bundle,
     conversion_metrics,
     create_order,
     customer_history,
@@ -81,13 +84,13 @@ def save_plan(plan):
 
 
 def get_logo():
-    path = Path("tenant_assets") / str(st.session_state.get("saas_tenant_id", "unknown")) / "logo.png"
-    if path.exists():
-        try:
-            return Image.open(path).convert("RGBA")
-        except Exception:
-            return None
-    return None
+    data = load_logo_bytes()
+    if not data:
+        return None
+    try:
+        return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
 
 
 ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]

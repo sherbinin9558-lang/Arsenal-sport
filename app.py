@@ -12,6 +12,7 @@ from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, a
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
+from asset_store import load_logo_bytes, save_logo_bytes
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
@@ -183,15 +184,17 @@ def _tenant_asset_root():
     return root
 
 def get_logo():
-    path = _tenant_asset_root() / "logo.png"
-    if path.exists():
-        try: return Image.open(path).convert("RGBA")
-        except Exception: return None
-    return None
+    data = load_logo_bytes()
+    if not data:
+        return None
+    try: return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception: return None
 
 def save_logo(f):
     img = Image.open(f).convert("RGBA")
-    img.save(_tenant_asset_root() / "logo.png")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    save_logo_bytes(buf.getvalue())
 
 # ==================== КАРТОЧКА ====================
 def get_font(size, bold=False):
