@@ -12,21 +12,29 @@ def _cfg(name, default=""):
     except Exception: value=os.getenv(name, default)
     return str(value or "").strip()
 
-SUPABASE_URL=_cfg("SUPABASE_URL").rstrip("/")
-SUPABASE_ANON_KEY=_cfg("SUPABASE_ANON_KEY")
+def _supabase_config():
+    # Read Secrets at runtime so Streamlit Secrets changes take effect without
+    # relying on module-import timing.
+    return _cfg("SUPABASE_URL").rstrip("/"), _cfg("SUPABASE_ANON_KEY")
 
-def saas_enabled(): return bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+def saas_enabled():
+    url, key = _supabase_config()
+    return bool(url and key)
 
 def demo_mode_enabled():
     return _cfg("DEMO_MODE","false").lower() in ("1","true","yes","on")
 
 def _headers(token=None):
-    h={"apikey":SUPABASE_ANON_KEY,"Content-Type":"application/json"}
+    _, key = _supabase_config()
+    h={"apikey":key,"Content-Type":"application/json"}
     if token: h["Authorization"]=f"Bearer {token}"
     return h
 
 def _request(method,path,token=None,**kwargs):
-    r=requests.request(method,f"{SUPABASE_URL}{path}",headers=_headers(token),timeout=20,**kwargs)
+    url, _ = _supabase_config()
+    if not url:
+        raise RuntimeError("SUPABASE_URL не настроен.")
+    r=requests.request(method,f"{url}{path}",headers=_headers(token),timeout=20,**kwargs)
     try: data=r.json()
     except Exception: data={"message":r.text}
     if not r.ok:
@@ -112,7 +120,8 @@ def login_ui():
     if saas_enabled():
         ok, message = supabase_health()
         if not ok:
-            st.error("Не удалось связаться с сервером аккаунтов. Проверьте настройки Supabase.")
+            st.error("Не удалось связаться с сервером аккаунтов.")
+            st.caption(message)
     tab1,tab2,tab3=st.tabs(["Войти","Создать магазин","Восстановить пароль"])
     with tab1:
         email=st.text_input("Email",key="saas_login_email")
