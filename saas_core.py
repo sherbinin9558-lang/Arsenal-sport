@@ -124,6 +124,17 @@ def render_account_bar():
             u=usage_snapshot()
             max_products=PLAN_LIMITS[plan]["products"]
             st.progress(min(1.0, u["products"]/max_products), text=f"Каталог · {u['products']} / {max_products}")
+        if saas_enabled():
+            try:
+                invites=my_invitations()
+                for inv in invites:
+                    st.info(f"Приглашение: роль «{inv.get('role')}»")
+                    if st.button("Принять приглашение", key=f"accept_inv_{inv.get('id')}", use_container_width=True):
+                        accept_invitation(inv.get("id"))
+                        st.success("Приглашение принято.")
+                        st.rerun()
+            except Exception:
+                pass
         if st.button("Выйти",key="saas_logout",use_container_width=True):
             token=st.session_state.get("saas_access_token")
             if token: sign_out(token)
