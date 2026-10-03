@@ -484,7 +484,7 @@ def _service_key():
 # ==================== PLATFORM OWNER CONSOLE ====================
 def platform_admin_enabled():
     email = _cfg("SAAS_ADMIN_EMAIL").lower()
-    return bool(email and st.session_state.get("saas_email","").lower() == email and _service_key())
+    return bool(email and st.session_state.get("saas_email","").lower() == email)
 
 def _admin_headers():
     key = _service_key()
