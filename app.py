@@ -541,6 +541,19 @@ def render_platform_admin():
             st.error(f"Не удалось сохранить: {e}")
 
     st.markdown("---")
+    st.markdown("### Настройки администратора")
+    st.caption("Системные настройки платформы. Чувствительные параметры не хранятся и не редактируются через клиентский интерфейс.")
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Доступ", "Разрешён")
+    s2.metric("Режим", "Platform Owner")
+    s3.metric("Управление", "Системное")
+    st.write("**Администратор платформы:** определяется серверной конфигурацией.")
+    st.write("**Безопасность:** секретные ключи и доступ к сервисной роли остаются вне интерфейса.")
+    st.caption("Изменение системных секретов выполняется только в настройках окружения. Это предотвращает сохранение чувствительных данных в базе и в клиентском коде.")
+    if st.button("↻ Обновить данные админ-панели", key="platform_admin_refresh", use_container_width=True):
+        st.rerun()
+
+    st.markdown("---")
     st.markdown("### Аккаунты")
     account_rows = []
     for u in users:
@@ -722,8 +735,7 @@ button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!imp
 /* MAX dialog. */
 div[data-testid="stDialog"]{display:flex!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:auto!important;}
 div[data-testid="stDialog"]>div,div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
-div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:relative!important;z-index:2147483647!important;background:linear-gradient(180deg,#ffffff 0%,#f8f9fc 100%)!important;color:#17151c!important;border:1px solid #d9ddea!important;border-radius:22px!important;box-shadow:0 28px 90px rgba(12,16,28,.34),0 0 0 1px rgba(91,92,226,.06)!important;max-height:90vh!important;overflow:auto!important;} div[data-testid="stDialog"] [role="dialog"]>button:first-of-type{width:38px!important;height:38px!important;border-radius:12px!important;border:1px solid #d7ff72!important;background:#b8ff00!important;color:#101500!important;box-shadow:0 0 16px rgba(184,255,0,.38)!important;right:14px!important;top:14px!important;} div[data-testid="stDialog"] [role="dialog"]>button:first-of-type:hover{background:#7cff00!important;transform:translateY(-1px)!important;}
-div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
+div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:relative!important;z-index:2147483647!important;background:linear-gradient(180deg,#ffffff 0%,#f8f9fc 100%)!important;color:#17151c!important;border:1px solid #d9ddea!important;border-radius:22px!important;box-shadow:0 28px 90px rgba(12,16,28,.34),0 0 0 1px rgba(91,92,226,.06)!important;max-height:90vh!important;overflow:auto!important;} div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
 [data-testid="stDialog"] [data-testid="stExpander"] button,div[role="dialog"] [data-testid="stExpander"] button{color:#b8ff00!important;opacity:1!important;}
 [data-testid="stDialog"] [data-testid="stExpander"] button svg,[data-testid="stDialog"] [data-testid="stExpander"] button svg *,div[role="dialog"] [data-testid="stExpander"] button svg,div[role="dialog"] [data-testid="stExpander"] button svg *{color:#b8ff00!important;stroke:#b8ff00!important;fill:none!important;opacity:1!important;stroke-width:3px!important;filter:drop-shadow(0 0 6px rgba(184,255,0,.9))!important;}
 .max-header{display:block!important;width:100%!important;padding:6px 52px 14px 0!important;border-bottom:1px solid #e8ebf1!important;margin-bottom:8px!important;}.max-header-title{font-size:clamp(1.25rem,2vw,1.55rem)!important;line-height:1.2!important;font-weight:950!important;letter-spacing:-.02em!important;color:#21164d!important;}.max-header-title span{color:#7cff00!important;text-shadow:0 0 8px rgba(184,255,0,.55)!important;}.max-header-subtitle{margin-top:4px!important;font-size:.82rem!important;color:#687182!important;}
