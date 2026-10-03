@@ -1,6 +1,6 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
-import hashlib, json, os, time
+import hashlib, json, os, re, time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
@@ -231,6 +231,36 @@ def validate_session():
     return _restore_session_from_access_token() or _restore_session_from_cookie()
 
 def _rest_get(path,token,params=None,headers=None): return _request("GET",path,token=token,headers=headers,params=params or {})
+
+def _rest_get_paged(path, token, params=None):
+    _, key = _supabase_config()
+    if not key:
+        raise SupabaseRequestError("SUPABASE_ANON_KEY не настроен.")
+    h = _headers(token)
+    h["Prefer"] = "count=exact"
+    response = requests.get(
+        f"{_supabase_config()[0]}{path}",
+        headers=h,
+        params=params or {},
+        timeout=20,
+    )
+    try:
+        data = response.json()
+    except Exception:
+        data = {"message": response.text}
+    if not response.ok:
+        raise SupabaseRequestError(
+            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
+            response.status_code,
+        )
+    total = None
+    content_range = response.headers.get("Content-Range", "")
+    if "/" in content_range:
+        try:
+            total = int(content_range.rsplit("/", 1)[1])
+        except (TypeError, ValueError):
+            total = None
+    return data, total
 def _rest_post(path,token,payload,headers=None): return _request("POST",path,token=token,headers=headers,json=payload)
 def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
 def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
@@ -627,12 +657,14 @@ _INTERNAL_RECORD_KEY = "_saas_record_id"
 def _clean_payload(row):
     if not isinstance(row, dict):
         return row
-    return {k: v for k, v in row.items() if k != _INTERNAL_RECORD_KEY}
+    return {k: v for k, v in row.items() if k not in {_INTERNAL_RECORD_KEY, "_saas_updated_at"}}
 
 
 def _prepare_loaded_payload(row):
     payload = dict(row.get("payload") or {})
     payload[_INTERNAL_RECORD_KEY] = str(row.get("record_id"))
+    if row.get("updated_at"):
+        payload["_saas_updated_at"] = row.get("updated_at")
     return payload
 
 
@@ -686,6 +718,84 @@ def data_load(entity,default):
 
     st.session_state[_data_session_key(entity)] = baseline
     return loaded
+
+
+def data_load_page(entity, page=1, page_size=50, search="", category="Все"):
+    """Load one page only; designed for catalogs with thousands of records."""
+    entity = _validate_data_entity(entity)
+    page = max(1, int(page or 1))
+    page_size = max(10, min(100, int(page_size or 50)))
+    search = str(search or "").strip()
+    category = str(category or "Все").strip()
+
+    if not saas_enabled():
+        rows = data_load(entity, [])
+        q = search.lower()
+        if q:
+            rows = [r for r in rows if q in " ".join(str(r.get(k, "")) for k in ("name", "brand", "article")).lower()]
+        if category and category != "Все":
+            rows = [r for r in rows if r.get("category", "Другое") == category]
+        total = len(rows)
+        start = (page - 1) * page_size
+        return {"rows": rows[start:start + page_size], "total": total, "page": page, "page_size": page_size}
+
+    token = st.session_state.get("saas_access_token")
+    params = {
+        "select": "record_id,payload,created_at,updated_at",
+        "tenant_id": f"eq.{tenant_id()}",
+        "entity": f"eq.{entity}",
+        "order": "created_at.desc,record_id.desc",
+        "limit": str(page_size),
+        "offset": str((page - 1) * page_size),
+    }
+    if search:
+        q = re.sub(r"[*(),]", " ", search).strip()
+        if q:
+            params["or"] = f"(payload->>name.ilike.*{q}*,payload->>brand.ilike.*{q}*,payload->>article.ilike.*{q}*)"
+    if category and category != "Все":
+        params["payload->>category"] = f"eq.{category}"
+
+    rows, total = _rest_get_paged("/rest/v1/app_data", token, params=params)
+    prepared = [_prepare_loaded_payload(row) for row in rows]
+    return {"rows": prepared, "total": int(total if total is not None else len(prepared)), "page": page, "page_size": page_size}
+
+
+def data_update_record(entity, record_id, payload, expected_updated_at):
+    """Atomically update one record without rewriting the whole entity."""
+    entity = _validate_data_entity(entity)
+    if not record_id or not expected_updated_at:
+        raise DataConflictError("Не удалось проверить версию записи. Обновите страницу и повторите.")
+    if saas_enabled() and not can("write_data"):
+        raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
+    try:
+        _rest_post("/rest/v1/rpc/save_app_data_batch", st.session_state.get("saas_access_token"), {
+            "p_tenant_id": tenant_id(), "p_entity": entity,
+            "p_rows": [{"record_id": str(record_id), "payload": _clean_payload(payload),
+                        "expected_updated_at": expected_updated_at, "is_new": False, "is_deleted": False}],
+        })
+    except SupabaseRequestError as e:
+        if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
+            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
+        raise
+
+
+def data_delete_record(entity, record_id, expected_updated_at):
+    """Atomically delete one record without rewriting the whole entity."""
+    entity = _validate_data_entity(entity)
+    if not record_id or not expected_updated_at:
+        raise DataConflictError("Не удалось проверить версию записи. Обновите страницу и повторите.")
+    if saas_enabled() and not can("write_data"):
+        raise PermissionError("У вашей роли нет прав на изменение данных магазина.")
+    try:
+        _rest_post("/rest/v1/rpc/save_app_data_batch", st.session_state.get("saas_access_token"), {
+            "p_tenant_id": tenant_id(), "p_entity": entity,
+            "p_rows": [{"record_id": str(record_id), "expected_updated_at": expected_updated_at,
+                        "is_new": False, "is_deleted": True}],
+        })
+    except SupabaseRequestError as e:
+        if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
+            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
+        raise
 
 
 def data_save(entity,rows):
