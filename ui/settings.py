@@ -38,7 +38,7 @@ def render_settings(*, load_settings, save_settings, templates, get_logo, save_l
         hashtags = st.text_input("Стандартные хэштеги", value=settings["hashtags"], key="settings_hashtags")
     with c2:
         main_sport = st.selectbox("Основной спорт", ["Футбол", "Баскетбол", "Все виды спорта"], index=["Футбол", "Баскетбол", "Все виды спорта"].index(settings["main_sport"]) if settings["main_sport"] in ["Футбол", "Баскетбол", "Все виды спорта"] else 0, key="settings_main_sport")
-        card_template = st.selectbox("Шаблон карточки", list(templates.keys()), index=list(templates.keys()).index(settings["card_template"]) if settings["card_template"] in TEMPLATES else 0, key="settings_card_template")
+        card_template = st.selectbox("Шаблон карточки", list(templates.keys()), index=list(templates.keys()).index(settings["card_template"]) if settings["card_template"] in templates else 0, key="settings_card_template")
         show_price_on_cards = st.selectbox("Показывать цену на карточках", ["Нет", "Да"], index=0 if settings["show_price_on_cards"] == "Нет" else 1, key="settings_show_price")
     
     st.markdown("### 🤖 AI-продавец")
