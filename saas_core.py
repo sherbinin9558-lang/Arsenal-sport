@@ -538,6 +538,7 @@ def data_load(entity,default):
         baseline[record_id] = {
             "updated_at": row.get("updated_at"),
             "created_at": row.get("created_at"),
+            "payload": dict(row.get("payload") or {}),
         }
         loaded.append(_prepare_loaded_payload(row))
 
@@ -575,7 +576,11 @@ def data_save(entity,rows):
             "payload":clean,
         }
         if record_id in baseline:
-            existing_payload.append(item)
+            # Only send an UPDATE when this session actually changed the row.
+            # This keeps unrelated parallel additions independent and avoids
+            # unnecessary version bumps/conflicts.
+            if item["payload"] != baseline[record_id].get("payload", {}):
+                existing_payload.append(item)
         else:
             new_payload.append(item)
 
