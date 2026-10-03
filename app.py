@@ -10,8 +10,9 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
-from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
+from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
+from ui.catalog import render_catalog
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -75,22 +76,31 @@ def _find_record_index(rows, record_id):
             return idx
     return None
 
-def update_product(record_id, prod):
+def update_product(record_id, prod, existing=None):
+    if existing is not None and existing.get("_saas_record_id") and existing.get("_saas_updated_at") and saas_enabled():
+        merged = dict(existing)
+        merged.update(dict(prod or {}))
+        merged.pop("_saas_updated_at", None)
+        data_update_record("products", existing["_saas_record_id"], merged, existing["_saas_updated_at"])
+        return
     p = load_products()
     idx = _find_record_index(p, record_id)
     if idx is not None:
-        existing = dict(p[idx] or {})
+        current = dict(p[idx] or {})
         updated = dict(prod or {})
-        stable_id = existing.get("_saas_record_id")
-        existing.update(updated)
+        stable_id = current.get("_saas_record_id")
+        current.update(updated)
         if stable_id:
-            existing["_saas_record_id"] = stable_id
+            current["_saas_record_id"] = stable_id
         else:
-            existing.pop("_saas_record_id", None)
-        p[idx] = existing
+            current.pop("_saas_record_id", None)
+        p[idx] = current
         save_products(p)
 
-def delete_product(record_id):
+def delete_product(record_id, existing=None):
+    if existing is not None and existing.get("_saas_record_id") and existing.get("_saas_updated_at") and saas_enabled():
+        data_delete_record("products", existing["_saas_record_id"], existing["_saas_updated_at"])
+        return
     p = load_products()
     idx = _find_record_index(p, record_id)
     if idx is not None:
@@ -1110,133 +1120,15 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
 # ========== 2: КАТАЛОГ ==========
 with tab2:
-    st.markdown('<div class="section-kicker">PRODUCT LIBRARY</div><div class="section-title">Каталог</div><div class="section-subtitle">Все товары и готовые материалы — в одном рабочем пространстве.</div>', unsafe_allow_html=True)
-    st.info("➕ Для нового товара откройте вкладку «📸 Создать».")
-
-    st.markdown("### 📥 Массовая загрузка товаров")
-    st.caption("Загрузите CSV или XLSX — товары добавятся в каталог без удаления существующих.")
-    template_csv = io.StringIO()
-    writer = csv.writer(template_csv, delimiter=";")
-    writer.writerow(["Название", "Бренд", "Артикул", "Размеры", "Цвет", "Категория", "Описание", "Характеристики"])
-    writer.writerow(["Футбольная форма", "Пример", "ART-001", "S,M,L,XL", "Чёрный", "Другое", "Описание товара", "Материал, особенности"])
-    st.download_button(
-        "⬇️ Скачать шаблон CSV",
-        template_csv.getvalue().encode("utf-8-sig"),
-        file_name="ai_agent_content_manager_products_template.csv",
-        mime="text/csv",
-        key="bulk_template_csv",
+    render_catalog(
+        categories=CATEGORIES,
+        category_emoji=CATEGORY_EMOJI,
+        data_load_page=data_load_page,
+        update_product=update_product,
+        delete_product=delete_product,
+        bulk_import_products=bulk_import_products,
+        data_conflict_error=DataConflictError,
     )
-    bulk_file = st.file_uploader(
-        "Файл с товарами",
-        type=["csv", "xlsx"],
-        key="bulk_products_file",
-        help="В CSV используйте первую строку как названия колонок. Для XLSX — первая строка должна содержать заголовки.",
-    )
-    bulk_update = st.checkbox("Обновлять существующие товары по артикулу", value=False, key="bulk_update_existing")
-    if bulk_file and st.button("📦 Импортировать товары", type="primary", key="bulk_import_btn"):
-        try:
-            added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
-            st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
-            if errors:
-                with st.expander("⚠️ Строки с ошибками"):
-                    for err in errors[:50]:
-                        st.write(err)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Не удалось импортировать файл: {e}")
-
-    st.markdown("---")
-    products = load_products()
-    if not products:
-        st.info("Каталог пуст.")
-    else:
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            search = st.text_input("🔍 Поиск")
-        with c2:
-            cat_filter = st.selectbox("Категория", ["Все"] + CATEGORIES)
-        with c3:
-            sort_by = st.selectbox("Сортировка", ["Сначала новые","Сначала старые","По названию","По бренду"])
-
-        filtered = []
-        for i, p in enumerate(products):
-            if search and search.lower() not in (p.get('name','') + p.get('brand','') + p.get('article','')).lower():
-                continue
-            if cat_filter != "Все" and p.get('category','Другое') != cat_filter:
-                continue
-            filtered.append((i, p))
-
-        if sort_by == "Сначала старые":
-            filtered = sorted(filtered, key=lambda x: x[0])
-        elif sort_by == "По названию":
-            filtered = sorted(filtered, key=lambda x: x[1].get('name','').lower())
-        elif sort_by == "По бренду":
-            filtered = sorted(filtered, key=lambda x: x[1].get('brand','').lower())
-        else:
-            filtered = sorted(filtered, key=lambda x: x[0], reverse=True)
-
-        st.caption(f"Найдено: {len(filtered)} из {len(products)}")
-        st.markdown("---")
-
-        for real_i, p in filtered:
-            with st.expander(f"{CATEGORY_EMOJI.get(p.get('category',''),'📦')} {p.get('brand','')} {p.get('name','')} — {p.get('article','')}"):
-                edit = st.toggle("✏️ Редактировать", key=f"edit_{real_i}")
-                if edit:
-                    ec1, ec2 = st.columns(2)
-                    with ec1:
-                        nn = st.text_input("Название", p.get('name',''), key=f"n_{real_i}")
-                        nb = st.text_input("Бренд", p.get('brand',''), key=f"b_{real_i}")
-                        na = st.text_input("Артикул", p.get('article',''), key=f"a_{real_i}")
-                    with ec2:
-                        ns = st.text_input("Размеры", p.get('sizes',''), key=f"s_{real_i}")
-                        nc = st.text_input("Цвет", p.get('color',''), key=f"c_{real_i}")
-                        ncat = st.selectbox("Категория", CATEGORIES,
-                            index=CATEGORIES.index(p.get('category','Другое')) if p.get('category','Другое') in CATEGORIES else 5,
-                            key=f"ct_{real_i}")
-                    nd = st.text_area("Описание", p.get('description',''), key=f"d_{real_i}")
-                    nsp = st.text_input("Характеристики", p.get('specs',''), key=f"sp_{real_i}")
-                    new_original = st.file_uploader(
-                        "📷 Исходное фото товара",
-                        type=["jpg", "jpeg", "png", "webp"],
-                        key=f"orig_{real_i}",
-                        help="Фото будет использоваться для автоматического создания карточки и Reels."
-                    )
-                    if st.button("💾 Сохранить", key=f"save_{real_i}"):
-                        updated = {
-                            "name": nn, "brand": nb, "article": na, "sizes": ns,
-                            "color": nc, "description": nd, "specs": nsp,
-                            "category": ncat, "date_added": p.get('date_added', str(datetime.date.today())),
-                            "price": p.get("price", ""),
-                            "stock": p.get("stock", 0),
-                            "total_stock": p.get("total_stock", p.get("stock", 0)),
-                            "stock_by_size": p.get("stock_by_size", {}),
-                        }
-                        # Не теряем сохранённую карточку и исходное фото.
-                        if p.get("card_image"):
-                            updated["card_image"] = p["card_image"]
-                        if p.get("original_image"):
-                            updated["original_image"] = p["original_image"]
-                        if new_original:
-                            original_buf = io.BytesIO()
-                            Image.open(new_original).convert("RGB").save(
-                                original_buf, format="JPEG", quality=95
-                            )
-                            updated["original_image"] = base64.b64encode(
-                                original_buf.getvalue()
-                            ).decode("ascii")
-                        update_product(p.get("_saas_record_id") or real_i, updated)
-                        st.success("Обновлено!")
-                        st.rerun()
-                else:
-                    st.write(f"**Размеры:** {p.get('sizes','—')}")
-                    st.write(f"**Цвет:** {p.get('color','—')}")
-                    st.write(f"**Описание:** {p.get('description','—')}")
-                    st.write(f"**Характеристики:** {p.get('specs','—')}")
-                    st.caption(f"Добавлено: {p.get('date_added','—')}")
-
-                if st.button("🗑️ Удалить", key=f"del_{real_i}"):
-                    delete_product(p.get("_saas_record_id") or real_i)
-                    st.rerun()
 
 # ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
 with tab3:
