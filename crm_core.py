@@ -24,6 +24,10 @@ def create_lead(name="", contact="", source="Website", message="", product="", p
     return lead
 
 def update_lead(lead_id, **changes):
+    if "id" in changes:
+        raise ValueError("Идентификатор лида нельзя изменять.")
+    if "status" in changes and changes["status"] not in STATUSES:
+        raise ValueError(f"Недопустимый статус лида: {changes['status']}")
     leads = load_leads()
     for lead in leads:
         if lead.get("id") == lead_id:
