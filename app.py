@@ -1770,6 +1770,34 @@ def render_max():
             p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
             p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
             st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
+            from saas_core import plan_catalog, subscription_snapshot, request_plan_change
+            sub=subscription_snapshot()
+            st.markdown("### 💳 Подписка")
+            status_names={"trialing":"Пробный период","active":"Активна","past_due":"Требует оплаты","canceled":"Отменена","unknown":"Статус уточняется"}
+            st.write(f"**Статус:** {status_names.get(sub.get('status'), sub.get('status','—'))}")
+            st.write(f"**Провайдер оплаты:** {sub.get('provider') or 'не подключён'}")
+            if sub.get("current_period_end"):
+                st.write(f"**Период до:** {sub['current_period_end']}")
+            st.caption("Оплата пока не списывается. Кнопки ниже фиксируют выбранный тариф и подготовлены для подключения платёжного провайдера.")
+            plans=plan_catalog()
+            b1,b2,b3=st.columns(3)
+            for col,(key,info) in zip((b1,b2,b3),plans.items()):
+                with col:
+                    col.markdown(f"### {info['name']}")
+                    col.write(info["description"])
+                    col.caption(f"Каталог: до {info['products']:,} · команда: до {info['users']}".replace(",", " "))
+                    if key == tenant_plan():
+                        col.success("Текущий тариф")
+                    elif st.button(f"Выбрать {info['name']}", key=f"choose_plan_{key}", use_container_width=True):
+                        request_plan_change(key)
+                        st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
+            requested=st.session_state.get("requested_plan")
+            if requested:
+                st.info(f"Подготовлен переход на тариф **{plans[requested]['name']}**. Реальная активация произойдёт после подтверждения оплаты.")
+            st.markdown("---")
+            st.markdown("### 🔐 Безопасность оплаты")
+            st.caption("Платёжные данные и секретные ключи не хранятся в интерфейсе или каталоге магазина.")
+
             st.markdown("---")
             st.markdown("### 👥 Команда магазина")
             from saas_core import current_role, team_members, team_invitations, create_team_invitation, limit
