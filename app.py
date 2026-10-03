@@ -1082,7 +1082,7 @@ with tab3:
 
             col_a, col_b = st.columns(2)
             with col_a:
-                if st.button(
+                if can("write_data") and st.button(
                     "🚀 Опубликовать в Telegram",
                     type="primary",
                     key=f"pub_tg_text_{st.session_state.get('text_generation_id', 0)}"
@@ -1325,13 +1325,13 @@ with tab4:
             pub1, pub2, pub3 = st.columns(3)
 
             with pub1:
-                if st.button("✈️ В Telegram", key="publish_reel_tg"):
+                if can("write_data") and st.button("✈️ В Telegram", key="publish_reel_tg"):
                     with st.spinner("Отправляю Reels в Telegram..."):
                         ok, msg = publish_reel_to_telegram(video_bytes, reel_caption)
                     (st.success if ok else st.error)(msg)
 
             with pub2:
-                if st.button("🅥 В VK", key="publish_reel_vk"):
+                if can("write_data") and st.button("🅥 В VK", key="publish_reel_vk"):
                     with st.spinner("Отправляю Reels в VK..."):
                         ok, msg = publish_reel_to_vk(video_bytes, reel_caption)
                     (st.success if ok else st.error)(msg)
@@ -1418,7 +1418,7 @@ with tab5:
                 with st.expander(f"{item.get('date','')} · {item.get('product','')} · {item.get('platform','')}"):
                     st.write(f"**Идея:** {item.get('idea','')}")
                     cs = item.get("status", "Идея")
-                    ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}")
+                    ns = st.selectbox("Этап", STATUSES, index=STATUSES.index(cs) if cs in STATUSES else 0, key=f"st_{ri}", disabled=not can("write_data"))
                     if can("write_data") and ns != cs:
                         updated = change_status(item, ns)
                         update_plan(item.get("_saas_record_id") or ri, updated)
