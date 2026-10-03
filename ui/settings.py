@@ -6,6 +6,18 @@ def render_settings(*, load_settings, save_settings, templates, get_logo, save_l
     settings = load_settings()
     
     st.markdown("### 🏪 Магазин")
+    st.markdown("### 🖼️ Логотип магазина")
+    current_logo = get_logo()
+    if current_logo is not None:
+        st.image(current_logo, width=180)
+    logo_file = st.file_uploader("Загрузить логотип", type=["png", "jpg", "jpeg", "webp"], key="settings_logo_upload")
+    if logo_file and st.button("Сохранить логотип", key="save_store_logo"):
+        try:
+            save_logo(logo_file)
+            st.success("Логотип сохранён.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось сохранить логотип: {e}")
     s1, s2 = st.columns(2)
     with s1:
         store_name = st.text_input("Название магазина", value=settings["store_name"], key="settings_store_name")
