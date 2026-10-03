@@ -1804,8 +1804,22 @@ def render_max():
             p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
             p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
             st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
-            from saas_core import plan_catalog, subscription_snapshot, request_plan_change
+            from saas_core import plan_catalog, subscription_snapshot, request_plan_change, set_auto_renew, current_role
             sub=subscription_snapshot()
+            st.markdown("### 🔄 Автопродление")
+            try:
+                sub_auto=subscription_snapshot()
+                auto_default=bool(sub_auto.get("auto_renew", st.session_state.get("auto_renew", False)))
+                if current_role() in ("owner","admin"):
+                    auto=st.toggle("Автоматически продлевать подписку", value=auto_default, key="billing_auto_renew")
+                    if auto != auto_default:
+                        set_auto_renew(auto)
+                        st.success("Настройка автопродления сохранена.")
+                else:
+                    st.caption("Изменять автопродление может только владелец или администратор.")
+            except Exception as e:
+                st.info(f"Автопродление пока не настроено: {e}")
+            st.markdown("---")
             st.markdown("### 💳 Подписка")
             status_names={"trialing":"Пробный период","active":"Активна","past_due":"Требует оплаты","canceled":"Отменена","unknown":"Статус уточняется"}
             st.write(f"**Статус:** {status_names.get(sub.get('status'), sub.get('status','—'))}")
