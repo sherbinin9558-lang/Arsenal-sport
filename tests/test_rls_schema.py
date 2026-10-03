@@ -20,8 +20,8 @@ class RlsSchemaRegressionTests(unittest.TestCase):
 
     def test_tenant_helpers_are_security_definer_and_locked_down(self):
         for name in ("is_tenant_member", "is_tenant_writer", "is_tenant_admin"):
-            fn = rf"create or replace function public\.{name}\(target_tenant uuid\)(.*?)(?=create or replace function public\.|alter table public\.invitations)",
-            self.assertRegex(self.sql, fn[0], name)
+            fn = rf"(?s)create or replace function public\.{name}\(target_tenant uuid\)(.*?)(?=create or replace function public\.|alter table public\.invitations)"
+            self.assertRegex(self.sql, fn, name)
             self.assertIn(
                 f"revoke all on function public.{name}(uuid) from public;",
                 self.sql,

@@ -5,6 +5,7 @@ the payment to the checkout session stored in Supabase, verifies the current
 payment state with T-Bank, and only then activates the subscription.
 """
 
+import hmac
 import os
 import requests
 from fastapi import FastAPI, Request, HTTPException
@@ -103,7 +104,7 @@ def _verify_webhook_secret(request: Request):
     expected = _env("TBANK_WEBHOOK_SECRET")
     if expected:
         auth = request.headers.get("authorization", "")
-        if auth != f"Bearer {expected}":
+        if not hmac.compare_digest(auth.encode("utf-8"), f"Bearer {expected}".encode("utf-8")):
             raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -130,7 +131,7 @@ async def payment_status(request: Request):
             expected_token = _token(body)
         except Exception:
             expected_token = ""
-        if supplied_token != expected_token:
+        if not hmac.compare_digest(str(supplied_token).encode("utf-8"), expected_token.encode("utf-8")):
             raise HTTPException(status_code=401, detail="Invalid webhook token")
 
     payment_id = str(payment_id)

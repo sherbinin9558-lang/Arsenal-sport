@@ -8,6 +8,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
+from asset_store import load_logo_bytes
 from card_generator import generate_card
 
 from automation_suite import (
@@ -27,8 +28,10 @@ from crm_core import (
     load_leads,
     update_lead,
     create_lead,
+    STATUSES as CRM_STATUSES,
 )
 from free_automation import (
+    content_bundle,
     conversion_metrics,
     create_order,
     customer_history,
@@ -81,13 +84,13 @@ def save_plan(plan):
 
 
 def get_logo():
-    path = Path("tenant_assets") / str(st.session_state.get("saas_tenant_id", "unknown")) / "logo.png"
-    if path.exists():
-        try:
-            return Image.open(path).convert("RGBA")
-        except Exception:
-            return None
-    return None
+    data = load_logo_bytes()
+    if not data:
+        return None
+    try:
+        return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
 
 
 ORDER_STATUSES = ["Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен", "Завершён", "Отменён"]
@@ -560,8 +563,12 @@ def render_max():
                             continue
                         try:
                             source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
-                            path = save_uploaded_photo(f, products_now[idx], idx)
-                            products_now[idx]["original_image"] = path
+                            # Same format as the catalog editor in app.py: base64 JPEG.
+                            original_buf = io.BytesIO()
+                            source_img.save(original_buf, format="JPEG", quality=95)
+                            products_now[idx]["original_image"] = base64.b64encode(
+                                original_buf.getvalue()
+                            ).decode("ascii")
                             p_now = products_now[idx]
                             card_img = generate_card(
                                 source_img,
@@ -639,7 +646,7 @@ def render_max():
                 else:
                     value = st.text_input("Новое значение", key="auto_bulk_value_text")
                 if can("write_data") and st.button("✏️ Применить к выбранным", type="primary", key="auto_bulk_apply"):
-                    if not indexes:
+                    if not selected_indexes:
                         st.warning("Выберите хотя бы один товар.")
                     elif not str(value).strip():
                         st.warning("Значение не должно быть пустым.")
