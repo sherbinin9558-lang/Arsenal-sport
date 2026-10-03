@@ -1195,6 +1195,18 @@ def render_max():
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
+st.markdown("""
+<style>
+button[key="sidebar_max"]{
+background:linear-gradient(135deg,#b8ff00,#7cff00)!important;
+color:#101500!important;
+border:1px solid #d7ff72!important;
+box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.42)!important;
+font-weight:900!important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 if not require_saas_access():
     st.stop()
 
@@ -1250,7 +1262,9 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
-    st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max", on_click=_open_max_from_sidebar)
+    if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
+        st.session_state["open_max"] = True
+        st.rerun()
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
@@ -1359,10 +1373,6 @@ def _max_launcher_fragment():
     if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
         st.session_state["open_max"] = True
         render_max()
-
-def _open_max_from_sidebar():
-    st.session_state["open_max"] = True
-    st.rerun("max_launcher")
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
