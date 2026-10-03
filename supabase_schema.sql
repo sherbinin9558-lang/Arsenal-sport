@@ -164,6 +164,34 @@ alter table public.memberships enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.app_data enable row level security;
 
+create or replace function public.is_tenant_writer(target_tenant uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1 from public.memberships
+    where user_id = auth.uid()
+      and tenant_id = target_tenant
+      and role in ('owner','admin','manager','editor')
+  );
+$$;
+
+create or replace function public.is_tenant_admin(target_tenant uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1 from public.memberships
+    where user_id = auth.uid()
+      and tenant_id = target_tenant
+      and role in ('owner','admin')
+  );
+$$;
+
 drop policy if exists "tenant members can read tenants" on public.tenants;
 create policy "tenant members can read tenants" on public.tenants
 for select to authenticated using ((select public.is_tenant_member(id)));
@@ -241,33 +269,7 @@ create index if not exists idx_invitations_tenant on public.invitations(tenant_i
 create index if not exists idx_invitations_email on public.invitations(lower(email));
 create index if not exists idx_invitations_invited_by on public.invitations(invited_by);
 
-create or replace function public.is_tenant_writer(target_tenant uuid)
-returns boolean
-language sql
-security definer
-set search_path = ''
-as $
-  select exists (
-    select 1 from public.memberships
-    where user_id = auth.uid()
-      and tenant_id = target_tenant
-      and role in ('owner','admin','manager','editor')
-  );
-$$;
 
-create or replace function public.is_tenant_admin(target_tenant uuid)
-returns boolean
-language sql
-security definer
-set search_path = ''
-as $
-  select exists (
-    select 1 from public.memberships
-    where user_id = auth.uid()
-      and tenant_id = target_tenant
-      and role in ('owner','admin')
-  );
-$$;
 
 -- Restrict SECURITY DEFINER tenant helpers to authenticated callers.
 revoke all on function public.is_tenant_member(uuid) from public;
