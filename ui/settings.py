@@ -88,5 +88,6 @@ def render_settings(*, load_settings, save_settings, templates, get_logo, save_l
             "ai_escalation_reply": ai_escalation_reply,
             "faq": [{"question": line.split("|",1)[0].strip(), "answer": line.split("|",1)[1].strip()} for line in faq_input.splitlines() if "|" in line and line.split("|",1)[0].strip() and line.split("|",1)[1].strip()],
         })
-        st
+        st.success("Настройки сохранены.")
+        st.rerun()
     
