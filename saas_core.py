@@ -131,6 +131,34 @@ def render_account_bar():
                 if k.startswith("saas_"): del st.session_state[k]
             st.rerun()
 
+def onboarding_complete():
+    if not saas_enabled():
+        return True
+    settings=data_load("settings", [])
+    return bool(settings and isinstance(settings[0], dict) and settings[0].get("onboarding_complete"))
+
+def render_onboarding():
+    st.markdown("## 🚀 Настройка магазина")
+    st.caption("Заполним основные данные один раз. Их можно изменить позже в настройках.")
+    with st.form("saas_onboarding_form"):
+        business=st.selectbox("Тип бизнеса", ["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"], key="onb_business")
+        city=st.text_input("Город / регион", key="onb_city")
+        telegram=st.text_input("Telegram магазина", placeholder="@your_store", key="onb_telegram")
+        instagram=st.text_input("Instagram", placeholder="@your_store", key="onb_instagram")
+        shipping=st.selectbox("Доставка", ["По России","По региону","Самовывоз","Другое"], key="onb_shipping")
+        submitted=st.form_submit_button("Сохранить и открыть платформу", type="primary", use_container_width=True)
+    if submitted:
+        data_save("settings", [{
+            "business_type": business,
+            "city": city.strip(),
+            "telegram": telegram.strip(),
+            "instagram": instagram.strip(),
+            "shipping": shipping,
+            "onboarding_complete": True
+        }])
+        st.session_state["saas_onboarding_complete"]=True
+        st.rerun()
+
 def require_saas_access():
     if not saas_enabled():
         if not st.session_state.get("saas_demo"):
@@ -146,7 +174,11 @@ def require_saas_access():
     try:
         user=get_user(token); tenant=current_tenant(token,user.get("id"))
         if not tenant: raise RuntimeError("Магазин не найден.")
-        _set_identity(user,tenant); render_account_bar(); return True
+        _set_identity(user,tenant)
+        if not onboarding_complete() and not st.session_state.get("saas_onboarding_complete"):
+            render_onboarding()
+            return False
+        render_account_bar(); return True
     except Exception:
         for k in list(st.session_state):
             if k.startswith("saas_"): del st.session_state[k]
