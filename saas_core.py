@@ -298,12 +298,12 @@ def can(action):
     role=current_role()
     if role=="owner":
         return True
-    if action in ("read","write_data"):
+    if action=="read":
+        return role in ("admin","manager","editor","viewer")
+    if action=="write_data":
         return role in ("admin","manager","editor")
-    if action in ("billing","team","settings"):
+    if action in ("billing","team","settings","manage_roles"):
         return role=="admin"
-    if action=="manage_roles":
-        return role in ("owner","admin")
     return False
 
 def set_member_role(target_user,new_role):
