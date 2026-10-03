@@ -107,11 +107,23 @@ def login_ui():
                         else: st.success("Магазин создан. Войдите после подтверждения email.")
                 except Exception as e: st.error(f"Не удалось создать магазин: {e}")
 
+def usage_snapshot():
+    products=len(data_load("products", []))
+    leads=len(data_load("leads", []))
+    orders=len(data_load("orders", []))
+    content=len(data_load("content_plan", []))
+    return {"products": products, "leads": leads, "orders": orders, "content": content}
+
 def render_account_bar():
     with st.sidebar:
         st.markdown("---")
         st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
-        st.caption(f"Тариф · {str(st.session_state.get('saas_plan','trial')).upper()}")
+        plan=str(st.session_state.get('saas_plan','trial')).lower()
+        st.caption(f"Тариф · {plan.upper()}")
+        if plan in PLAN_LIMITS:
+            u=usage_snapshot()
+            max_products=PLAN_LIMITS[plan]["products"]
+            st.progress(min(1.0, u["products"]/max_products), text=f"Каталог · {u['products']} / {max_products}")
         if st.button("Выйти",key="saas_logout",use_container_width=True):
             token=st.session_state.get("saas_access_token")
             if token: sign_out(token)
