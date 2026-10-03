@@ -201,5 +201,27 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("attempts < 3", source)
 
 
+
+
+class RoleBasedUiRegressionTests(unittest.TestCase):
+    def test_write_controls_are_gated_in_catalog_and_content(self):
+        root = Path(__file__).resolve().parents[1]
+        catalog = (root / "ui" / "catalog.py").read_text(encoding="utf-8")
+        app = (root / "app.py").read_text(encoding="utf-8")
+        self.assertIn("can_write", catalog)
+        self.assertIn('if can_write and st.button("📦 Импортировать товары"', catalog)
+        self.assertIn('if can_write and st.button("🗑️ Удалить"', catalog)
+        self.assertIn('if can("write_data") and st.form_submit_button("📌 Добавить в workflow")', app)
+        self.assertIn('disabled=not can("write_data")', app)
+
+    def test_settings_ui_preserves_identity_and_requires_settings_permission(self):
+        root = Path(__file__).resolve().parents[1]
+        settings = (root / "ui" / "settings.py").read_text(encoding="utf-8")
+        max_ui = (root / "ui" / "max.py").read_text(encoding="utf-8")
+        app = (root / "app.py").read_text(encoding="utf-8")
+        self.assertIn('st.success("Настройки сохранены.")', settings)
+        self.assertIn('if can("settings"):', app)
+        self.assertIn('payload["_saas_record_id"] = current["_saas_record_id"]', max_ui)
+
 if __name__ == "__main__":
     unittest.main()
