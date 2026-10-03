@@ -289,8 +289,8 @@ for select using (public.is_tenant_admin(tenant_id));
 
 drop policy if exists "admins can create invitations" on public.invitations;
 create policy "admins can create invitations" on public.invitations
-for insert with check (
-  public.is_tenant_admin(tenant_id)
+for insert to authenticated with check (
+  (select public.is_tenant_admin(tenant_id))
   and invited_by = auth.uid()
   and role in ('admin','manager','editor','viewer')
 );
@@ -329,7 +329,7 @@ using (public.is_tenant_member(tenant_id));
 -- Invitation acceptance by the invited account.
 drop policy if exists "invitees can read own invitations" on public.invitations;
 create policy "invitees can read own invitations" on public.invitations
-for select using (lower(email) = lower(coalesce(auth.jwt()->>'email','')) and status = 'pending' and expires_at > now());
+for select to authenticated using (lower(email) = lower(coalesce((select auth.jwt()->>'email'),'')) and status = 'pending' and expires_at > now());
 
 create or replace function public.accept_invitation(invite_id uuid)
 returns uuid
