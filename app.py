@@ -1611,6 +1611,8 @@ def save_settings(data):
 with tab7:
     if can("settings"):
         render_settings(
-        load_settings=load_settings, save_settings=save_settings, templates=TEMPLATES,
-        get_logo=get_logo, save_logo=save_logo,
-    )
+            load_settings=load_settings, save_settings=save_settings, templates=TEMPLATES,
+            get_logo=get_logo, save_logo=save_logo,
+        )
+    else:
+        st.info("Настройки магазина доступны только владельцу и администратору.")
