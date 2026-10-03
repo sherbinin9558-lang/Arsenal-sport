@@ -9,7 +9,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance
-from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription, can
+from saas_core import require_saas_access, render_account_bar, data_load, data_save, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -405,6 +405,109 @@ def publish_reel_to_vk(video_bytes, caption):
     except Exception as e:
         return False, f"Ошибка VK: {e}"
 
+
+# ==================== OWNER CONSOLE ====================
+def render_platform_admin():
+    st.markdown(
+        '<div class="dashboard-hero">'
+        '<div class="dashboard-hero-kicker">PLATFORM OWNER</div>'
+        '<div class="dashboard-hero-title">Админ-панель платформы</div>'
+        '<div class="dashboard-hero-text">Управление магазинами, тарифами, подписками и аккаунтами AI Agent Content Manager.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        tenants, subs, members, users = platform_admin_snapshot()
+    except Exception as e:
+        st.error(f"Не удалось загрузить данные админ-панели: {e}")
+        return
+
+    sub_by_tenant = {str(x.get("tenant_id")): x for x in subs}
+    owner_by_tenant = {}
+    for m in members:
+        if m.get("role") == "owner" and str(m.get("tenant_id")) not in owner_by_tenant:
+            owner_by_tenant[str(m.get("tenant_id"))] = m.get("user_id")
+    email_by_user = {str(u.get("id")): u.get("email","") for u in users}
+
+    active = sum(1 for t in tenants if str(t.get("status","")).lower() == "active")
+    trial = sum(1 for t in tenants if str(t.get("plan","")).lower() == "trial")
+    paid = sum(1 for t in tenants if str(t.get("plan","")).lower() in ("starter","pro","business"))
+
+    k1,k2,k3,k4 = st.columns(4)
+    k1.metric("Магазины", len(tenants))
+    k2.metric("Активные", active)
+    k3.metric("Trial", trial)
+    k4.metric("Платные", paid)
+
+    st.markdown("### Магазины")
+    rows = []
+    for t in tenants:
+        tid = str(t.get("id"))
+        sub = sub_by_tenant.get(tid,{})
+        owner_id = str(owner_by_tenant.get(tid) or "")
+        rows.append({
+            "Магазин": t.get("name","—"),
+            "Владелец": email_by_user.get(owner_id,"—"),
+            "Тариф": str(t.get("plan","trial")).upper(),
+            "Статус": t.get("status","—"),
+            "Подписка": sub.get("status","—"),
+            "Создан": str(t.get("created_at",""))[:10],
+        })
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    if not tenants:
+        st.info("Пока нет зарегистрированных магазинов.")
+        return
+
+    st.markdown("### Управление магазином")
+    labels = [f'{t.get("name","Магазин")} · {str(t.get("plan","trial")).upper()}' for t in tenants]
+    selected = st.selectbox("Магазин", labels, key="platform_admin_tenant")
+    t = tenants[labels.index(selected)]
+    tid = str(t.get("id"))
+    sub = sub_by_tenant.get(tid,{})
+    current_plan = str(t.get("plan","trial")).lower()
+    current_status = str(t.get("status","active")).lower()
+    current_sub_status = str(sub.get("status","trialing")).lower()
+    current_renew = bool(sub.get("auto_renew",False))
+
+    a,b = st.columns(2)
+    with a:
+        new_plan = st.selectbox("Тариф", ["trial","starter","pro","business"],
+                                index=["trial","starter","pro","business"].index(current_plan) if current_plan in ["trial","starter","pro","business"] else 0,
+                                key="platform_admin_plan")
+        new_status = st.selectbox("Статус магазина", ["active","suspended","cancelled"],
+                                  index=["active","suspended","cancelled"].index(current_status) if current_status in ["active","suspended","cancelled"] else 0,
+                                  key="platform_admin_status")
+    with b:
+        new_sub_status = st.selectbox("Статус подписки", ["trialing","active","past_due","canceled"],
+                                      index=["trialing","active","past_due","canceled"].index(current_sub_status) if current_sub_status in ["trialing","active","past_due","canceled"] else 0,
+                                      key="platform_admin_sub_status")
+        new_renew = st.toggle("Автопродление", value=current_renew, key="platform_admin_renew")
+
+    if st.button("Сохранить изменения", type="primary", use_container_width=True, key="platform_admin_save"):
+        try:
+            platform_admin_set_tenant(tid, plan=new_plan, status=new_status)
+            platform_admin_set_subscription(tid, plan=new_plan, status=new_sub_status, auto_renew=new_renew)
+            st.success("Изменения сохранены.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось сохранить: {e}")
+
+    st.markdown("---")
+    st.markdown("### Аккаунты")
+    account_rows = []
+    for u in users:
+        uid = str(u.get("id"))
+        tenant_for_user = next((x for x in members if str(x.get("user_id")) == uid), {})
+        account_rows.append({
+            "Email": u.get("email","—"),
+            "Роль": tenant_for_user.get("role","—"),
+            "Подтверждён": "Да" if u.get("email_confirmed_at") else "Нет",
+            "Создан": str(u.get("created_at",""))[:10],
+        })
+    st.dataframe(account_rows, use_container_width=True, hide_index=True)
+    st.caption("Доступ к этой панели определяется секретом SAAS_ADMIN_EMAIL и service-role ключом. Обычные владельцы магазинов её не видят.")
+
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
@@ -573,14 +676,21 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
-tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    [
-        "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
-        "◷ План", "◉ Аналитика", "⚙ Настройки"
-    ]
-)
+tab_labels = [
+    "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
+    "◷ План", "◉ Аналитика", "⚙ Настройки"
+]
+if platform_admin_enabled():
+    tab_labels.append("♛ Админ")
+_tabs = st.tabs(tab_labels)
+tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[:8]
+tab_admin = _tabs[8] if len(_tabs) > 8 else None
 
 # ========== DASHBOARD ==========
+if tab_admin is not None:
+    with tab_admin:
+        render_platform_admin()
+
 with tab_dashboard:
     products = load_products()
     plan = load_plan()
