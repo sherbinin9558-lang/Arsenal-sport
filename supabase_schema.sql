@@ -50,6 +50,97 @@ create index if not exists idx_subscriptions_status on public.subscriptions(stat
 alter table public.subscriptions add column if not exists provider_payment_id text;
 alter table public.subscriptions add column if not exists provider_payment_method_id text;
 create index if not exists idx_subscriptions_provider_payment on public.subscriptions(provider_payment_id);
+create unique index if not exists idx_subscriptions_provider_payment_unique
+on public.subscriptions(provider, provider_payment_id)
+where provider_payment_id is not null;
+
+create or replace function public.activate_paid_subscription(
+  p_tenant_id uuid,
+  p_plan text,
+  p_provider text,
+  p_provider_payment_id text,
+  p_provider_payment_method_id text default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  current_sub public.subscriptions;
+begin
+  if p_plan not in ('starter','pro','business') then
+    raise exception 'INVALID_PLAN';
+  end if;
+  if p_provider not in ('yookassa','tbank') then
+    raise exception 'INVALID_PROVIDER';
+  end if;
+  if p_provider_payment_id is null or btrim(p_provider_payment_id) = '' then
+    raise exception 'PAYMENT_ID_REQUIRED';
+  end if;
+
+  if not exists (select 1 from public.tenants where id = p_tenant_id) then
+    raise exception 'TENANT_NOT_FOUND';
+  end if;
+
+  select * into current_sub
+    from public.subscriptions
+   where tenant_id = p_tenant_id
+   for update;
+
+  if not found then
+    insert into public.subscriptions (
+      tenant_id, plan, status, provider, provider_payment_id,
+      provider_payment_method_id, current_period_end, next_billing_at
+    )
+    values (
+      p_tenant_id, p_plan, 'active', p_provider, p_provider_payment_id,
+      p_provider_payment_method_id, now() + interval '30 days',
+      now() + interval '30 days'
+    );
+  elsif current_sub.provider = p_provider
+    and current_sub.provider_payment_id = p_provider_payment_id then
+    return true;
+  else
+    if exists (
+      select 1 from public.subscriptions
+       where provider = p_provider
+         and provider_payment_id = p_provider_payment_id
+         and tenant_id <> p_tenant_id
+    ) then
+      raise exception 'PAYMENT_ALREADY_BOUND';
+    end if;
+
+    update public.subscriptions
+       set plan = p_plan,
+           status = 'active',
+           provider = p_provider,
+           provider_payment_id = p_provider_payment_id,
+           provider_payment_method_id = coalesce(
+             p_provider_payment_method_id,
+             provider_payment_method_id
+           ),
+           current_period_end = now() + interval '30 days',
+           next_billing_at = now() + interval '30 days',
+           updated_at = now()
+     where tenant_id = p_tenant_id;
+  end if;
+
+  update public.tenants
+     set plan = p_plan,
+         status = 'active'
+   where id = p_tenant_id;
+
+  return true;
+end;
+$;
+
+revoke all on function public.activate_paid_subscription(
+  uuid,text,text,text,text
+) from public;
+grant execute on function public.activate_paid_subscription(
+  uuid,text,text,text,text
+) to service_role;
 
 create or replace function public.is_tenant_member(target_tenant uuid)
 returns boolean
