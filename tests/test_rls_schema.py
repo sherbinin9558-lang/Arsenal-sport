@@ -80,6 +80,19 @@ class RlsSchemaRegressionTests(unittest.TestCase):
         self.assertNotIn("save_app_data_batch(uuid,text,jsonb,text[])", migration)
         self.assertIn("grant execute on function public.save_app_data_batch(uuid,text,jsonb) to authenticated;", migration)
 
+    def test_security_definer_functions_pin_empty_search_path(self):
+        files = [
+            "supabase_schema.sql",
+            "supabase/migrations/20261004_atomic_app_data_batch_save.sql",
+            "supabase/migrations/20261004_atomic_app_data_conflict_hardening.sql",
+            "supabase/migrations/20261003222323_owner_role_protection.sql",
+        ]
+        for rel in files:
+            sql = (Path(__file__).resolve().parents[1] / rel).read_text(encoding="utf-8")
+            parts = sql.lower().split("security definer")
+            for part in parts[1:]:
+                self.assertIn("set search_path = ''", part[:120], rel)
+
     def test_member_role_rpc_cannot_demote_owner(self):
         self.assertIn("CANNOT_CHANGE_OWNER_ROLE", self.sql)
         self.assertIn("if target_current_role = 'owner' then", self.sql)
