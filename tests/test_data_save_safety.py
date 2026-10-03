@@ -155,5 +155,29 @@ class DemoModeRecordRegressionTests(unittest.TestCase):
         self.assertIn('reel_product.get("_saas_record_id") or st.session_state.get("r_sel", 0)', source)
 
 
+class LargeCatalogPerformanceRegressionTests(unittest.TestCase):
+    def test_paged_catalog_api_and_single_record_writes_exist(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn("def data_load_page(", source)
+        self.assertIn('Prefer"] = "count=exact"', source)
+        self.assertIn("def data_update_record(", source)
+        self.assertIn("def data_delete_record(", source)
+
+    def test_catalog_ui_is_paged(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "catalog.py").read_text(encoding="utf-8")
+        self.assertIn("data_load_page", source)
+        self.assertIn("На странице", source)
+        self.assertIn("catalog_next", source)
+        self.assertNotIn("for real_i, p in enumerate(products):", source)
+
+
+class GrowthEnginePerformanceRegressionTests(unittest.TestCase):
+    def test_product_attribution_uses_match_index(self):
+        source = (Path(__file__).resolve().parents[1] / "growth_engine.py").read_text(encoding="utf-8")
+        self.assertIn("def _build_product_match_index", source)
+        self.assertIn("_candidate_product_indexes", source)
+        self.assertIn("O(products × leads/orders/content)", source)
+
+
 if __name__ == "__main__":
     unittest.main()
