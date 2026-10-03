@@ -120,10 +120,17 @@ def _establish_session(result):
     user = result.get("user") or get_user(token)
     previous_user_id = st.session_state.get("saas_user_id")
     selected_tenant_id = st.session_state.get("saas_tenant_id") if previous_user_id == user.get("id") else None
+    tenants = user_tenants(token,user.get("id"))
     tenant = current_tenant(token, user.get("id"), selected_tenant_id)
-    if not tenant:
-        raise RuntimeError("У аккаунта несколько магазинов. Выберите магазин перед входом.")
     st.session_state["saas_access_token"] = token
+    st.session_state["saas_user_id"] = user.get("id")
+    st.session_state["saas_email"] = user.get("email","")
+    if len(tenants) > 1 and not tenant:
+        st.session_state["saas_tenant_choices"] = tenants
+        st.session_state.pop("saas_tenant_status",None)
+        return True
+    if not tenant:
+        raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
     refresh_token = result.get("refresh_token")
     if refresh_token:
         _persist_refresh_token(refresh_token)
@@ -220,11 +227,14 @@ def _rest_post(path,token,payload,headers=None): return _request("POST",path,tok
 def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
 def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
 
-def current_tenant(token,user_id=None,selected_tenant_id=None):
+def user_tenants(token,user_id=None):
     uid=user_id or st.session_state.get("saas_user_id")
-    if not uid: return None
-    rows=_rest_get("/rest/v1/memberships",token,params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}"})
-    tenants=[row.get("tenants") for row in rows if row.get("tenants")]
+    if not uid: return []
+    rows=_rest_get("/rest/v1/memberships",token,params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}","order":"created_at.asc"})
+    return [row.get("tenants") for row in rows if row.get("tenants")]
+
+def current_tenant(token,user_id=None,selected_tenant_id=None):
+    tenants=user_tenants(token,user_id)
     if not tenants:
         return None
     selected=str(selected_tenant_id or st.session_state.get("saas_tenant_id") or "").strip()
@@ -235,6 +245,23 @@ def current_tenant(token,user_id=None,selected_tenant_id=None):
     if len(tenants) == 1:
         return tenants[0]
     return None
+
+def _clear_tenant_runtime_cache():
+    for key in list(st.session_state):
+        if key.startswith("_saas_data_records_") or key in ("max_data_snapshot","saas_onboarding_complete"):
+            st.session_state.pop(key, None)
+
+def switch_tenant(tenant):
+    token=st.session_state.get("saas_access_token")
+    uid=st.session_state.get("saas_user_id")
+    if not token or not uid or not isinstance(tenant,dict) or not tenant.get("id"):
+        raise RuntimeError("Не удалось проверить выбранный магазин.")
+    verified=current_tenant(token,uid,str(tenant["id"]))
+    if not verified:
+        raise PermissionError("У вас нет доступа к выбранному магазину.")
+    _set_identity({"id":uid,"email":st.session_state.get("saas_email","")},verified)
+    _clear_tenant_runtime_cache()
+    st.session_state["saas_last_validated_at"]=time.time()
 
 def subscription(token,tenant_id):
     rows=_rest_get("/rest/v1/subscriptions",token,params={"select":"*","tenant_id":f"eq.{tenant_id}","limit":"1"})
@@ -302,9 +329,53 @@ def login_ui():
 def usage_snapshot():
     return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
 
+def render_tenant_selector():
+    token=st.session_state.get("saas_access_token")
+    uid=st.session_state.get("saas_user_id")
+    if not token or not uid:
+        return False
+    tenants=user_tenants(token,uid)
+    if len(tenants) <= 1:
+        st.session_state.pop("saas_tenant_choices",None)
+        return False
+    current=st.session_state.get("saas_tenant_id")
+    labels=[f"{t.get('name','Магазин')} · {str(t.get('slug') or t.get('id',''))[:24]}" for t in tenants]
+    by_label=dict(zip(labels,tenants))
+    default_index=next((i for i,t in enumerate(tenants) if str(t.get("id"))==str(current)),0)
+    st.markdown("### Выберите магазин")
+    label=st.selectbox("Магазин",labels,index=default_index,key="saas_tenant_picker")
+    if st.button("Открыть магазин",type="primary",use_container_width=True,key="saas_tenant_switch"):
+        try:
+            switch_tenant(by_label[label])
+            st.session_state.pop("saas_tenant_choices",None)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось переключить магазин: {e}")
+    return True
+
 def render_account_bar():
     with st.sidebar:
-        st.markdown("---"); st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
+        st.markdown("---")
+        token=st.session_state.get("saas_access_token")
+        uid=st.session_state.get("saas_user_id")
+        if token and uid:
+            try:
+                tenants=user_tenants(token,uid)
+                if len(tenants)>1:
+                    labels=[f"{t.get('name','Магазин')} · {str(t.get('slug') or t.get('id',''))[:24]}" for t in tenants]
+                    current=str(st.session_state.get("saas_tenant_id") or "")
+                    idx=next((i for i,t in enumerate(tenants) if str(t.get("id"))==current),0)
+                    choice=st.selectbox("Магазин",labels,index=idx,key="saas_account_tenant_picker")
+                    if st.button("Переключить магазин",use_container_width=True,key="saas_account_tenant_switch"):
+                        try:
+                            selected=tenants[labels.index(choice)]
+                            switch_tenant(selected)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Не удалось переключить магазин: {e}")
+            except Exception as e:
+                st.caption(f"Не удалось загрузить список магазинов: {e}")
+        st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
         plan=str(st.session_state.get('saas_plan','trial')).lower(); st.caption(f"Тариф · {plan.upper()}"); st.caption(f"Роль · {current_role().upper()}")
         if plan in PLAN_LIMITS:
             u=usage_snapshot(); max_products=PLAN_LIMITS[plan]["products"]; st.progress(min(1.0,u["products"]/max_products),text=f"Каталог · {u['products']} / {max_products}")
@@ -493,6 +564,12 @@ def require_saas_access():
         return False
 
     st.session_state.pop("saas_auth_error", None)
+
+    if not st.session_state.get("saas_tenant_id"):
+        if render_tenant_selector():
+            return False
+        st.error("Магазин не выбран.")
+        return False
 
     tenant_status = str(st.session_state.get("saas_tenant_status", "active")).lower()
     if tenant_status != "active":
