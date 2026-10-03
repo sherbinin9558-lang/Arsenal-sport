@@ -52,9 +52,9 @@ class OnboardingSettingsSafetyTests(unittest.TestCase):
 class SettingsRecordSafetyTests(unittest.TestCase):
     def test_settings_preserve_saas_record_identity(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
-        self.assertIn('if data.get("_saas_record_id"):', source)
-        self.assertIn('record_id = data.get("_saas_record_id")', source)
-        self.assertIn('payload["_saas_record_id"] = record_id', source)
+        self.assertIn('existing = data_load("settings", [])', source)
+        self.assertIn('existing[0].get("_saas_record_id")', source)
+        self.assertIn('payload["_saas_record_id"] = existing[0]["_saas_record_id"]', source)
 
 
 class ProductStockRegressionTests(unittest.TestCase):
