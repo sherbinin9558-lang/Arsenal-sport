@@ -56,12 +56,12 @@ def stock_rows(products):
     for p in products:
         by_size = p.get("stock_by_size") or {}
         total = 0
-        if isinstance(by_size, dict):
+        if isinstance(by_size, dict) and by_size:
             for value in by_size.values():
                 try: total += max(0, int(value or 0))
                 except Exception: pass
         else:
-            try: total = max(0, int(p.get("total_stock", 0) or 0))
+            try: total = max(0, int(p.get("total_stock", p.get("stock", 0)) or 0))
             except Exception: total = 0
         rows.append((p, total))
     return rows
