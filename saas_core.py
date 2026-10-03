@@ -175,9 +175,17 @@ def _restore_session_from_access_token():
     try:
         user = get_user(token)
         selected_tenant_id = st.session_state.get("saas_tenant_id")
+        tenants = user_tenants(token,user.get("id"))
         tenant = current_tenant(token, user.get("id"), selected_tenant_id)
+        if not tenant and len(tenants) > 1:
+            st.session_state["saas_user_id"] = user.get("id")
+            st.session_state["saas_email"] = user.get("email","")
+            st.session_state["saas_tenant_choices"] = tenants
+            st.session_state["saas_last_validated_at"] = time.time()
+            st.session_state.pop("saas_auth_error", None)
+            return True
         if not tenant:
-            raise RuntimeError("У аккаунта несколько магазинов. Выберите магазин.")
+            raise RuntimeError("Магазин не найден.")
         _set_identity(user, tenant)
         st.session_state["saas_last_validated_at"] = time.time()
         st.session_state.pop("saas_auth_error", None)
