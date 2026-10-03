@@ -473,11 +473,8 @@ def data_load(entity,default):
         try:
             with open(path,encoding="utf-8") as f: return json.load(f)
         except Exception:
-            legacy={"products":"products.json","content_plan":"content_plan.json","content_attribution":"content_attribution.json","leads":"leads.json","orders":"orders.json"}.get(entity)
-            if legacy:
-                try:
-                    with open(legacy,encoding="utf-8") as f: return json.load(f)
-                except Exception: pass
+            # Production/demo tenants must never fall back to shared legacy files.
+            # A tenant-specific local file is the only non-Supabase fallback.
             return default
     token=st.session_state.get("saas_access_token")
     rows=_rest_get("/rest/v1/app_data",token,params={"select":"record_id,payload","tenant_id":f"eq.{tenant_id()}","entity":f"eq.{entity}"})
