@@ -2,7 +2,7 @@ name: P2/P3 quality gate
 
 on:
   push:
-    branches: ["feat/p2-p3-hardening-20261004"]
+    branches: ["main", "feat/p2-p3-hardening-20261004", "full-audit-repair-20261004"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
