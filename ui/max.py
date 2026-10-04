@@ -624,15 +624,14 @@ def render_max():
             else:
                 content_max = min(100, len(products))
                 content_default = min(30, content_max)
-                # Keep the slider state valid if the catalog size changes between reruns.
-                saved_content_limit = st.session_state.get("auto_content_limit", content_default)
-                if not isinstance(saved_content_limit, int) or saved_content_limit < 1 or saved_content_limit > content_max:
-                    st.session_state["auto_content_limit"] = content_default
+                # Use a catalog-size-specific widget key so a smaller catalog never reuses
+                # an out-of-range value from a previous Streamlit session state.
                 content_limit = st.slider(
                     "Сколько товаров обработать",
                     min_value=1,
                     max_value=content_max,
-                    key="auto_content_limit",
+                    value=content_default,
+                    key=f"auto_content_limit_{content_max}",
                 )
                 if can("write_data") and st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
                     bundles = {}
