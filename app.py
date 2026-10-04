@@ -60,6 +60,12 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+def max_product_title(product):
+    """Return a safe short product title for dashboard/MAX summaries."""
+    if not isinstance(product, dict):
+        return "Товар"
+    return str(product.get("name") or product.get("title") or "Товар").strip() or "Товар"
+
 def load_products():
     key = "_app_products_cache"
     if key not in st.session_state:
