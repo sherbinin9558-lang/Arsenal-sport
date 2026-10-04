@@ -10,7 +10,7 @@ try:
 except Exception:
     CookieController = None
 
-PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":10000,"users":3,"content":1000},"pro":{"products":10000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
+PLAN_LIMITS={"trial":{"products":100,"users":1,"content":100},"starter":{"products":7000,"users":3,"content":1000},"pro":{"products":7000,"users":10,"content":10000},"business":{"products":100000,"users":50,"content":100000}}
 
 def _cfg(name, default=""):
     try: value=st.secrets.get(name, os.getenv(name, default))
