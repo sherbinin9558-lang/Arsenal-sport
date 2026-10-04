@@ -152,6 +152,41 @@ def crm_pipeline(leads: Iterable[dict]) -> dict:
             "avg_score": round(sum(x.get("lead_score",0) for x in enriched) / len(enriched), 1) if enriched else 0.0}
 
 
+
+def run_notification_automation(products: list[dict], leads: list[dict], orders: list[dict], plan: list[dict]) -> list[dict]:
+    """Create deduplicated operational notifications from observed store data."""
+    if not can("write_data"):
+        return []
+    existing = _rows(ENTITY_NOTIFICATIONS)
+    keys = {str(x.get("automation_key")) for x in existing}
+    created = []
+    for product in products:
+        try:
+            stock = int(product.get("stock", product.get("total_stock", 0)) or 0)
+        except (TypeError, ValueError):
+            stock = 0
+        if 0 < stock <= 2:
+            key = f"low-stock:{product.get('_saas_record_id') or product.get('article') or product.get('name')}"
+            if key not in keys:
+                row = create_notification("Низкий остаток", f"«{product.get('name','Товар')}» — осталось {stock} шт.", "warning")
+                row["automation_key"] = key
+                created.append(row); keys.add(key)
+    for lead in [enrich_lead(x) for x in leads]:
+        if lead.get("intent") == "Горячий":
+            key = f"hot-lead:{lead.get('_saas_record_id') or lead.get('id') or lead.get('name')}"
+            if key not in keys:
+                row = create_notification("Горячий лид", f"{lead.get('name') or lead.get('product') or 'Новый клиент'}: {lead.get('next_action')}", "success")
+                row["automation_key"] = key
+                created.append(row); keys.add(key)
+    if created:
+        rows = _rows(ENTITY_NOTIFICATIONS)
+        by_id = {x["id"]: x for x in created}
+        for row in rows:
+            if row.get("id") in by_id:
+                row["automation_key"] = by_id[row["id"]].get("automation_key")
+        _write(ENTITY_NOTIFICATIONS, rows)
+    return created
+
 # ---------- Safe AI-agent actions ----------
 
 ACTION_REGISTRY = {
