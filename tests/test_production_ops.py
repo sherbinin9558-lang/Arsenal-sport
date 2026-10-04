@@ -48,5 +48,14 @@ class TestProductionOps(unittest.TestCase):
     def test_future_agent_timestamp_is_invalid(self):
         self.assertTrue(production_ops.agent_is_expired("2099-01-01T00:00:00Z"))
 
+    @patch("production_ops._http_json", return_value=(True, 200, 0.01, {"response": [{"id": 1}]}))
+    def test_vk_health_does_not_put_token_in_url(self, http_mock):
+        result = production_ops.vk_health("secret-token")
+        self.assertEqual(result["status"], "ok")
+        called_url = http_mock.call_args.args[0]
+        self.assertNotIn("secret-token", called_url)
+        body = http_mock.call_args.kwargs["data"].decode("utf-8")
+        self.assertIn("access_token=secret-token", body)
+
 if __name__ == "__main__":
     unittest.main()
