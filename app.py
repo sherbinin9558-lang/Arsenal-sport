@@ -348,7 +348,7 @@ def gen_vk(p, tone):
 # ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
 def publish_to_telegram(image_bytes, caption):
     try:
-        token = _telegram_token()
+        token = _telegram_auth_token()
         channel = _telegram_chat_id(st.secrets.get("TELEGRAM_CHANNEL", ""))
         api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
         files = {"photo": ("card.png", image_bytes, "image/png")}
@@ -364,12 +364,36 @@ def publish_to_telegram(image_bytes, caption):
         return False, f"Ошибка публикации: {e}"
 
 # ==================== ПУБЛИКАЦИЯ REELS ====================
+def _telegram_token_candidates():
+    """Return configured Telegram tokens without exposing their values."""
+    candidates = []
+    for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_TOKEN"):
+        try:
+            value = str(st.secrets.get(name, "") or "").strip()
+        except Exception:
+            value = ""
+        if value and value not in candidates:
+            candidates.append(value)
+    return candidates
+
 def _telegram_token():
-    """Return the canonical Telegram bot token, with legacy-name compatibility."""
-    token = str(st.secrets.get("TELEGRAM_BOT_TOKEN", "") or "").strip()
-    if not token:
-        token = str(st.secrets.get("TELEGRAM_TOKEN", "") or "").strip()
-    return token
+    """Return the first configured Telegram token (legacy name supported)."""
+    return (_telegram_token_candidates() or [""])[0]
+
+def _telegram_auth_token():
+    """Return a token that passes Telegram getMe, falling back to the first configured token."""
+    candidates = _telegram_token_candidates()
+    if not candidates:
+        return ""
+    for candidate in candidates:
+        try:
+            resp = requests.get(_telegram_api(candidate, "getMe"), timeout=(5, 10))
+            result = resp.json()
+            if resp.ok and result.get("ok") is True:
+                return candidate
+        except (requests.RequestException, ValueError):
+            continue
+    return candidates[0]
 
 def _telegram_chat_id(raw_channel):
     value = str(raw_channel or "").strip()
