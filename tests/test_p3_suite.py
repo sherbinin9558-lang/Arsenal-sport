@@ -122,5 +122,12 @@ class TestP3Suite(unittest.TestCase):
         with self.assertRaises(ValueError):
             p3_suite.update_instagram_draft(row["id"], scheduled_at="2030-01-01T10:00:00")
 
+    def test_analytics_ignores_malformed_amounts(self):
+        result = p3_suite.advanced_analytics(
+            [], [], [{"amount": "not-a-number", "status": "Завершён"}, {"amount": "1 250 ₽", "status": "Завершён"}], []
+        )
+        self.assertEqual(result["revenue"], 1250.0)
+        self.assertEqual(result["completed_orders"], 2)
+
 if __name__ == "__main__":
     unittest.main()
