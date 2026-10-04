@@ -76,7 +76,7 @@ def _auth_cookies():
 
 def _read_refresh_token():
     # CookieController is asynchronous on a fresh Streamlit session. Explicitly
-    # refresh its browser cache, then allow the component one render cycle before
+    # refresh its browser cache, then allow the component a few render cycles before
     # falling back to the request cookies.
     cookies = _auth_cookies()
     if cookies is not None:
@@ -87,15 +87,20 @@ def _read_refresh_token():
                 return str(token)
         except Exception:
             pass
-        try:
-            cookies.refresh()
-            time.sleep(1.0)
-            all_cookies = cookies.getAll() or {}
-            token = all_cookies.get(_AUTH_COOKIE)
-            if token:
-                return str(token)
-        except Exception:
-            pass
+
+        attempts = 0
+        while attempts < 3:
+            attempts += 1
+            try:
+                cookies.refresh()
+                time.sleep(0.35)
+                all_cookies = cookies.getAll() or {}
+                token = all_cookies.get(_AUTH_COOKIE)
+                if token:
+                    return str(token)
+            except Exception:
+                pass
+
         try:
             token = cookies.get(_AUTH_COOKIE)
             if token:
