@@ -7,7 +7,7 @@ def render_dashboard(
     load_products, load_plan, load_leads, load_orders,
     crm_metrics, order_metrics, conversion_metrics, workflow_metrics,
     low_stock_products, growth_recommendations, max_product_title,
-    attribution_loader, attribution_metrics, add_product,
+    attribution_loader, attribution_metrics, add_product, add_plan,
     categories, can_write,
 ):
     # Reuse the dashboard snapshot only until a successful write invalidates it.
