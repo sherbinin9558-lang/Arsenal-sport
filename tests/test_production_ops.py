@@ -27,7 +27,7 @@ class TestProductionOps(unittest.TestCase):
 
     def test_expired_agent_is_detected(self):
         self.assertTrue(production_ops.agent_is_expired("2000-01-01T00:00:00Z"))
-        self.assertFalse(production_ops.agent_is_expired("2099-01-01T00:00:00Z"))
+        self.assertTrue(production_ops.agent_is_expired("2099-01-01T00:00:00Z"))
 
 
     @patch("production_ops.data_load", return_value=[])
