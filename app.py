@@ -913,21 +913,38 @@ def _bulk_value(row, *keys):
     return ""
 
 def parse_bulk_file(uploaded_file):
-    raw = uploaded_file.getvalue()
     name = (uploaded_file.name or "").lower()
-
+    max_bytes = 50 * 1024 * 1024
+    try:
+        size = int(uploaded_file.size or 0)
+    except Exception:
+        size = 0
+    if size > max_bytes:
+        raise ValueError("Файл импорта больше 50 МБ. Разделите его на несколько частей.")
     if name.endswith(".xlsx"):
         try:
             from openpyxl import load_workbook
         except ImportError:
             raise RuntimeError("Для XLSX нужен openpyxl. CSV можно загружать без дополнительных зависимостей.")
-        wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        uploaded_file.seek(0)
+        wb = load_workbook(uploaded_file, read_only=True, data_only=True)
         ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return []
-        headers = [str(x or "").strip() for x in rows[0]]
-        return [dict(zip(headers, row)) for row in rows[1:] if any(x not in (None, "") for x in row)]
+        iterator = ws.iter_rows(values_only=True)
+        try:
+            headers = [str(x or "").strip() for x in next(iterator)]
+        except StopIteration:
+            wb.close()
+            return iter(())
+        def xlsx_rows():
+            try:
+                for row in iterator:
+                    if any(x not in (None, "") for x in row):
+                        yield dict(zip(headers, row))
+            finally:
+                wb.close()
+        return xlsx_rows()
+    uploaded_file.seek(0)
+    raw = uploaded_file.read()
     text = raw.decode("utf-8-sig")
     sample = text[:4096]
     try:
@@ -936,7 +953,7 @@ def parse_bulk_file(uploaded_file):
         dialect = csv.excel
         dialect.delimiter = ";"
     reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-    return [dict(row) for row in reader if any(str(v or "").strip() for v in row.values())]
+    return (dict(row) for row in reader if any(str(v or "").strip() for v in row.values()))
 
 def bulk_import_products(uploaded_file, update_existing=False):
     rows = parse_bulk_file(uploaded_file)
@@ -957,7 +974,10 @@ def bulk_import_products(uploaded_file, update_existing=False):
         raise PermissionError("У вашей роли нет прав на импорт товаров.")
 
 
+    max_rows = 100000
     for line_no, row in enumerate(rows, start=2):
+        if line_no - 1 > max_rows:
+            raise ValueError(f"Импорт ограничен {max_rows:,} строками за один запуск.")
         name = _bulk_value(row, "name")
         brand = _bulk_value(row, "brand")
         article = _bulk_value(row, "article")
