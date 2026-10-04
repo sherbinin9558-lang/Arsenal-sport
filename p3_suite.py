@@ -284,10 +284,10 @@ def execute_agent_action(action: dict) -> dict:
     if kind == "create_task":
         row = create_task(payload.get("title","AI-задача"), payload.get("description",""),
                           payload.get("assignee",""), payload.get("priority","Обычный"),
-                          payload.get("due_date",""), record_id=f"agent_task_{action.get('id')}"))
+                          payload.get("due_date",""), record_id=f"agent_task_{action.get('id')}")
         return {"status": "executed", "task_id": row["id"]}
     if kind == "create_notification":
-        row = create_notification(payload.get("title","AI уведомление"), payload.get("body",""))
+        row = create_notification(payload.get("title","AI уведомление"), payload.get("body",""), link=f"agent_action:{action.get('id')}", record_id=f"agent_notification_{action.get('id')}")
         return {"status": "executed", "notification_id": row["id"]}
     if kind == "queue_instagram_draft":
         row = queue_instagram_draft(payload.get("caption",""), payload.get("media_ref",""),
