@@ -635,18 +635,20 @@ try:
     checkout_id=st.query_params.get("checkout_id")
     billing_return=st.query_params.get("billing")
     if billing_return == "tbank_return" and not st.session_state.get("tbank_verified"):
-        from tbank_billing import get_state
-        pid=st.session_state.get("tbank_payment_id")
-        if pid:
-            payment=get_state(pid)
-            status=payment.get("Status")
-            plan=st.session_state.get("tbank_plan")
-            if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business"):
-                activate_paid_subscription(plan,str(pid),None,provider="tbank",tenant=st.session_state.get("saas_tenant_id"))
-                st.session_state["tbank_verified"]=True
-                st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
-            elif status:
-                st.info(f"Статус платежа Т‑Банк: {status}.")
+        from tbank_billing import get_state, get_checkout_by_order
+        order_id=st.query_params.get("order_id")
+        tenant_id=str(st.session_state.get("saas_tenant_id") or "")
+        checkout=get_checkout_by_order(str(order_id), tenant_id) if order_id and tenant_id else None
+        pid=str((checkout or {}).get("provider_payment_id") or "")
+        payment=get_state(pid) if pid else {}
+        status=payment.get("Status")
+        plan=str((checkout or {}).get("plan") or "").lower()
+        if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business") and pid:
+            activate_paid_subscription(plan,pid,None,provider="tbank",tenant=tenant_id)
+            st.session_state["tbank_verified"]=True
+            st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
+        elif status:
+            st.info(f"Статус платежа Т‑Банк: {status}.")
     elif (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
         from billing import get_checkout_by_order, get_payment
         if checkout_id:
