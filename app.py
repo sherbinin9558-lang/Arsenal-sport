@@ -370,7 +370,7 @@ def _telegram_api(token, method):
 
 def publish_reel_to_telegram(video_bytes, caption):
     try:
-        token = _telegram_token()
+        token = _telegram_auth_token()
         channel = _telegram_chat_id(st.secrets.get("TELEGRAM_CHANNEL", ""))
         if not token:
             return False, "TELEGRAM_TOKEN пустой."
