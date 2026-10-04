@@ -239,3 +239,17 @@ class RoleBasedUiRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
+    def test_max_tariff_text_matches_standard_catalog_limit(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn("до 7 000 товаров", source)
+        self.assertNotIn("до 10 000 товаров", source)
+
+    def test_webmcp_content_plan_does_not_expose_raw_record_payload(self):
+        source = (Path(__file__).resolve().parents[1] / "webmcp_tools.py").read_text(encoding="utf-8")
+        self.assertIn("allowed_plan", source)
+        self.assertIn('"date"', source)
+        self.assertIn('"idea"', source)
+        self.assertNotIn('"history"', source)
