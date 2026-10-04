@@ -87,6 +87,7 @@ class TestP3Suite(unittest.TestCase):
         updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         self.assertEqual(updated["status"], "На проверке")
         updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
+        # Explicit approval transition: Черновик -> На проверке -> Одобрено.
         updated = p3_suite.update_instagram_draft(row["id"], status="Одобрено")
         updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано")
         self.assertEqual(updated["status"], "Запланировано")
