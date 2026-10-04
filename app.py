@@ -1019,7 +1019,7 @@ with tab3:
         idx = st.selectbox(
             "Товар",
             range(len(names)),
-            format_func=lambda x: names[x],
+            format_func=lambda x, names=names: names[x],
             key="text_product"
         )
 
@@ -1143,7 +1143,7 @@ with tab4:
         st.info("Сначала создайте товар.")
     else:
         names = [f"{p.get('brand','')} {p.get('name','')}" for p in products]
-        idx = st.selectbox("Товар", range(len(names)), format_func=lambda x: names[x], key="r_sel")
+        idx = st.selectbox("Товар", range(len(names)), format_func=lambda x, names=names: names[x], key="r_sel")
 
         if st.button("🎬 Сгенерировать", type="primary"):
             p = products[idx]
@@ -1190,15 +1190,15 @@ with tab4:
 5. Ссылка на товар"""
 
             st.subheader("💡 Идеи")
-            st.text_area("", ideas, height=200, key="id_out")
+            st.text_area("Идеи", ideas, height=200, key="id_out", label_visibility="collapsed")
             st.download_button("⬇️ Идеи", ideas, file_name=f"{n}_ideas.txt")
 
             st.subheader("🎬 Сценарий")
-            st.text_area("", script, height=350, key="sc_out")
+            st.text_area("Сценарий", script, height=350, key="sc_out", label_visibility="collapsed")
             st.download_button("⬇️ Сценарий", script, file_name=f"{n}_script.txt")
 
             st.subheader("📱 Stories")
-            st.text_area("", stories, height=150, key="st_out")
+            st.text_area("Stories", stories, height=150, key="st_out", label_visibility="collapsed")
             st.download_button("⬇️ Stories", stories, file_name=f"{n}_stories.txt")
 
         st.markdown("---")
