@@ -5,6 +5,10 @@ on:
     branches: ["feat/p2-p3-hardening-20261004"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   regression:
