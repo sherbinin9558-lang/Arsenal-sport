@@ -156,6 +156,13 @@ class DemoModeRecordRegressionTests(unittest.TestCase):
         self.assertIn("def _find_record_index(", app)
 
 
+class CatalogPlanLimitRegressionTests(unittest.TestCase):
+    def test_standard_plans_cap_catalog_at_7000_products(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('"starter":{"products":7000', source)
+        self.assertIn('"pro":{"products":7000', source)
+
+
 class LargeCatalogPerformanceRegressionTests(unittest.TestCase):
     def test_paged_catalog_api_and_single_record_writes_exist(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
