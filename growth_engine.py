@@ -182,9 +182,9 @@ def recommendation_matrix(products, leads, orders, plan):
     format_rows.sort(key=lambda x: (-x["score"], x["format"]))
     return {"products": product_rows, "channels": channel_rows, "formats": format_rows}
 
-def recommendations(products, leads, orders, plan):
+def recommendations(products, leads, orders, plan, _matrix=None):
     f = funnel(leads, orders, plan, products)
-    matrix = recommendation_matrix(products, leads, orders, plan)
+    matrix = _matrix if _matrix is not None else recommendation_matrix(products, leads, orders, plan)
     out = []
     if not products:
         return ["Добавьте товары: AI не будет придумывать ассортимент."]
@@ -210,8 +210,8 @@ def recommendations(products, leads, orders, plan):
         out.append("Следующий цикл: товар → формат → канал → CTA → лид → заказ → анализ.")
     return out[:6]
 
-def next_content(products, leads, orders, plan, limit=7):
-    matrix = recommendation_matrix(products, leads, orders, plan)
+def next_content(products, leads, orders, plan, limit=7, _matrix=None):
+    matrix = _matrix if _matrix is not None else recommendation_matrix(products, leads, orders, plan)
     used = Counter((x.get("product"), x.get("platform"), x.get("type")) for x in plan)
     ranked_products = [x["product"] for x in matrix["products"] if x["stock"] > 0]
     ranked_products += [x["product"] for x in matrix["products"] if x["product"] not in ranked_products]
@@ -268,8 +268,8 @@ def ai_summary(products, leads, orders, plan):
     return {
         "headline": "AI-слой: анализ → рекомендация → следующий контент",
         "funnel": funnel(leads, orders, plan, products),
-        "recommendations": recommendations(products, leads, orders, plan),
-        "next_content": next_content(products, leads, orders, plan),
+        "recommendations": recommendations(products, leads, orders, plan, _matrix=matrix),
+        "next_content": next_content(products, leads, orders, plan, _matrix=matrix),
         "products": matrix["products"],
         "channels": matrix["channels"],
         "formats": matrix["formats"],
