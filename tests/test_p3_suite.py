@@ -97,7 +97,7 @@ class TestP3Suite(unittest.TestCase):
         self.assertEqual(updated["status"], "Одобрено")
         updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано", scheduled_at="2030-01-01T10:00:00Z")
         self.assertEqual(updated["status"], "Запланировано")
-        with self.assertRaises(PermissionError):
+        with self.assertRaises(ValueError):
             p3_suite.update_instagram_draft(row["id"], status="Опубликовано")
         with self.assertRaises(ValueError):
             p3_suite.update_instagram_draft(row["id"], status="Черновик")
