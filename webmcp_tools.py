@@ -1,6 +1,7 @@
 """Read-only WebMCP tools for the authenticated Arsenal Sport app."""
 import streamlit as st
 import streamlit.components.v2 as components
+from saas_core import data_load
 
 _WEBMCP_COMPONENT = components.component(
     name="arsenal_sport_webmcp",
