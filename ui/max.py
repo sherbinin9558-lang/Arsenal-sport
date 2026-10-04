@@ -68,19 +68,35 @@ CATEGORIES = ["Футболка", "Кроссовки", "Спортивный к
 
 
 def load_products():
-    return data_load("products", [])
+    # Reuse the app-level cache on the MAX fragment rerun. The main app
+    # already loads products during the normal page render, so MAX should
+    # not perform a second remote read just to open the dialog.
+    key = "_app_products_cache"
+    if key in st.session_state:
+        return st.session_state[key]
+    data = data_load("products", [])
+    st.session_state[key] = data
+    return data
 
 
 def save_products(products):
     data_save("products", products)
+    st.session_state["_app_products_cache"] = products
 
 
 def load_plan():
-    return data_load("content_plan", [])
+    # Reuse the app-level cache for the same reason as products.
+    key = "_app_plan_cache"
+    if key in st.session_state:
+        return st.session_state[key]
+    data = data_load("content_plan", [])
+    st.session_state[key] = data
+    return data
 
 
 def save_plan(plan):
     data_save("content_plan", plan)
+    st.session_state["_app_plan_cache"] = plan
 
 
 def get_logo():
