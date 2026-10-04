@@ -51,6 +51,18 @@ class TestP2Hardening(unittest.TestCase):
         self.assertTrue(hasattr(billing, "create_checkout"))
         self.assertTrue(hasattr(tbank_billing, "create_checkout"))
 
+    @patch("tbank_billing._cfg", side_effect=lambda name, default="": {
+        "SUPABASE_SERVICE_ROLE_KEY": "key",
+        "SUPABASE_URL": "https://example.supabase.co",
+    }.get(name, default))
+    @patch("tbank_billing.requests.post")
+    def test_tbank_checkout_storage_failure_is_not_silent(self, post_mock, cfg_mock):
+        post_mock.return_value.ok = False
+        post_mock.return_value.text = "db unavailable"
+        import tbank_billing
+        with self.assertRaises(RuntimeError):
+            tbank_billing._save_checkout("tenant", "order", "payment", "pro")
+
     def test_large_xlsx_roundtrip(self):
         from openpyxl import Workbook, load_workbook
         import tempfile
