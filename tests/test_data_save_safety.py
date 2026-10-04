@@ -257,7 +257,7 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
 class DashboardWriteInvalidationRegressionTests(unittest.TestCase):
     def test_product_atomic_writes_invalidate_dashboard_snapshot(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
-        self.assertGreaterEqual(source.count('st.session_state[" _app_data_revision"]'), 0)
+        self.assertIn('st.session_state["_app_data_revision"]', source)
         self.assertIn('data_update_record("products"', source)
         self.assertIn('data_delete_record("products"', source)
         self.assertIn('st.session_state.pop("max_data_snapshot", None)', source)
