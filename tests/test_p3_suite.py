@@ -84,10 +84,35 @@ class TestP3Suite(unittest.TestCase):
         row = p3_suite.queue_instagram_draft("Новый пост", scheduled_at="2030-01-01T10:00:00Z", record_id="same")
         self.assertEqual(row["status"], "Черновик")
         load_mock.return_value = [row]
+        updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
+        self.assertEqual(updated["status"], "На проверке")
+        updated = p3_suite.update_instagram_draft(row["id"], status="Одобрено")
         updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано")
         self.assertEqual(updated["status"], "Запланировано")
+        with self.assertRaises(PermissionError):
+            p3_suite.update_instagram_draft(row["id"], status="Опубликовано")
         with self.assertRaises(ValueError):
-            p3_suite.update_instagram_draft(row["id"], status="PUBLISH_NOW")
+            p3_suite.update_instagram_draft(row["id"], status="Черновик")
+
+    @patch("p3_suite.data_load", return_value=[])
+    @patch("p3_suite.data_save")
+    @patch("p3_suite.can", return_value=True)
+    @patch("p3_suite.current_role", return_value="manager")
+    def test_approval_records_actor_and_executes_safely(self, role_mock, can_mock, save_mock, load_mock):
+        row = p3_suite.queue_agent_action("create_notification", {"title": "T", "body": "B"})
+        load_mock.return_value = [row]
+        approved = p3_suite.approve_agent_action(row["id"], execute=False)
+        self.assertEqual(approved["status"], "approved")
+        self.assertEqual(approved["approved_by_role"], "manager")
+
+    @patch("p3_suite.data_load", return_value=[])
+    @patch("p3_suite.data_save")
+    @patch("p3_suite.can", return_value=True)
+    def test_instagram_requires_timezone_and_valid_transition(self, can_mock, save_mock, load_mock):
+        row = p3_suite.queue_instagram_draft("Post")
+        load_mock.return_value = [row]
+        with self.assertRaises(ValueError):
+            p3_suite.update_instagram_draft(row["id"], scheduled_at="2030-01-01T10:00:00")
 
 if __name__ == "__main__":
     unittest.main()
