@@ -41,6 +41,69 @@ def render_catalog(
             added, updated, skipped, errors = bulk_import_products(bulk_file, bulk_update)
             st.success(f"Готово: добавлено {added}, обновлено {updated}, пропущено {skipped}.")
             if errors:
+                with st.expander("⚠️ Строки с ошибками"):
+                    for err in errors[:50]:
+                        st.write(err)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Не удалось импортировать файл: {e}")
+
+    st.markdown("---")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        search = st.text_input("🔍 Поиск", key="catalog_search", placeholder="Название, бренд или артикул")
+    with c2:
+        cat_filter = st.selectbox("Категория", ["Все"] + categories, key="catalog_category")
+    with c3:
+        current_size = st.selectbox("На странице", [25, 50, 100], index=[25, 50, 100].index(page_size) if page_size in (25, 50, 100) else 1, key="catalog_page_size")
+
+    page_key = "catalog_page"
+    if st.session_state.get("_catalog_query_signature") != (search, cat_filter, current_size):
+        st.session_state[page_key] = 1
+        st.session_state["_catalog_query_signature"] = (search, cat_filter, current_size)
+
+    page = max(1, int(st.session_state.get(page_key, 1)))
+    try:
+        result = data_load_page("products", page=page, page_size=current_size, search=search, category=cat_filter)
+    except Exception as e:
+        st.error(f"Не удалось загрузить каталог: {e}")
+        return
+
+    products = result["rows"]
+    total = result["total"]
+    pages = max(1, math.ceil(total / current_size))
+
+    if page > pages:
+        page = pages
+        st.session_state[page_key] = page
+        result = data_load_page("products", page=page, page_size=current_size, search=search, category=cat_filter)
+        products = result["rows"]
+        total = result["total"]
+
+    st.caption(f"Показано {len(products)} из {total} товаров · страница {page} из {pages}")
+    if pages > 1:
+        nav1, nav2, nav3 = st.columns([1, 2, 1])
+        with nav1:
+            if st.button("← Назад", disabled=page <= 1, key="catalog_prev"):
+                st.session_state[page_key] = page - 1
+                st.rerun()
+        with nav2:
+            chosen_page = st.selectbox("Страница", range(1, pages + 1), index=page - 1, key="catalog_page_number")
+            if int(chosen_page) != page:
+                st.session_state[page_key] = int(chosen_page)
+                st.rerun()
+        with nav3:
+            if st.button("Вперёд →", disabled=page >= pages, key="catalog_next"):
+                st.session_state[page_key] = page + 1
+                st.rerun()
+
+    if not products:
+        st.info("По заданным условиям товары не найдены.")
+        return
+
+    for local_i, p in enumerate(products):
+        record_id = p.get("_saas_record_id") or local_i
+        key_suffix = str(record_id)
         product_expander = st.expander(
             f"{category_emoji.get(p.get('category',''),'📦')} "
             f"{p.get('brand','')} {p.get('name','')} — {p.get('article','')}",
