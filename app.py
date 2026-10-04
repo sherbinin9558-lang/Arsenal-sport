@@ -331,9 +331,7 @@ def gen_vk(p, tone):
 def publish_to_telegram(image_bytes, caption):
     try:
         token = st.secrets["TELEGRAM_TOKEN"]
-        channel = st.secrets["TELEGRAM_CHANNEL"]
-        if not channel.startswith("@"):
-            channel = "@" + channel
+        channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
         api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
         files = {"photo": ("card.png", image_bytes, "image/png")}
         data = {"chat_id": channel, "caption": caption[:1024]}
