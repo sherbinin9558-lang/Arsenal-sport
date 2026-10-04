@@ -797,6 +797,7 @@ def data_update_record(entity, record_id, payload, expected_updated_at):
             "p_rows": [{"record_id": str(record_id), "payload": _clean_payload(payload),
                         "expected_updated_at": expected_updated_at, "is_new": False, "is_deleted": False}],
         })
+        _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
@@ -816,6 +817,7 @@ def data_delete_record(entity, record_id, expected_updated_at):
             "p_rows": [{"record_id": str(record_id), "expected_updated_at": expected_updated_at,
                         "is_new": False, "is_deleted": True}],
         })
+        _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
