@@ -42,6 +42,12 @@ def _write_allowed() -> None:
         raise PermissionError("Недостаточно прав для изменения данных.")
 
 
+def _approval_allowed() -> None:
+    role = str(current_role() or "").lower()
+    if role not in {"owner", "admin", "manager"}:
+        raise PermissionError("Подтверждать AI-действия могут только владелец, администратор или менеджер.")
+
+
 # ---------- Notifications ----------
 
 def create_notification(title: str, body: str, level: str = "info", link: str = "") -> dict:
@@ -86,7 +92,7 @@ def mark_notification_read(notification_id: str) -> bool:
 # ---------- Team tasks ----------
 
 def create_task(title: str, description: str = "", assignee: str = "", priority: str = "Обычный",
-                due_date: str = "", entity_type: str = "", entity_id: str = "") -> dict:
+                due_date: str = "", entity_type: str = "", entity_id: str = "", record_id: str = "") -> dict:
     _write_allowed()
     title = str(title or "").strip()
     if not title:
@@ -99,6 +105,8 @@ def create_task(title: str, description: str = "", assignee: str = "", priority:
         "entity_type": str(entity_type), "entity_id": str(entity_id), "created_at": _now(),
         "created_by": str(__import__("streamlit").session_state.get("saas_user_id","")),
     }
+    if record_id:
+        row["_saas_record_id"] = str(record_id)
     rows = _rows(ENTITY_TASKS)
     rows.insert(0, row)
     _write(ENTITY_TASKS, rows[:5000])
@@ -241,6 +249,7 @@ def queue_agent_action(action_type: str, payload: dict) -> dict:
 
 def approve_agent_action(action_id: str, execute: bool = False) -> dict | None:
     _write_allowed()
+    _approval_allowed()
     rows = _rows(ENTITY_AGENT_ACTIONS)
     target = next((x for x in rows if str(x.get("id")) == str(action_id)), None)
     if not target:
@@ -265,7 +274,7 @@ def execute_agent_action(action: dict) -> dict:
     if kind == "create_task":
         row = create_task(payload.get("title","AI-задача"), payload.get("description",""),
                           payload.get("assignee",""), payload.get("priority","Обычный"),
-                          payload.get("due_date",""))
+                          payload.get("due_date",""), record_id=f"agent_task_{action.get('id')}"))
         return {"status": "executed", "task_id": row["id"]}
     if kind == "create_notification":
         row = create_notification(payload.get("title","AI уведомление"), payload.get("body",""))
