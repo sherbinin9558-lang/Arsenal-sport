@@ -816,7 +816,8 @@ def data_update_record(entity, record_id, payload, expected_updated_at):
         _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
-            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
+            _invalidate_entity_cache(entity)
+            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.") from e
         raise
 
 
@@ -836,8 +837,22 @@ def data_delete_record(entity, record_id, expected_updated_at):
         _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
-            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
+            _invalidate_entity_cache(entity)
+            raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.") from e
         raise
+
+
+def _invalidate_entity_cache(entity):
+    """Drop session caches after a rejected concurrent write.
+
+    The caller must reload from the database before attempting another write;
+    this prevents a stale CRM/order/catalog object from being reused after a
+    version conflict.
+    """
+    st.session_state.pop(f"_app_{entity}_cache", None)
+    st.session_state.pop(_data_session_key(entity), None)
+    st.session_state.pop("_settings_baseline", None)
+    _invalidate_computed_snapshots()
 
 
 def _invalidate_computed_snapshots():
@@ -910,6 +925,7 @@ def data_save(entity,rows):
         not item.get("is_new") and not item.get("expected_updated_at")
         for item in batch
     ):
+        _invalidate_entity_cache(entity)
         raise DataConflictError(
             "Не удалось проверить версию одной из записей. Обновите данные и повторите сохранение."
         )
@@ -938,6 +954,7 @@ def data_save(entity,rows):
                 "RECORD_ALREADY_EXISTS",
             )
         ):
+            _invalidate_entity_cache(entity)
             raise DataConflictError(
                 "Данные изменились в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
             ) from e
