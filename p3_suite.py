@@ -56,14 +56,18 @@ def create_notification(title: str, body: str, level: str = "info", link: str = 
     body = str(body or "").strip()
     if not title or not body:
         raise ValueError("Заголовок и текст уведомления обязательны.")
+    rows = _rows(ENTITY_NOTIFICATIONS)
+    if record_id:
+        existing = next((x for x in rows if str(x.get("_saas_record_id")) == str(record_id) or str(x.get("id")) == f"ntf_{record_id}"), None)
+        if existing:
+            return existing
     row = {
-        "id": _id("ntf"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
+        "id": f"ntf_{record_id}" if record_id else _id("ntf"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
         "body": str(body).strip(), "level": level if level in {"info","success","warning","error"} else "info",
         "link": str(link or ""), "read": False, "created_at": _now(),
     }
     if record_id:
         row["_saas_record_id"] = str(record_id)
-    rows = _rows(ENTITY_NOTIFICATIONS)
     rows.insert(0, row)
     _write(ENTITY_NOTIFICATIONS, rows[:500])
     return row
@@ -100,8 +104,13 @@ def create_task(title: str, description: str = "", assignee: str = "", priority:
     if not title:
         raise ValueError("Название задачи не может быть пустым.")
     priority = priority if priority in {"Низкий","Обычный","Высокий","Срочно"} else "Обычный"
+    rows = _rows(ENTITY_TASKS)
+    if record_id:
+        existing = next((x for x in rows if str(x.get("_saas_record_id")) == str(record_id) or str(x.get("id")) == f"task_{record_id}"), None)
+        if existing:
+            return existing
     row = {
-        "id": _id("task"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
+        "id": f"task_{record_id}" if record_id else _id("task"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
         "description": str(description).strip(), "assignee": str(assignee).strip(),
         "priority": priority, "due_date": str(due_date).strip(), "status": "Открыта",
         "entity_type": str(entity_type), "entity_id": str(entity_id), "created_at": _now(),
@@ -109,7 +118,6 @@ def create_task(title: str, description: str = "", assignee: str = "", priority:
     }
     if record_id:
         row["_saas_record_id"] = str(record_id)
-    rows = _rows(ENTITY_TASKS)
     rows.insert(0, row)
     _write(ENTITY_TASKS, rows[:5000])
     return row
@@ -295,12 +303,16 @@ def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "
     caption = str(caption or "").strip()
     if not caption:
         raise ValueError("Подпись Instagram не может быть пустой.")
-    row = {"id": _id("ig"), "tenant_id": str(tenant_id()), "caption": str(caption).strip(),
+    rows = _rows(ENTITY_INSTAGRAM_QUEUE)
+    if record_id:
+        existing = next((x for x in rows if str(x.get("_saas_record_id")) == str(record_id) or str(x.get("id")) == f"ig_{record_id}"), None)
+        if existing:
+            return existing
+    row = {"id": f"ig_{record_id}" if record_id else _id("ig"), "tenant_id": str(tenant_id()), "caption": str(caption).strip(),
            "media_ref": str(media_ref), "product_id": str(product_id), "status": "Черновик",
            "created_at": _now()}
     if record_id:
         row["_saas_record_id"] = str(record_id)
-    rows = _rows(ENTITY_INSTAGRAM_QUEUE)
     rows.insert(0, row)
     _write(ENTITY_INSTAGRAM_QUEUE, rows[:1000])
     return row
