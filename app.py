@@ -124,6 +124,8 @@ def delete_product(record_id, existing=None):
     if existing is not None and existing.get("_saas_record_id") and existing.get("_saas_updated_at") and saas_enabled():
         data_delete_record("products", existing["_saas_record_id"], existing["_saas_updated_at"])
         st.session_state.pop("_app_products_cache", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
