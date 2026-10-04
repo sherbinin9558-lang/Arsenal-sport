@@ -13,6 +13,7 @@ from growth_engine import ai_summary, attribution_performance, recommendations a
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
+from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics)
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
@@ -801,17 +802,17 @@ st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobil
 
 base_tab_labels = [
     "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
-    "◷ План", "◉ Аналитика", "⚙ Настройки"
+    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр"
 ]
 _is_platform_admin = platform_admin_enabled()
 tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
 _tabs = st.tabs(tab_labels)
 if _is_platform_admin:
     tab_admin = _tabs[0]
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[1:9]
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = _tabs[1:10]
 else:
     tab_admin = None
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = _tabs[:8]
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = _tabs[:9]
 
 # ========== DASHBOARD ==========
 if tab_admin is not None:
@@ -1628,6 +1629,68 @@ def save_settings(data):
     data_save("settings", [payload])
 
 
+
+
+# ========== 8: AI OPERATIONS CENTER ==========
+with tab8:
+    st.markdown('<div class="section-kicker">AI OPERATIONS</div><div class="section-title">Центр автоматизации</div><div class="section-subtitle">CRM-интеллект, задачи команды, уведомления, безопасные AI-действия и очередь Instagram.</div>', unsafe_allow_html=True)
+    products = load_products(); plan = load_plan(); leads = load_leads(); orders = load_orders()
+    metrics = advanced_analytics(products, leads, orders, plan)
+    k1,k2,k3,k4,k5 = st.columns(5)
+    k1.metric("Лиды", metrics["leads"]); k2.metric("Заказы", metrics["orders"]); k3.metric("Выручка", f"{metrics['revenue']:,.0f} ₽".replace(","," ")); k4.metric("Заявка → заказ", f"{metrics['lead_to_order']:.1f}%"); k5.metric("Средний заказ", f"{metrics['revenue_per_order']:,.0f} ₽".replace(","," "))
+    a,b = st.columns(2)
+    with a:
+        st.subheader("CRM-интеллект")
+        pipeline = crm_pipeline(leads)
+        st.write(f"Горячих лидов: **{pipeline['hot']}** · Средний score: **{pipeline['avg_score']}**")
+        from p3_suite import enrich_lead
+        for lead in [enrich_lead(v) for v in leads if enrich_lead(v).get("intent") == "Горячий"][:10]:
+            st.write(f"• **{lead.get('name') or lead.get('product') or 'Лид'}** — {lead.get('lead_score')}/100 · {lead.get('next_action')}")
+    with b:
+        st.subheader("Команда и задачи")
+        tm = task_metrics(); st.write(f"Всего задач: **{tm['total']}** · Открытых: **{tm['open']}")
+        with st.form("p3_task_form"):
+            title = st.text_input("Новая задача", placeholder="Позвонить клиенту / подготовить Reels")
+            priority = st.selectbox("Приоритет", ["Низкий","Обычный","Высокий","Срочно"])
+            due = st.text_input("Срок", placeholder="2026-10-10")
+            if st.form_submit_button("Создать задачу"):
+                try:
+                    create_task(title, priority=priority, due_date=due); st.success("Задача создана."); st.rerun()
+                except Exception as e: st.error(str(e))
+    st.markdown("---")
+    a,b = st.columns(2)
+    with a:
+        st.subheader("Уведомления")
+        unread = notifications(True, 20)
+        st.caption(f"Непрочитанных: {len(unread)}")
+        for n in unread[:10]:
+            st.info(f"{n.get('title')}: {n.get('body')}")
+            if st.button("Прочитано", key=f"p3_ntf_{n.get('id')}"):
+                mark_notification_read(n.get("id")); st.rerun()
+        if st.button("Создать тестовое уведомление", key="p3_demo_notification"):
+            try:
+                create_notification("Центр автоматизации", "Уведомления готовы к работе.", "success"); st.rerun()
+            except Exception as e: st.error(str(e))
+    with b:
+        st.subheader("AI actions — только через подтверждение")
+        st.caption("Внешняя публикация и платежи автоматически не выполняются. AI сначала создаёт действие, затем менеджер подтверждает его.")
+        if st.button("Создать AI-задачу на follow-up", key="p3_queue_action"):
+            try:
+                queue_agent_action("create_task", {"title":"AI follow-up по горячим лидам","priority":"Высокий"}); st.rerun()
+            except Exception as e: st.error(str(e))
+        actions = [x for x in __import__("saas_core").data_load("agent_actions", []) if x.get("status") == "pending_approval"]
+        for action in actions[:10]:
+            st.write(f"**{action.get('action')}** · {action.get('id')}")
+            if st.button("Подтвердить и выполнить", key=f"p3_approve_{action.get('id')}"):
+                try:
+                    approve_agent_action(action.get("id"), execute=True); st.rerun()
+                except Exception as e: st.error(str(e))
+    st.markdown("---")
+    st.subheader("Instagram automation")
+    st.caption("Очередь публикаций: генерация и подготовка безопасны; фактическая публикация требует подключённого API и отдельного подтверждения.")
+    iq = instagram_queue()
+    if iq: st.dataframe(iq[:20], use_container_width=True, hide_index=True)
+    else: st.info("Очередь Instagram пока пуста.")
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
