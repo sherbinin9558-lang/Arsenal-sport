@@ -1734,6 +1734,8 @@ def load_settings():
             "record_id": data.get("_saas_record_id"),
             "updated_at": data.get("_saas_updated_at"),
         }
+    else:
+        st.session_state.pop("_settings_baseline", None)
     result = DEFAULT_SETTINGS.copy()
     result.update({k: data.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS})
     return result
@@ -1754,6 +1756,8 @@ def save_settings(data):
         payload["_saas_record_id"] = existing[0]["_saas_record_id"]
     data_save("settings", [payload])
     st.session_state.pop("_settings_baseline", None)
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 
 
