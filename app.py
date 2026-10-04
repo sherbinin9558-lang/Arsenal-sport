@@ -915,7 +915,11 @@ def _bulk_value(row, *keys):
     return ""
 
 def parse_bulk_file(uploaded_file):
+    max_bytes = 50 * 1024 * 1024
+    max_rows = 100_000
     raw = uploaded_file.getvalue()
+    if len(raw) > max_bytes:
+        raise ValueError("Файл слишком большой. Максимальный размер импорта — 50 МБ.")
     name = (uploaded_file.name or "").lower()
 
     if name.endswith(".xlsx"):
@@ -924,13 +928,30 @@ def parse_bulk_file(uploaded_file):
         except ImportError:
             raise RuntimeError("Для XLSX нужен openpyxl. CSV можно загружать без дополнительных зависимостей.")
         wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return []
-        headers = [str(x or "").strip() for x in rows[0]]
-        return [dict(zip(headers, row)) for row in rows[1:] if any(x not in (None, "") for x in row)]
-    text = raw.decode("utf-8-sig")
+        try:
+            ws = wb.active
+            iterator = ws.iter_rows(values_only=True)
+            try:
+                first = next(iterator)
+            except StopIteration:
+                return
+            headers = [str(x or "").strip() for x in first]
+            count = 0
+            for row in iterator:
+                if not any(x not in (None, "") for x in row):
+                    continue
+                count += 1
+                if count > max_rows:
+                    raise ValueError("В файле больше 100 000 строк. Разбейте импорт на несколько файлов.")
+                yield dict(zip(headers, row))
+        finally:
+            wb.close()
+        return
+
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("CSV должен быть в кодировке UTF-8.") from exc
     sample = text[:4096]
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=";,\\t,")
@@ -938,7 +959,11 @@ def parse_bulk_file(uploaded_file):
         dialect = csv.excel
         dialect.delimiter = ";"
     reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-    return [dict(row) for row in reader if any(str(v or "").strip() for v in row.values())]
+    for count, row in enumerate(reader, start=1):
+        if count > max_rows:
+            raise ValueError("В файле больше 100 000 строк. Разбейте импорт на несколько файлов.")
+        if any(str(v or "").strip() for v in row.values()):
+            yield dict(row)
 
 def bulk_import_products(uploaded_file, update_existing=False):
     rows = parse_bulk_file(uploaded_file)
