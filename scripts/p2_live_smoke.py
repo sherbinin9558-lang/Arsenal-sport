@@ -43,7 +43,22 @@ def telegram_readonly():
 def vk_readonly():
     token=os.getenv("VK_TOKEN","").strip()
     if not token: return {"status":"skipped","reason":"VK_TOKEN not set"}
-    ok,status,elapsed,body=http("https://api.vk.com/method/users.get?access_token="+token+"&v=5.199")
+    import urllib.parse
+    req=Request(
+        "https://api.vk.com/method/users.get",
+        data=urllib.parse.urlencode({"access_token": token, "v": "5.199"}).encode(),
+        headers={"Content-Type":"application/x-www-form-urlencoded","User-Agent":"ArsenalSport-P2-Smoke/1.0"},
+        method="POST",
+    )
+    start=time.perf_counter()
+    try:
+        with urlopen(req, timeout=15) as r:
+            body=r.read(4096)
+            ok,status=True,r.status
+    except (HTTPError, URLError, TimeoutError) as e:
+        body=str(e).encode()
+        ok,status=False,getattr(e,"code",0)
+    elapsed=time.perf_counter()-start
     return {"status":"ok" if ok else "failed","http":status,"latency_ms":round(elapsed*1000,1),
             "body":body.decode("utf-8","replace")[:500]}
 
@@ -62,7 +77,8 @@ def browser_webmcp():
         email=os.getenv("E2E_EMAIL","").strip()
         password=os.getenv("E2E_PASSWORD","")
         if not email or not password:
-            raise RuntimeError("E2E credentials are required for authenticated WebMCP smoke.")
+            browser.close()
+            return {"status":"skipped","reason":"E2E credentials not set"}
         email_field = page.get_by_label("Email")
         password_field = page.get_by_label("Пароль")
         login_button = page.get_by_role("button", name="Войти")
