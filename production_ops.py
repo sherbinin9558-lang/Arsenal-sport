@@ -85,8 +85,8 @@ def vk_health(token: str | None = None) -> dict:
     return result
 
 
-def provider_health() -> dict:
-    return {"checked_at": now_iso(), "telegram": telegram_health(), "vk": vk_health()}
+def provider_health(telegram_token: str | None = None, vk_token: str | None = None) -> dict:
+    return {"checked_at": now_iso(), "telegram": telegram_health(telegram_token), "vk": vk_health(vk_token)}
 
 
 def audit_event(action: str, target: str = "", outcome: str = "success", details: dict | None = None) -> dict:
