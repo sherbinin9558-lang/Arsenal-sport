@@ -78,6 +78,8 @@ def load_products():
 def save_products(p):
     data_save("products", p)
     st.session_state["_app_products_cache"] = p
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 def add_product(prod):
     p = load_products()
     if not feature_allowed("products", len(p)):
@@ -101,6 +103,8 @@ def update_product(record_id, prod, existing=None):
         merged.pop("_saas_updated_at", None)
         data_update_record("products", existing["_saas_record_id"], merged, existing["_saas_updated_at"])
         st.session_state.pop("_app_products_cache", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
@@ -120,6 +124,8 @@ def delete_product(record_id, existing=None):
     if existing is not None and existing.get("_saas_record_id") and existing.get("_saas_updated_at") and saas_enabled():
         data_delete_record("products", existing["_saas_record_id"], existing["_saas_updated_at"])
         st.session_state.pop("_app_products_cache", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
@@ -152,6 +158,8 @@ def load_plan():
 def save_plan(pl):
     data_save("content_plan", pl)
     st.session_state["_app_plan_cache"] = pl
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 ATTRIBUTION_FILE = Path("content_attribution.json")
 def load_attribution(): return data_load("content_attribution", [])
@@ -177,24 +185,45 @@ def add_plan(item):
 def update_plan(record_id, item):
     p = load_plan()
     idx = _find_record_index(p, record_id)
-    if idx is not None:
-        existing = dict(p[idx] or {})
-        updated = dict(item or {})
-        stable_id = existing.get("_saas_record_id")
-        existing.update(updated)
-        if stable_id:
-            existing["_saas_record_id"] = stable_id
-        else:
-            existing.pop("_saas_record_id", None)
-        p[idx] = existing
-        save_plan(p)
+    if idx is None:
+        return
+    existing = dict(p[idx] or {})
+    updated = dict(item or {})
+    stable_id = existing.get("_saas_record_id")
+    expected = existing.get("_saas_updated_at")
+    if stable_id and expected and saas_enabled():
+        merged = dict(existing)
+        merged.update(updated)
+        merged.pop("_saas_updated_at", None)
+        data_update_record("content_plan", stable_id, merged, expected)
+        st.session_state.pop("_app_plan_cache", None)
+        st.session_state.pop("max_data_snapshot", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        return
+    if stable_id:
+        existing["_saas_record_id"] = stable_id
+    else:
+        existing.pop("_saas_record_id", None)
+    existing.update(updated)
+    p[idx] = existing
+    save_plan(p)
 
 def delete_plan(record_id):
     p = load_plan()
     idx = _find_record_index(p, record_id)
-    if idx is not None:
-        p.pop(idx)
-        save_plan(p)
+    if idx is None:
+        return
+    existing = dict(p[idx] or {})
+    stable_id = existing.get("_saas_record_id")
+    expected = existing.get("_saas_updated_at")
+    if stable_id and expected and saas_enabled():
+        data_delete_record("content_plan", stable_id, expected)
+        st.session_state.pop("_app_plan_cache", None)
+        st.session_state.pop("max_data_snapshot", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        return
+    p.pop(idx)
+    save_plan(p)
 
 def _tenant_asset_root():
     root = Path("tenant_assets") / str(st.session_state.get("saas_tenant_id", "unknown"))
@@ -878,7 +907,7 @@ with tab_dashboard:
         workflow_metrics=workflow_metrics, low_stock_products=low_stock_products,
         growth_recommendations=_cached_growth_recommendations, max_product_title=max_product_title,
         attribution_loader=load_attribution, attribution_metrics=attribution_metrics,
-        add_product=add_product, categories=CATEGORIES, can_write=can("write_data"),
+        add_product=add_product, add_plan=add_plan, categories=CATEGORIES, can_write=can("write_data"),
     )
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
@@ -1704,16 +1733,35 @@ DEFAULT_SETTINGS = {
 def load_settings():
     rows = data_load("settings", [])
     data = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
+    if data.get("_saas_record_id"):
+        st.session_state["_settings_baseline"] = {
+            "record_id": data.get("_saas_record_id"),
+            "updated_at": data.get("_saas_updated_at"),
+        }
+    else:
+        st.session_state.pop("_settings_baseline", None)
     result = DEFAULT_SETTINGS.copy()
     result.update({k: data.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS})
     return result
 
 def save_settings(data):
     payload = {k: data.get(k, "") for k in DEFAULT_SETTINGS}
+    baseline = st.session_state.get("_settings_baseline") or {}
+    record_id = baseline.get("record_id")
+    expected = baseline.get("updated_at")
+    if record_id and expected and saas_enabled():
+        data_update_record("settings", record_id, payload, expected)
+        st.session_state.pop("_settings_baseline", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
+        return
     existing = data_load("settings", [])
     if existing and isinstance(existing[0], dict) and existing[0].get("_saas_record_id"):
         payload["_saas_record_id"] = existing[0]["_saas_record_id"]
     data_save("settings", [payload])
+    st.session_state.pop("_settings_baseline", None)
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 
 

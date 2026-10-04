@@ -7,18 +7,23 @@ def render_dashboard(
     load_products, load_plan, load_leads, load_orders,
     crm_metrics, order_metrics, conversion_metrics, workflow_metrics,
     low_stock_products, growth_recommendations, max_product_title,
-    attribution_loader, attribution_metrics, add_product,
+    attribution_loader, attribution_metrics, add_product, add_plan,
     categories, can_write,
 ):
-    # Reuse one dashboard snapshot so opening MAX does not trigger another
-    # round of Supabase reads.
-    if "max_data_snapshot" not in st.session_state:
+    # Reuse the dashboard snapshot only until a successful write invalidates it.
+    # This keeps the dashboard fast without showing stale data after edits.
+    revision = st.session_state.get("_app_data_revision", 0)
+    if (
+        "max_data_snapshot" not in st.session_state
+        or st.session_state.get("_max_data_snapshot_revision") != revision
+    ):
         st.session_state["max_data_snapshot"] = {
             "products": load_products(),
             "plan": load_plan(),
             "leads": load_leads(),
             "orders": load_orders(),
         }
+        st.session_state["_max_data_snapshot_revision"] = revision
     snap = st.session_state["max_data_snapshot"]
     products = snap["products"]
     plan = snap["plan"]
@@ -166,9 +171,66 @@ def render_dashboard(
     with b:
         st.markdown("### Быстрые действия")
         if st.button("➕ Добавить товар", key="dash_add_product", use_container_width=True):
-            st.info("Откройте раздел «Создать» — там можно сразу загрузить фото и создать карточку.")
-        if st.button("📅 Открыть контент-план", key="dash_open_plan", use_container_width=True):
-            st.info("Откройте раздел «План» для управления публикациями и workflow.")
+            st.session_state["dashboard_quick_add"] = True
+        if st.button("📅 Добавить материал в план", key="dash_open_plan", use_container_width=True):
+            st.session_state["dashboard_quick_plan"] = True
+
+        if st.session_state.get("dashboard_quick_add"):
+            with st.form("dashboard_quick_add_form", clear_on_submit=True):
+                st.caption("Быстрое добавление без перехода в другой раздел.")
+                name = st.text_input("Название товара", key="dash_quick_name")
+                brand = st.text_input("Бренд", key="dash_quick_brand")
+                article = st.text_input("Артикул", key="dash_quick_article")
+                category = st.selectbox("Категория", categories, key="dash_quick_category")
+                price = st.text_input("Цена, ₽", key="dash_quick_price")
+                stock = st.number_input("Остаток", min_value=0, value=0, step=1, key="dash_quick_stock")
+                submitted = st.form_submit_button("Создать товар", type="primary", use_container_width=True)
+            if submitted:
+                if not can_write:
+                    st.error("У вас нет прав на создание товара.")
+                elif not name.strip() or not brand.strip():
+                    st.error("Укажите название и бренд.")
+                else:
+                    try:
+                        add_product({
+                            "name": name.strip(), "brand": brand.strip(), "article": article.strip(),
+                            "category": category, "price": price.strip(), "stock": int(stock),
+                            "total_stock": int(stock), "sizes": "", "color": "",
+                            "description": "", "specs": "", "card_image": "",
+                            "date_added": str(datetime.date.today()),
+                        })
+                        st.session_state["dashboard_quick_add"] = False
+                        st.success("Товар создан.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Не удалось создать товар: {e}")
+
+        if st.session_state.get("dashboard_quick_plan"):
+            with st.form("dashboard_quick_plan_form", clear_on_submit=True):
+                st.caption("Быстрое добавление материала в контент-план.")
+                plan_date = st.date_input("Дата", value=datetime.date.today(), key="dash_quick_plan_date")
+                platform = st.selectbox("Платформа", ["Instagram", "Telegram", "VK", "Другое"], key="dash_quick_plan_platform")
+                product = st.text_input("Товар", key="dash_quick_plan_product")
+                content_type = st.selectbox("Тип", ["Пост", "Reels", "Stories", "Карусель"], key="dash_quick_plan_type")
+                idea = st.text_area("Идея / текст", key="dash_quick_plan_idea")
+                priority = st.selectbox("Приоритет", ["Обычный", "Высокий", "Срочно"], key="dash_quick_plan_priority")
+                submitted = st.form_submit_button("Добавить в план", type="primary", use_container_width=True)
+            if submitted:
+                if not can_write:
+                    st.error("У вас нет прав на изменение контент-плана.")
+                elif not product.strip():
+                    st.error("Укажите товар.")
+                else:
+                    try:
+                        add_plan({
+                            "date": str(plan_date), "platform": platform, "product": product.strip(),
+                            "type": content_type, "idea": idea.strip(), "status": "Идея", "priority": priority,
+                        })
+                        st.session_state["dashboard_quick_plan"] = False
+                        st.success("Материал добавлен в план.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Не удалось добавить материал: {e}")
     
     st.markdown("---")
     st.markdown("### Состояние системы")

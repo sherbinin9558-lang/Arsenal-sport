@@ -21,6 +21,8 @@ def save_orders(orders):
     data_save("orders", orders)
     import streamlit as st
     st.session_state["_app_orders_cache"] = orders
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 def create_order(customer="", contact="", product="", product_id="", amount="", status="Новая", source="Manual", content_id="", lead_id=""):
     if status not in ORDER_STATUSES:

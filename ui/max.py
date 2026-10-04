@@ -82,6 +82,8 @@ def load_products():
 def save_products(products):
     data_save("products", products)
     st.session_state["_app_products_cache"] = products
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 
 def load_plan():
@@ -97,6 +99,8 @@ def load_plan():
 def save_plan(plan):
     data_save("content_plan", plan)
     st.session_state["_app_plan_cache"] = plan
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 
 def get_logo():

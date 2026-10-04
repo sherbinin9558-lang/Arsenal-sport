@@ -20,6 +20,8 @@ def save_leads(leads):
     data_save("leads", leads)
     import streamlit as st
     st.session_state["_app_leads_cache"] = leads
+    st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+    st.session_state.pop("max_data_snapshot", None)
 
 def create_lead(name="", contact="", source="Website", message="", product="", product_id="", content_id="", order_id=""):
     leads = load_leads()
