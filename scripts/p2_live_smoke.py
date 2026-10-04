@@ -59,6 +59,13 @@ def browser_webmcp():
         page=browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(2500)
+        email=os.getenv("E2E_EMAIL","").strip()
+        password=os.getenv("E2E_PASSWORD","")
+        if email and password and page.get_by_label("Email").count():
+            page.get_by_label("Email").fill(email)
+            page.get_by_label("Пароль").fill(password)
+            page.get_by_role("button", name="Войти").click()
+            page.wait_for_timeout(5000)
         result=page.evaluate("""() => ({
           url: location.href,
           hasWebMcpSdk: !!globalThis.__WEBMCP_TELEMETRY__,
