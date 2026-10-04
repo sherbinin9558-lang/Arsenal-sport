@@ -186,7 +186,9 @@ def render_dashboard(
                 stock = st.number_input("Остаток", min_value=0, value=0, step=1, key="dash_quick_stock")
                 submitted = st.form_submit_button("Создать товар", type="primary", use_container_width=True)
             if submitted:
-                if not name.strip() or not brand.strip():
+                if not can_write:
+                    st.error("У вас нет прав на создание товара.")
+                elif not name.strip() or not brand.strip():
                     st.error("Укажите название и бренд.")
                 else:
                     try:
