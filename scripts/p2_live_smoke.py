@@ -62,7 +62,7 @@ def browser_webmcp():
         result=page.evaluate("""() => ({
           url: location.href,
           hasWebMcpSdk: !!globalThis.__WEBMCP_TELEMETRY__,
-          registered: !!globalThis.__WEBMCP_REGISTERED__
+          registered: !!globalThis.__ARSENAL_WEBMCP_READY__
         })""")
         browser.close()
     return {"status":"ok","result":result}
