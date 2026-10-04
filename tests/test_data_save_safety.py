@@ -254,6 +254,15 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
         self.assertNotIn('"history"', source)
 
 
+class MaxWriteInvalidationRegressionTests(unittest.TestCase):
+    def test_max_local_writes_invalidate_snapshot(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1', source)
+        self.assertIn('st.session_state.pop("max_data_snapshot", None)', source)
+        self.assertIn('def save_products(products):', source)
+        self.assertIn('def save_plan(plan):', source)
+
+
 class DashboardWriteInvalidationRegressionTests(unittest.TestCase):
     def test_product_atomic_writes_invalidate_dashboard_snapshot(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
