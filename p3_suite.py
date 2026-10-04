@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import hashlib
 import json
+import uuid
 import re
 from typing import Any, Iterable
 
@@ -24,7 +25,7 @@ def _now() -> str:
 
 
 def _id(prefix: str) -> str:
-    return prefix + "_" + hashlib.sha256(f"{tenant_id()}:{_now()}".encode()).hexdigest()[:16]
+    return f"{prefix}_{uuid.uuid4().hex}"
 
 
 def _rows(entity: str) -> list[dict]:
@@ -45,6 +46,10 @@ def _write_allowed() -> None:
 
 def create_notification(title: str, body: str, level: str = "info", link: str = "") -> dict:
     _write_allowed()
+    title = str(title or "").strip()
+    body = str(body or "").strip()
+    if not title or not body:
+        raise ValueError("Заголовок и текст уведомления обязательны.")
     row = {
         "id": _id("ntf"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
         "body": str(body).strip(), "level": level if level in {"info","success","warning","error"} else "info",
@@ -83,6 +88,9 @@ def mark_notification_read(notification_id: str) -> bool:
 def create_task(title: str, description: str = "", assignee: str = "", priority: str = "Обычный",
                 due_date: str = "", entity_type: str = "", entity_id: str = "") -> dict:
     _write_allowed()
+    title = str(title or "").strip()
+    if not title:
+        raise ValueError("Название задачи не может быть пустым.")
     priority = priority if priority in {"Низкий","Обычный","Высокий","Срочно"} else "Обычный"
     row = {
         "id": _id("task"), "tenant_id": str(tenant_id()), "title": str(title).strip(),
@@ -118,8 +126,24 @@ def update_task(task_id: str, **changes: Any) -> dict | None:
 def task_metrics() -> dict:
     rows = _rows(ENTITY_TASKS)
     counts = Counter(str(x.get("status","Открыта")) for x in rows)
+    today = datetime.now(timezone.utc).date()
+    overdue = 0
+    for row in rows:
+        if str(row.get("status","Открыта")) == "Готово":
+            continue
+        due = str(row.get("due_date","")).strip()
+        if due:
+            try:
+                if datetime.fromisoformat(due.replace("Z","+00:00")).date() < today:
+                    overdue += 1
+            except ValueError:
+                try:
+                    if datetime.strptime(due[:10], "%Y-%m-%d").date() < today:
+                        overdue += 1
+                except ValueError:
+                    pass
     return {"total": len(rows), "open": sum(x.get("status") != "Готово" for x in rows),
-            "overdue": 0, "by_status": dict(counts)}
+            "overdue": overdue, "by_status": dict(counts)}
 
 
 # ---------- Deeper CRM intelligence ----------
@@ -257,6 +281,9 @@ def execute_agent_action(action: dict) -> dict:
 
 def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "") -> dict:
     _write_allowed()
+    caption = str(caption or "").strip()
+    if not caption:
+        raise ValueError("Подпись Instagram не может быть пустой.")
     row = {"id": _id("ig"), "tenant_id": str(tenant_id()), "caption": str(caption).strip(),
            "media_ref": str(media_ref), "product_id": str(product_id), "status": "Черновик",
            "created_at": _now()}
