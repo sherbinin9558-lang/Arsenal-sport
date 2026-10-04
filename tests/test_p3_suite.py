@@ -87,6 +87,8 @@ class TestP3Suite(unittest.TestCase):
             [dict(row)],
             [{**row, "status": "На проверке"}],
             [{**row, "status": "Одобрено"}],
+            [{**row, "status": "Запланировано", "scheduled_at": "2030-01-01T10:00:00Z"}],
+            [{**row, "status": "Запланировано", "scheduled_at": "2030-01-01T10:00:00Z"}],
         ]
         updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         self.assertEqual(updated["status"], "На проверке")
