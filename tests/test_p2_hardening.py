@@ -63,6 +63,20 @@ class TestP2Hardening(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             tbank_billing._save_checkout("tenant", "order", "payment", "pro")
 
+    @patch("webmcp_tools.data_load")
+    def test_webmcp_content_plan_is_allowlisted(self, load_mock):
+        import webmcp_tools
+        load_mock.side_effect = [
+            [{"city": "Краснодар", "secret_note": "hidden"}],
+            [{"_saas_record_id": "p1", "name": "Ball", "private_cost": 100}],
+            [{"_saas_record_id": "c1", "date": "2026-10-04", "platform": "Telegram",
+              "idea": "Post", "status": "Идея", "private_note": "hidden"}],
+        ]
+        data = webmcp_tools._webmcp_data()
+        self.assertNotIn("private_note", data["content_plan"][0])
+        self.assertNotIn("private_cost", data["products"][0])
+        self.assertNotIn("secret_note", data["settings"])
+
     def test_large_xlsx_roundtrip(self):
         from openpyxl import Workbook, load_workbook
         import tempfile
