@@ -312,6 +312,7 @@ def _clear_tenant_runtime_cache():
     for key in list(st.session_state):
         if key.startswith("_saas_data_records_") or key in ("max_data_snapshot","saas_onboarding_complete"):
             st.session_state.pop(key, None)
+    st.session_state.pop("_saas_data_page_cache", None)
 
 def switch_tenant(tenant):
     token=st.session_state.get("saas_access_token")
@@ -763,6 +764,15 @@ def data_load_page(entity, page=1, page_size=50, search="", category="Все"):
         start = (page - 1) * page_size
         return {"rows": rows[start:start + page_size], "total": total, "page": page, "page_size": page_size}
 
+    cache_key = (
+        entity, page, page_size, search, category,
+        str(st.session_state.get("saas_tenant_id", "")),
+    )
+    page_cache = st.session_state.setdefault("_saas_data_page_cache", {})
+    cached = page_cache.get(cache_key)
+    if cached and (time.time() - cached.get("at", 0)) < 5:
+        return cached["result"]
+
     token = st.session_state.get("saas_access_token")
     params = {
         "select": "record_id,payload,created_at,updated_at",
@@ -781,7 +791,13 @@ def data_load_page(entity, page=1, page_size=50, search="", category="Все"):
 
     rows, total = _rest_get_paged("/rest/v1/app_data", token, params=params)
     prepared = [_prepare_loaded_payload(row) for row in rows]
-    return {"rows": prepared, "total": int(total if total is not None else len(prepared)), "page": page, "page_size": page_size}
+    result = {"rows": prepared, "total": int(total if total is not None else len(prepared)), "page": page, "page_size": page_size}
+    page_cache[cache_key] = {"at": time.time(), "result": result}
+    if len(page_cache) > 100:
+        oldest = sorted(page_cache.items(), key=lambda item: item[1].get("at", 0))[:20]
+        for key, _ in oldest:
+            page_cache.pop(key, None)
+    return result
 
 
 def data_update_record(entity, record_id, payload, expected_updated_at):
@@ -830,6 +846,7 @@ def _invalidate_computed_snapshots():
     # can reuse the snapshot without stale results.
     st.session_state.pop("_app_growth_snapshot", None)
     st.session_state.pop("_app_growth_snapshot_key", None)
+    st.session_state.pop("_saas_data_page_cache", None)
 
 
 def data_save(entity,rows):
