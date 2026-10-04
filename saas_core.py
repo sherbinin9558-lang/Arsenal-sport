@@ -459,11 +459,6 @@ def render_account_bar():
 def plan_catalog():
     return {"starter":{"name":"STARTER","products":7000,"users":3,"description":"Для небольшого магазина"},"pro":{"name":"PRO","products":7000,"users":10,"description":"Для растущего бизнеса"},"business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"}}
 
-def _service_key():
-    try: value=st.secrets.get("SUPABASE_SERVICE_ROLE_KEY",os.getenv("SUPABASE_SERVICE_ROLE_KEY",""))
-    except Exception: value=os.getenv("SUPABASE_SERVICE_ROLE_KEY","")
-    return str(value or "").strip()
-
 def activate_paid_subscription(plan,provider_payment_id,payment_method_id=None,provider="yookassa",tenant=None):
     key=_service_key()
     if not key or not saas_enabled():

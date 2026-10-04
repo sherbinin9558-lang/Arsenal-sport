@@ -1,6 +1,7 @@
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
+from image_utils import open_photo
 import json, io, datetime, csv, requests, base64, re, tempfile, os
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
@@ -937,7 +938,7 @@ with tab1:
             st.error("Заполните: Название и Бренд")
         else:
             with st.spinner("Генерация..."):
-                img = Image.open(up).convert("RGB") if up else None
+                img = open_photo(up) if up else None
                 card = generate_card(img, name, brand, article, sizes, color, description, specs, category, template, get_logo())
                 card_buf = io.BytesIO()
                 card.save(card_buf, format="PNG")
@@ -1377,9 +1378,9 @@ with tab4:
                     original_b64 = reel_product.get("original_image")
                     if original_b64:
                         try:
-                            source_image = Image.open(
+                            source_image = open_photo(
                                 io.BytesIO(base64.b64decode(original_b64))
-                            ).convert("RGB")
+                            )
                         except Exception:
                             source_image = None
 

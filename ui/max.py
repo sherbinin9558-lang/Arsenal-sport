@@ -7,6 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 from PIL import Image
+from image_utils import open_photo
 
 from asset_store import load_logo_bytes
 from card_generator import generate_card
@@ -590,9 +591,14 @@ def render_max():
                             skipped.append(f.name)
                             continue
                         try:
-                            source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
-                            path = save_uploaded_photo(f, products_now[idx], idx)
-                            products_now[idx]["original_image"] = path
+                            source_img = open_photo(io.BytesIO(f.getvalue()))
+                            # Same format as the catalog editor: base64 JPEG (a file path here
+                            # made Reels fail because the app decodes this field as base64).
+                            original_buf = io.BytesIO()
+                            source_img.save(original_buf, format="JPEG", quality=95)
+                            products_now[idx]["original_image"] = base64.b64encode(
+                                original_buf.getvalue()
+                            ).decode("ascii")
                             p_now = products_now[idx]
                             card_img = generate_card(
                                 source_img,
