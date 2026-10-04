@@ -244,6 +244,10 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
         self.assertIn("до 7 000 товаров", source)
         self.assertNotIn("до 10 000 товаров", source)
 
+    def test_webmcp_imports_data_loader(self):
+        source = (Path(__file__).resolve().parents[1] / "webmcp_tools.py").read_text(encoding="utf-8")
+        self.assertIn("from saas_core import data_load", source)
+
     def test_webmcp_content_plan_does_not_expose_raw_record_payload(self):
         source = (Path(__file__).resolve().parents[1] / "webmcp_tools.py").read_text(encoding="utf-8")
         self.assertIn("allowed_plan", source)
