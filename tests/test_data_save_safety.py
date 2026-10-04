@@ -254,6 +254,23 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
         self.assertNotIn('"history"', source)
 
 
+class DashboardWriteInvalidationRegressionTests(unittest.TestCase):
+    def test_product_atomic_writes_invalidate_dashboard_snapshot(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertGreaterEqual(source.count('st.session_state[" _app_data_revision"]'), 0)
+        self.assertIn('data_update_record("products"', source)
+        self.assertIn('data_delete_record("products"', source)
+        self.assertIn('st.session_state.pop("max_data_snapshot", None)', source)
+
+    def test_crm_and_order_writes_invalidate_dashboard_snapshot(self):
+        root = Path(__file__).resolve().parents[1]
+        crm = (root / "crm_core.py").read_text(encoding="utf-8")
+        orders = (root / "free_automation.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state["_app_data_revision"]', crm)
+        self.assertIn('st.session_state.pop("max_data_snapshot", None)', crm)
+        self.assertIn('st.session_state["_app_data_revision"]', orders)
+        self.assertIn('st.session_state.pop("max_data_snapshot", None)', orders)
+
 class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
     def test_dashboard_snapshot_is_invalidated_after_local_writes(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
