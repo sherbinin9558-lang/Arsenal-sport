@@ -13,7 +13,7 @@ import re
 from typing import Any, Iterable
 
 from saas_core import data_load, data_save, tenant_id, current_role, can
-from production_ops import validate_agent_payload, agent_is_expired
+from production_ops import validate_agent_payload, agent_is_expired, audit_event
 
 ENTITY_TASKS = "tasks"
 ENTITY_NOTIFICATIONS = "notifications"
@@ -276,11 +276,22 @@ def approve_agent_action(action_id: str, execute: bool = False) -> dict | None:
         return target
     target["status"] = "approved"
     target["approved_at"] = _now()
+    target["approved_by_role"] = str(current_role() or "")
+    target["approved_by"] = str(__import__("streamlit").session_state.get("saas_user_id",""))
     if execute:
-        result = execute_agent_action(target)
-        target["status"] = result.get("status", "executed")
-        target["result"] = result
-        target["executed_at"] = _now()
+        try:
+            result = execute_agent_action(target)
+            target["status"] = result.get("status", "executed")
+            target["result"] = result
+            target["executed_at"] = _now()
+            audit_event("agent_action_execute", str(action_id), target["status"], {"action": target.get("action")})
+        except Exception as exc:
+            target["status"] = "failed"
+            target["result"] = {"status": "failed", "reason": str(exc)[:500]}
+            target["failed_at"] = _now()
+            audit_event("agent_action_execute", str(action_id), "failed", {"action": target.get("action"), "error": str(exc)[:300]})
+    else:
+        audit_event("agent_action_approve", str(action_id), "approved", {"action": target.get("action")})
     _write(ENTITY_AGENT_ACTIONS, rows)
     return target
 
@@ -317,9 +328,11 @@ def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "
         raise ValueError("Подпись Instagram превышает лимит 2200 символов.")
     if scheduled_at:
         try:
-            datetime.fromisoformat(str(scheduled_at).replace("Z","+00:00"))
+            parsed = datetime.fromisoformat(str(scheduled_at).replace("Z","+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timezone required")
         except ValueError as exc:
-            raise ValueError("scheduled_at должен быть ISO-датой.") from exc
+            raise ValueError("scheduled_at должен быть ISO-датой с часовым поясом.") from exc
     rows = _rows(ENTITY_INSTAGRAM_QUEUE)
     if record_id:
         existing = next((x for x in rows if str(x.get("_saas_record_id")) == str(record_id) or str(x.get("id")) == f"ig_{record_id}"), None)
@@ -395,6 +408,8 @@ def crm_insights(leads: list[dict]) -> dict:
 def update_instagram_draft(draft_id: str, **changes: Any) -> dict | None:
     _write_allowed()
     allowed = {"caption", "media_ref", "product_id", "scheduled_at", "status"}
+    if set(changes) - allowed:
+        raise ValueError("Недопустимые поля Instagram-черновика.")
     if "caption" in changes:
         caption = str(changes["caption"] or "").strip()
         if not caption or len(caption) > 2200:
@@ -402,19 +417,41 @@ def update_instagram_draft(draft_id: str, **changes: Any) -> dict | None:
         changes["caption"] = caption
     if "scheduled_at" in changes and changes["scheduled_at"]:
         try:
-            datetime.fromisoformat(str(changes["scheduled_at"]).replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(str(changes["scheduled_at"]).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timezone required")
         except ValueError as exc:
-            raise ValueError("scheduled_at должен быть ISO-датой.") from exc
-    allowed_statuses = {"Черновик", "На проверке", "Одобрено", "Запланировано", "Опубликовано", "Отменено"}
-    if "status" in changes and changes["status"] not in allowed_statuses:
-        raise ValueError("Недопустимый статус Instagram.")
+            raise ValueError("scheduled_at должен быть ISO-датой с часовым поясом.") from exc
     rows = _rows(ENTITY_INSTAGRAM_QUEUE)
     target = next((x for x in rows if str(x.get("id")) == str(draft_id)), None)
     if not target:
         return None
+    current = str(target.get("status") or "Черновик")
+    allowed_statuses = {"Черновик", "На проверке", "Одобрено", "Запланировано", "Опубликовано", "Отменено"}
+    if "status" in changes:
+        nxt = str(changes["status"])
+        if nxt not in allowed_statuses:
+            raise ValueError("Недопустимый статус Instagram.")
+        transitions = {
+            "Черновик": {"На проверке", "Отменено"},
+            "На проверке": {"Черновик", "Одобрено", "Отменено"},
+            "Одобрено": {"На проверке", "Запланировано", "Отменено"},
+            "Запланировано": {"Одобрено", "Отменено"},
+            "Опубликовано": set(),
+            "Отменено": set(),
+        }
+        if nxt != current and nxt not in transitions.get(current, set()):
+            raise ValueError(f"Недопустимый переход Instagram: {current} → {nxt}.")
+        if nxt == "Опубликовано":
+            raise PermissionError("Публикация Instagram выполняется только подключённым провайдером после отдельного подтверждения.")
+    if "scheduled_at" in changes and changes["scheduled_at"] and current not in {"Одобрено", "Запланировано"} and changes.get("status") != "Запланировано":
+        raise ValueError("Сначала одобрите материал, затем назначайте время публикации.")
     for key, value in changes.items():
         if key in allowed:
             target[key] = value
+    if target.get("status") == "Запланировано" and not target.get("scheduled_at"):
+        raise ValueError("Для запланированного Instagram-материала требуется scheduled_at.")
     target["updated_at"] = _now()
     _write(ENTITY_INSTAGRAM_QUEUE, rows)
+    audit_event("instagram_queue_update", str(draft_id), "success", {"status": target.get("status")})
     return target
