@@ -686,9 +686,13 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
-    if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
-        st.session_state["open_max"] = True
-        render_max()
+    @st.fragment(key="max_sidebar_launcher")
+    def _max_sidebar_launcher():
+        if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
+            st.session_state["open_max"] = True
+            render_max()
+
+    _max_sidebar_launcher()
     st.markdown("---")
     try:
         tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
@@ -787,10 +791,16 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
     unsafe_allow_html=True,
 )
 
-# MAX launcher: direct dialog call. Keep the dialog itself as the only Streamlit fragment.
-if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
-    st.session_state["open_max"] = True
-    render_max()
+# MAX launcher: run the button as an independent fragment so opening the
+# dialog does not rerun the entire application. The dialog itself remains
+# Streamlit's native fragment.
+@st.fragment(key="max_mobile_launcher")
+def _max_mobile_launcher():
+    if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
+        st.session_state["open_max"] = True
+        render_max()
+
+_max_mobile_launcher()
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
