@@ -332,8 +332,8 @@ def gen_vk(p, tone):
 # ==================== ПУБЛИКАЦИЯ В TELEGRAM ====================
 def publish_to_telegram(image_bytes, caption):
     try:
-        token = st.secrets["TELEGRAM_TOKEN"]
-        channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
+        token = _telegram_token()
+        channel = _telegram_chat_id(st.secrets.get("TELEGRAM_CHANNEL", ""))
         api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
         files = {"photo": ("card.png", image_bytes, "image/png")}
         data = {"chat_id": channel, "caption": caption[:1024]}
@@ -348,6 +348,13 @@ def publish_to_telegram(image_bytes, caption):
         return False, f"Ошибка публикации: {e}"
 
 # ==================== ПУБЛИКАЦИЯ REELS ====================
+def _telegram_token():
+    """Return the canonical Telegram bot token, with legacy-name compatibility."""
+    token = str(st.secrets.get("TELEGRAM_BOT_TOKEN", "") or "").strip()
+    if not token:
+        token = str(st.secrets.get("TELEGRAM_TOKEN", "") or "").strip()
+    return token
+
 def _telegram_chat_id(raw_channel):
     value = str(raw_channel or "").strip()
     if value.startswith("https://t.me/"):
@@ -363,8 +370,8 @@ def _telegram_api(token, method):
 
 def publish_reel_to_telegram(video_bytes, caption):
     try:
-        token = str(st.secrets["TELEGRAM_TOKEN"]).strip()
-        channel = _telegram_chat_id(st.secrets["TELEGRAM_CHANNEL"])
+        token = _telegram_token()
+        channel = _telegram_chat_id(st.secrets.get("TELEGRAM_CHANNEL", ""))
         if not token:
             return False, "TELEGRAM_TOKEN пустой."
         if not channel:
@@ -438,6 +445,8 @@ def publish_reel_to_telegram(video_bytes, caption):
         except requests.RequestException:
             pass
 
+        if resp.status_code == 401:
+            return False, "Telegram отклонил авторизацию (HTTP 401). Проверь TELEGRAM_BOT_TOKEN в Streamlit Secrets: токен должен быть действующим токеном этого бота из BotFather."
         return False, f"Telegram API не принял Reels: {description} (HTTP {resp.status_code}, {size_mb:.1f} МБ)."
 
     except KeyError as e:
