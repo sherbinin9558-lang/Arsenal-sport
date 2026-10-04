@@ -58,7 +58,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
     if not r.ok:
         raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
 
-def get_checkout_by_order(checkout_id):
+def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -73,6 +73,8 @@ def get_checkout_by_order(checkout_id):
     if not r.ok:
         raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
     rows=r.json()
+    if tenant_id is not None:
+        rows = [row for row in rows if str(row.get("tenant_id")) == str(tenant_id)]
     return rows[0] if rows else None
 
 def configured():
