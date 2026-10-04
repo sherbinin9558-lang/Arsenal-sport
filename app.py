@@ -1130,10 +1130,20 @@ with tab3:
                 key=f"t_out_{st.session_state.get('text_generation_id', 0)}"
             )
 
+            # Telegram should publish the original product photo, not the generated
+            # marketplace card. Keep the card as a fallback for older products
+            # that do not have an original image stored.
             card_to_send = None
-            if "last_card_bytes" in st.session_state:
+            original_b64 = p.get("original_image")
+            if original_b64:
+                try:
+                    card_to_send = base64.b64decode(original_b64)
+                except Exception:
+                    card_to_send = None
+
+            if not card_to_send and "last_card_bytes" in st.session_state:
                 card_to_send = st.session_state["last_card_bytes"]
-            elif p.get("card_image"):
+            if not card_to_send and p.get("card_image"):
                 try:
                     card_to_send = base64.b64decode(p["card_image"])
                 except Exception:
