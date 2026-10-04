@@ -354,3 +354,67 @@ def advanced_analytics(products: list[dict], leads: list[dict], orders: list[dic
         "revenue_per_order": round(revenue/len(orders),2) if orders else 0.0,
         "top_sources": dict(Counter(str(x.get("source","unknown")) for x in leads)),
     }
+
+
+def crm_insights(leads: list[dict]) -> dict:
+    """Actionable CRM funnel, SLA and duplicate insights without mutating lead records."""
+    enriched = [enrich_lead(x) for x in leads]
+    by_source = Counter(str(x.get("source") or "unknown") for x in enriched)
+    by_product = Counter(str(x.get("product") or "unknown") for x in enriched if x.get("product"))
+    statuses = Counter(str(x.get("status") or "Новый") for x in enriched)
+    overdue_followups = 0
+    duplicate_contacts = 0
+    seen = set()
+    for lead in enriched:
+        contact = str(lead.get("contact") or lead.get("phone") or lead.get("telegram") or "").strip().lower()
+        if contact:
+            if contact in seen:
+                duplicate_contacts += 1
+            seen.add(contact)
+        if lead.get("status") in {"Новый", "В работе", "Ожидает ответа"}:
+            updated = str(lead.get("updated_at") or lead.get("created_at") or "")
+            if updated:
+                try:
+                    age = datetime.now().date() - datetime.fromisoformat(updated[:19]).date()
+                    overdue_followups += age.days >= 2
+                except ValueError:
+                    pass
+    converted = sum(x.get("status") in {"Заказ оформлен", "Завершён"} for x in enriched)
+    return {
+        "total": len(enriched),
+        "statuses": dict(statuses),
+        "by_source": dict(by_source),
+        "by_product": dict(by_product.most_common(10)),
+        "hot_leads": sum(x.get("intent") == "Горячий" for x in enriched),
+        "conversion_rate": round(converted / len(enriched) * 100, 2) if enriched else 0.0,
+        "duplicate_contacts": duplicate_contacts,
+        "followup_overdue": int(overdue_followups),
+    }
+
+
+def update_instagram_draft(draft_id: str, **changes: Any) -> dict | None:
+    _write_allowed()
+    allowed = {"caption", "media_ref", "product_id", "scheduled_at", "status"}
+    if "caption" in changes:
+        caption = str(changes["caption"] or "").strip()
+        if not caption or len(caption) > 2200:
+            raise ValueError("Instagram-подпись должна содержать 1–2200 символов.")
+        changes["caption"] = caption
+    if "scheduled_at" in changes and changes["scheduled_at"]:
+        try:
+            datetime.fromisoformat(str(changes["scheduled_at"]).replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("scheduled_at должен быть ISO-датой.") from exc
+    allowed_statuses = {"Черновик", "На проверке", "Одобрено", "Запланировано", "Опубликовано", "Отменено"}
+    if "status" in changes and changes["status"] not in allowed_statuses:
+        raise ValueError("Недопустимый статус Instagram.")
+    rows = _rows(ENTITY_INSTAGRAM_QUEUE)
+    target = next((x for x in rows if str(x.get("id")) == str(draft_id)), None)
+    if not target:
+        return None
+    for key, value in changes.items():
+        if key in allowed:
+            target[key] = value
+    target["updated_at"] = _now()
+    _write(ENTITY_INSTAGRAM_QUEUE, rows)
+    return target
