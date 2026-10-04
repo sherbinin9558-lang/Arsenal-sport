@@ -887,6 +887,19 @@ base_tab_labels = [
 ]
 _is_platform_admin = platform_admin_enabled()
 tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
+
+# Hide Streamlit's tab-strip scroll arrows without changing tab behavior.
+# The tab buttons themselves remain fully interactive; only the auxiliary
+# left/right scroll controls are removed from the visual layer.
+st.markdown("""
+<style>
+button[aria-label*="Scroll tabs"],
+button[aria-label*="Прокрут"] {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 _tabs = st.tabs(tab_labels)
 if _is_platform_admin:
     tab_admin = _tabs[0]
