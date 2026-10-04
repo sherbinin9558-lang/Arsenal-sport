@@ -30,5 +30,23 @@ class TestProductionOps(unittest.TestCase):
         self.assertFalse(production_ops.agent_is_expired("2099-01-01T00:00:00Z"))
 
 
+    @patch("production_ops.data_load", return_value=[])
+    @patch("production_ops.data_save")
+    @patch("production_ops.can", return_value=True)
+    def test_audit_redacts_sensitive_fields(self, can_mock, save_mock, load_mock):
+        row = production_ops.audit_event("provider_check", details={"token": "hidden-value", "note": "ok"})
+        self.assertEqual(row["details"]["token"], "[REDACTED]")
+        self.assertEqual(row["details"]["note"], "ok")
+
+    @patch("production_ops.data_load", return_value=[])
+    def test_operations_health_is_read_only_without_credentials(self, load_mock):
+        result = production_ops.operations_health()
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["providers"]["telegram"]["status"], "skipped")
+        self.assertEqual(result["providers"]["vk"]["status"], "skipped")
+
+    def test_future_agent_timestamp_is_invalid(self):
+        self.assertTrue(production_ops.agent_is_expired("2099-01-01T00:00:00Z"))
+
 if __name__ == "__main__":
     unittest.main()
