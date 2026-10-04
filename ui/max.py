@@ -622,8 +622,10 @@ def render_max():
             if not products:
                 st.info("Сначала добавьте товары в каталог.")
             else:
-                content_max = min(100, len(products))
-                content_default = min(30, content_max)
+                # Clamp the widget bounds defensively. Streamlit rejects a slider when
+                # max_value falls below min_value, so never pass a zero/negative upper bound.
+                content_max = max(1, min(100, len(products)))
+                content_default = max(1, min(30, content_max))
                 # Use a catalog-size-specific widget key so a smaller catalog never reuses
                 # an out-of-range value from a previous Streamlit session state.
                 content_limit = st.slider(
