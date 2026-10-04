@@ -622,7 +622,18 @@ def render_max():
             if not products:
                 st.info("Сначала добавьте товары в каталог.")
             else:
-                content_limit = st.slider("Сколько товаров обработать", 1, min(100, len(products)), min(30, len(products)), key="auto_content_limit")
+                content_max = min(100, len(products))
+                content_default = min(30, content_max)
+                # Keep the slider state valid if the catalog size changes between reruns.
+                saved_content_limit = st.session_state.get("auto_content_limit", content_default)
+                if not isinstance(saved_content_limit, int) or saved_content_limit < 1 or saved_content_limit > content_max:
+                    st.session_state["auto_content_limit"] = content_default
+                content_limit = st.slider(
+                    "Сколько товаров обработать",
+                    min_value=1,
+                    max_value=content_max,
+                    key="auto_content_limit",
+                )
                 if can("write_data") and st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
                     bundles = {}
                     for i,p in enumerate(products[:content_limit]):
