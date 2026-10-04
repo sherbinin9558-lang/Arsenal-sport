@@ -934,9 +934,13 @@ def parse_bulk_file(uploaded_file):
 def bulk_import_products(uploaded_file, update_existing=False):
     rows = parse_bulk_file(uploaded_file)
     products = load_products()
+
+    # Work on an isolated copy first. A failed import must never leave the
+    # session-state catalog partially mutated.
+    working_products = [dict(p or {}) for p in products]
     existing = {
         str(p.get("article", "")).strip().lower(): i
-        for i, p in enumerate(products)
+        for i, p in enumerate(working_products)
         if str(p.get("article", "")).strip()
     }
     added = updated = skipped = 0
@@ -944,6 +948,8 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
     if not can("write_data"):
         raise PermissionError("У вашей роли нет прав на импорт товаров.")
+
+
     for line_no, row in enumerate(rows, start=2):
         name = _bulk_value(row, "name")
         brand = _bulk_value(row, "brand")
@@ -971,17 +977,17 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
         key = article.lower()
         if update_existing and key and key in existing:
-            products[existing[key]].update(product)
+            working_products[existing[key]].update(product)
             updated += 1
         else:
-            if not feature_allowed("products", len(products)):
+            if not feature_allowed("products", len(working_products) + 1):
                 raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
-            products.append(product)
+            working_products.append(product)
             if key:
-                existing[key] = len(products) - 1
+                existing[key] = len(working_products) - 1
             added += 1
 
-    save_products(products)
+    save_products(working_products)
     return added, updated, skipped, errors
 
 
