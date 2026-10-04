@@ -92,7 +92,7 @@ def make_reel(card_path, out_path, duration=8, music_path=None, caption=None):
                     local_dur = (t1 - t0) * duration
                     break
             frame = _frame_at(fg, bg, local_t, scene_name, max(local_dur, 0.01))
-            process.stdin.write(frame)
+            process.stdin.write(frame.tobytes())
         process.stdin.close()
         stderr = process.stderr.read().decode("utf-8", errors="replace")
         return_code = process.wait()
