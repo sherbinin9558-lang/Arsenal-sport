@@ -797,6 +797,7 @@ def data_update_record(entity, record_id, payload, expected_updated_at):
             "p_rows": [{"record_id": str(record_id), "payload": _clean_payload(payload),
                         "expected_updated_at": expected_updated_at, "is_new": False, "is_deleted": False}],
         })
+        _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
@@ -816,10 +817,19 @@ def data_delete_record(entity, record_id, expected_updated_at):
             "p_rows": [{"record_id": str(record_id), "expected_updated_at": expected_updated_at,
                         "is_new": False, "is_deleted": True}],
         })
+        _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
         if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.")
         raise
+
+
+def _invalidate_computed_snapshots():
+    # Expensive local analytics are derived from the current session data.
+    # Invalidate them only after a successful write so ordinary widget reruns
+    # can reuse the snapshot without stale results.
+    st.session_state.pop("_app_growth_snapshot", None)
+    st.session_state.pop("_app_growth_snapshot_key", None)
 
 
 def data_save(entity,rows):
@@ -837,6 +847,7 @@ def data_save(entity,rows):
         clean_rows=[_clean_payload(row) for row in rows]
         with open(f"data/{tenant_id()}_{entity}.json","w",encoding="utf-8") as f:
             json.dump(clean_rows,f,ensure_ascii=False,indent=2)
+        _invalidate_computed_snapshots()
         return
 
     token=st.session_state.get("saas_access_token")
@@ -918,6 +929,7 @@ def data_save(entity,rows):
     # Refresh the actual database versions only after the whole transaction
     # succeeds. If any row conflicts, PostgreSQL rolls the entire batch back.
     data_load(entity,[])
+    _invalidate_computed_snapshots()
 
 def _service_key():
     return _cfg("SUPABASE_SERVICE_ROLE_KEY")

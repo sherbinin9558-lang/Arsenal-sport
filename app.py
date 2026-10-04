@@ -127,6 +127,22 @@ def delete_product(record_id, existing=None):
         p.pop(idx)
         save_products(p)
 
+def _growth_snapshot(products, plan, leads, orders):
+    """Reuse expensive growth analytics across ordinary Streamlit reruns."""
+    key = (
+        id(products), id(plan), id(leads), id(orders),
+        len(products), len(plan), len(leads), len(orders),
+    )
+    if st.session_state.get("_app_growth_snapshot_key") != key:
+        st.session_state["_app_growth_snapshot"] = ai_summary(products, leads, orders, plan)
+        st.session_state["_app_growth_snapshot_key"] = key
+    return st.session_state["_app_growth_snapshot"]
+
+
+def _cached_growth_recommendations(products, leads, orders, plan):
+    return _growth_snapshot(products, plan, leads, orders).get("recommendations", [])
+
+
 def load_plan():
     key = "_app_plan_cache"
     if key not in st.session_state:
@@ -836,7 +852,7 @@ with tab_dashboard:
         load_products=load_products, load_plan=load_plan, load_leads=load_leads, load_orders=load_orders,
         crm_metrics=crm_metrics, order_metrics=order_metrics, conversion_metrics=conversion_metrics,
         workflow_metrics=workflow_metrics, low_stock_products=low_stock_products,
-        growth_recommendations=growth_recommendations, max_product_title=max_product_title,
+        growth_recommendations=_cached_growth_recommendations, max_product_title=max_product_title,
         attribution_loader=load_attribution, attribution_metrics=attribution_metrics,
         add_product=add_product, categories=CATEGORIES, can_write=can("write_data"),
     )
