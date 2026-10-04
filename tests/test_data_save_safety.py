@@ -237,9 +237,6 @@ class RoleBasedUiRegressionTests(unittest.TestCase):
         self.assertIn('if can("settings"):', app)
         self.assertIn('payload["_saas_record_id"] = current["_saas_record_id"]', max_ui)
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
     def test_max_tariff_text_matches_standard_catalog_limit(self):
@@ -253,3 +250,7 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
         self.assertIn('"date"', source)
         self.assertIn('"idea"', source)
         self.assertNotIn('"history"', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
