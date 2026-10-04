@@ -76,12 +76,20 @@ def _auth_cookies():
 
 def _read_refresh_token():
     """Read the latest refresh token without a long blocking poll.
-    
+
     CookieController is the source of truth for the client cookie because
     Supabase rotates refresh tokens after a successful refresh. Streamlit's
     request-cookie snapshot can briefly contain the previous token on a fresh
     rerun. Refresh the controller once, then allow a short propagation window.
+
+    The first page execution after a hard browser reload can happen before the
+    client-side CookieController component has returned its cookie value. We
+    record that first probe so the auth gate can wait for the component's
+    automatic rerun instead of flashing the login screen.
     """
+    probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
+    st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 2)
+
     cookies = _auth_cookies()
     if cookies is not None:
         try:
@@ -183,13 +191,17 @@ def _establish_session(result):
 def _restore_session_from_cookie():
     refresh_token = _read_refresh_token()
     if not refresh_token:
-        st.session_state.pop("_saas_cookie_probe_attempts", None)
         return False
     try:
-        return _establish_session(refresh_session(refresh_token))
+        restored = _establish_session(refresh_session(refresh_token))
+        st.session_state.pop("_saas_cookie_probe_count", None)
+        st.session_state.pop("_saas_cookie_restore_failed", None)
+        return restored
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
             _clear_refresh_token()
+            st.session_state["_saas_cookie_restore_failed"] = True
+            st.session_state.pop("_saas_cookie_probe_count", None)
             return False
         st.session_state["saas_auth_error"] = str(e)
         return False
@@ -634,6 +646,23 @@ def require_saas_access():
             if st.session_state.get("saas_auth_error"):
                 st.error("Не удалось восстановить сессию. Проверьте соединение с сервером аккаунтов и обновите страницу.")
                 st.caption(st.session_state["saas_auth_error"])
+                login_ui()
+                return False
+
+            # CookieController is a client-side component. On a hard browser
+            # reload its first Python execution can happen before the component
+            # has returned the existing cookie. Do not flash the login screen:
+            # wait for the component's automatic rerun once, then fall back to
+            # the real login screen if no cookie exists.
+            if (
+                not st.session_state.get("_saas_cookie_restore_failed")
+                and int(st.session_state.get("_saas_cookie_probe_count", 0) or 0) == 1
+            ):
+                st.info("Восстанавливаем сессию…")
+                st.stop()
+
+            st.session_state.pop("_saas_cookie_probe_count", None)
+            st.session_state.pop("_saas_cookie_restore_failed", None)
             login_ui()
             return False
 
