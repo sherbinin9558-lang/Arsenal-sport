@@ -934,9 +934,13 @@ def parse_bulk_file(uploaded_file):
 def bulk_import_products(uploaded_file, update_existing=False):
     rows = parse_bulk_file(uploaded_file)
     products = load_products()
+
+    # Work on an isolated copy first. A failed import must never leave the
+    # session-state catalog partially mutated.
+    working_products = [dict(p or {}) for p in products]
     existing = {
         str(p.get("article", "")).strip().lower(): i
-        for i, p in enumerate(products)
+        for i, p in enumerate(working_products)
         if str(p.get("article", "")).strip()
     }
     added = updated = skipped = 0
@@ -944,6 +948,18 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
     if not can("write_data"):
         raise PermissionError("У вашей роли нет прав на импорт товаров.")
+
+    max_products = None
+    if saas_enabled():
+        max_products = int(feature_allowed("products", len(products) + len(rows)) and len(products) + len(rows) or len(products))
+        # feature_allowed() only answers whether the requested size is allowed;
+        # the exact limit is checked below without mutating the catalog.
+        try:
+            from saas_core import limit as _catalog_limit
+            max_products = int(_catalog_limit("products"))
+        except Exception:
+            max_products = None
+
     for line_no, row in enumerate(rows, start=2):
         name = _bulk_value(row, "name")
         brand = _bulk_value(row, "brand")
@@ -971,17 +987,17 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
         key = article.lower()
         if update_existing and key and key in existing:
-            products[existing[key]].update(product)
+            working_products[existing[key]].update(product)
             updated += 1
         else:
-            if not feature_allowed("products", len(products)):
+            if max_products is not None and len(working_products) >= max_products:
                 raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
-            products.append(product)
+            working_products.append(product)
             if key:
-                existing[key] = len(products) - 1
+                existing[key] = len(working_products) - 1
             added += 1
 
-    save_products(products)
+    save_products(working_products)
     return added, updated, skipped, errors
 
 
