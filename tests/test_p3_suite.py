@@ -83,13 +83,17 @@ class TestP3Suite(unittest.TestCase):
     def test_instagram_lifecycle_and_schedule(self, can_mock, save_mock, load_mock):
         row = p3_suite.queue_instagram_draft("Новый пост", scheduled_at="2030-01-01T10:00:00Z", record_id="same")
         self.assertEqual(row["status"], "Черновик")
-        load_mock.return_value = [row]
+        load_mock.side_effect = [
+            [dict(row)],
+            [{**row, "status": "На проверке"}],
+            [{**row, "status": "Одобрено"}],
+        ]
         updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         self.assertEqual(updated["status"], "На проверке")
-        updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         # Explicit approval transition: Черновик -> На проверке -> Одобрено.
         updated = p3_suite.update_instagram_draft(row["id"], status="Одобрено")
-        updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано")
+        self.assertEqual(updated["status"], "Одобрено")
+        updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано", scheduled_at="2030-01-01T10:00:00Z")
         self.assertEqual(updated["status"], "Запланировано")
         with self.assertRaises(PermissionError):
             p3_suite.update_instagram_draft(row["id"], status="Опубликовано")
