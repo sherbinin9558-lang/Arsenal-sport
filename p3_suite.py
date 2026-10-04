@@ -13,6 +13,7 @@ import re
 from typing import Any, Iterable
 
 from saas_core import data_load, data_save, tenant_id, current_role, can
+from production_ops import validate_agent_payload, agent_is_expired
 
 ENTITY_TASKS = "tasks"
 ENTITY_NOTIFICATIONS = "notifications"
@@ -241,10 +242,12 @@ ACTION_REGISTRY = {
 def propose_agent_action(action_type: str, payload: dict) -> dict:
     if action_type not in ACTION_REGISTRY:
         raise ValueError("Действие не разрешено.")
+    clean = validate_agent_payload(action_type, payload)
     return {
         "id": _id("act"), "tenant_id": str(tenant_id()), "action": action_type,
-        "payload": dict(payload or {}), "status": "pending_approval", "created_at": _now(),
+        "payload": clean, "status": "pending_approval", "created_at": _now(),
         "created_by": str(__import__("streamlit").session_state.get("saas_user_id","")),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat().replace("+00:00","Z"),
     }
 
 
@@ -266,6 +269,11 @@ def approve_agent_action(action_id: str, execute: bool = False) -> dict | None:
         return None
     if target.get("status") != "pending_approval":
         return target
+    if agent_is_expired(target.get("created_at", "")):
+        target["status"] = "expired"
+        target["expired_at"] = _now()
+        _write(ENTITY_AGENT_ACTIONS, rows)
+        return target
     target["status"] = "approved"
     target["approved_at"] = _now()
     if execute:
@@ -280,7 +288,9 @@ def approve_agent_action(action_id: str, execute: bool = False) -> dict | None:
 def execute_agent_action(action: dict) -> dict:
     """Execute only internal, reversible actions. External publishing/payment is never implicit."""
     kind = action.get("action")
-    payload = action.get("payload") or {}
+    payload = validate_agent_payload(str(kind), action.get("payload") or {})
+    if agent_is_expired(action.get("created_at", "")):
+        return {"status": "blocked", "reason": "AI-действие просрочено и требует нового подтверждения."}
     if kind == "create_task":
         row = create_task(payload.get("title","AI-задача"), payload.get("description",""),
                           payload.get("assignee",""), payload.get("priority","Обычный"),
@@ -298,18 +308,25 @@ def execute_agent_action(action: dict) -> dict:
 
 # ---------- Instagram automation (safe queue, not silent publishing) ----------
 
-def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "", record_id: str = "") -> dict:
+def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "", record_id: str = "", scheduled_at: str = "") -> dict:
     _write_allowed()
     caption = str(caption or "").strip()
     if not caption:
         raise ValueError("Подпись Instagram не может быть пустой.")
+    if len(caption) > 2200:
+        raise ValueError("Подпись Instagram превышает лимит 2200 символов.")
+    if scheduled_at:
+        try:
+            datetime.fromisoformat(str(scheduled_at).replace("Z","+00:00"))
+        except ValueError as exc:
+            raise ValueError("scheduled_at должен быть ISO-датой.") from exc
     rows = _rows(ENTITY_INSTAGRAM_QUEUE)
     if record_id:
         existing = next((x for x in rows if str(x.get("_saas_record_id")) == str(record_id) or str(x.get("id")) == f"ig_{record_id}"), None)
         if existing:
             return existing
     row = {"id": f"ig_{record_id}" if record_id else _id("ig"), "tenant_id": str(tenant_id()), "caption": str(caption).strip(),
-           "media_ref": str(media_ref), "product_id": str(product_id), "status": "Черновик",
+           "media_ref": str(media_ref), "product_id": str(product_id), "status": "Черновик", "scheduled_at": str(scheduled_at or ""),
            "created_at": _now()}
     if record_id:
         row["_saas_record_id"] = str(record_id)
