@@ -237,5 +237,21 @@ class RoleBasedUiRegressionTests(unittest.TestCase):
         self.assertIn('if can("settings"):', app)
         self.assertIn('payload["_saas_record_id"] = current["_saas_record_id"]', max_ui)
 
+
+
+class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
+    def test_max_tariff_text_matches_standard_catalog_limit(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn("до 7 000 товаров", source)
+        self.assertNotIn("до 10 000 товаров", source)
+
+    def test_webmcp_imports_data_loader_and_minimizes_content_plan(self):
+        source = (Path(__file__).resolve().parents[1] / "webmcp_tools.py").read_text(encoding="utf-8")
+        self.assertIn("from saas_core import data_load", source)
+        self.assertIn("allowed_plan", source)
+        self.assertIn('"date"', source)
+        self.assertIn('"idea"', source)
+        self.assertNotIn('"history"', source)
+
 if __name__ == "__main__":
     unittest.main()
