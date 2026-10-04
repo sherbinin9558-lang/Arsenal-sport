@@ -133,7 +133,13 @@ def _webmcp_data():
     except Exception:
         products = []
     try:
-        content_plan = data_load("content_plan", [])
+        raw_plan = data_load("content_plan", [])
+        allowed_plan = ("content_id", "_saas_record_id", "date", "platform", "product", "type", "idea", "status", "priority")
+        content_plan = [
+            {k: row.get(k) for k in allowed_plan if k in row}
+            for row in raw_plan
+            if isinstance(row, dict)
+        ]
     except Exception:
         content_plan = []
 
