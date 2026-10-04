@@ -4,21 +4,6 @@ import streamlit as st
 def render_settings(*, load_settings, save_settings, templates, get_logo, save_logo):
     st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация AI Agent Content Manager для контента и работы магазина.</div>', unsafe_allow_html=True)
     settings = load_settings()
-    settings_language = settings.get("language", "Русский")
-    language_options = ["Русский", "English", "Deutsch", "Français", "中文", "Italiano"]
-    if settings_language not in language_options:
-        settings_language = "Русский"
-
-    st.markdown("### 🌐 Язык интерфейса")
-    language = st.selectbox(
-        "Язык панели",
-        language_options,
-        index=language_options.index(settings_language),
-        key="settings_language",
-        help="Выбор языка интерфейса. Перевод всех разделов будет подключаться через единый языковой слой.",
-    )
-    st.caption("Доступны: русский, английский, немецкий, французский, китайский и итальянский.")
-    
     st.markdown("### 🏪 Магазин")
     st.markdown("### 🖼️ Логотип магазина")
     current_logo = get_logo()
@@ -83,6 +68,22 @@ def render_settings(*, load_settings, save_settings, templates, get_logo, save_l
     faq_text = "\n".join(f"{item.get('question','')} | {item.get('answer','')}" for item in faq if isinstance(item, dict))
     faq_input = st.text_area("Вопрос | Ответ — по одному на строку", value=faq_text, height=180, key="settings_faq")
     st.caption("Пример: Как заказать? | Напишите название товара, размер и город.")
+
+    settings_language = settings.get("language", "Русский")
+    language_options = ["Русский", "English", "Deutsch", "Français", "中文", "Italiano"]
+    if settings_language not in language_options:
+        settings_language = "Русский"
+
+    st.markdown("### 🌐 Язык интерфейса")
+    language = st.selectbox(
+        "Язык панели",
+        language_options,
+        index=language_options.index(settings_language),
+        key="settings_language",
+        help="Выбор языка интерфейса. Перевод всех разделов будет подключаться через единый языковой слой.",
+    )
+    st.caption("Доступны: русский, английский, немецкий, французский, китайский и итальянский.")
+    
     
     if st.button("💾 Сохранить все настройки", type="primary", key="save_store_settings"):
         save_settings({
