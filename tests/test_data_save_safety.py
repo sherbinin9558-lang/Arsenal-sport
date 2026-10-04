@@ -42,6 +42,21 @@ class DataSaveSafetyRegressionTests(unittest.TestCase):
         self.assertIn("raise DataConflictError", self.source)
 
 
+class ConcurrencyConflictRecoveryTests(unittest.TestCase):
+    def test_concurrency_conflict_invalidates_entity_cache(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn("def _invalidate_entity_cache(entity):", source)
+        self.assertIn('st.session_state.pop(f"_app_{entity}_cache", None)', source)
+        self.assertIn('st.session_state.pop(_data_session_key(entity), None)', source)
+        self.assertIn("_invalidate_entity_cache(entity)", source)
+
+    def test_all_concurrency_paths_preserve_original_exception(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertGreaterEqual(source.count("raise DataConflictError("), 4)
+        self.assertIn("from e", source)
+        self.assertIn('"RECORD_ALREADY_EXISTS"', source)
+
+
 class OnboardingSettingsSafetyTests(unittest.TestCase):
     def test_onboarding_preserves_existing_settings_record_identity(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
