@@ -1751,7 +1751,7 @@ with tab8:
     o3.metric("Метрики", ops["metrics"])
     if st.button("Проверить Telegram / VK", key="p3_provider_health"):
         try:
-            health = provider_health(str(st.secrets.get("TELEGRAM_BOT_TOKEN", "") or ""), str(st.secrets.get("VK_TOKEN", "") or ""))
+            health = provider_health(_telegram_token(), str(st.secrets.get("VK_TOKEN", "") or ""))
             for name in ("telegram","vk"):
                 item = health[name]
                 if item["status"] == "ok":
