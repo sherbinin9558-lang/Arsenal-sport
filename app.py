@@ -497,7 +497,11 @@ def render_platform_admin():
         '</div>',
         unsafe_allow_html=True,
     )
-    if not _cfg("SUPABASE_SERVICE_ROLE_KEY"):
+    try:
+        admin_service_key = str(st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")) or "").strip()
+    except Exception:
+        admin_service_key = str(os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or "").strip()
+    if not admin_service_key:
         st.warning(
             "Админ-панель не может загрузить системные данные: "
             "SUPABASE_SERVICE_ROLE_KEY не настроен на сервере. "
