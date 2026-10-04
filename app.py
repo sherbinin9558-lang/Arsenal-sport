@@ -12,6 +12,7 @@ from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, a
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
+from asset_store import load_logo_bytes, save_logo_bytes
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
@@ -183,15 +184,17 @@ def _tenant_asset_root():
     return root
 
 def get_logo():
-    path = _tenant_asset_root() / "logo.png"
-    if path.exists():
-        try: return Image.open(path).convert("RGBA")
-        except Exception: return None
-    return None
+    data = load_logo_bytes()
+    if not data:
+        return None
+    try: return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception: return None
 
 def save_logo(f):
     img = Image.open(f).convert("RGBA")
-    img.save(_tenant_asset_root() / "logo.png")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    save_logo_bytes(buf.getvalue())
 
 # ==================== КАРТОЧКА ====================
 def get_font(size, bold=False):
@@ -1016,7 +1019,7 @@ with tab3:
         idx = st.selectbox(
             "Товар",
             range(len(names)),
-            format_func=lambda x: names[x],
+            format_func=lambda x, names=names: names[x],
             key="text_product"
         )
 
@@ -1140,7 +1143,7 @@ with tab4:
         st.info("Сначала создайте товар.")
     else:
         names = [f"{p.get('brand','')} {p.get('name','')}" for p in products]
-        idx = st.selectbox("Товар", range(len(names)), format_func=lambda x: names[x], key="r_sel")
+        idx = st.selectbox("Товар", range(len(names)), format_func=lambda x, names=names: names[x], key="r_sel")
 
         if st.button("🎬 Сгенерировать", type="primary"):
             p = products[idx]
@@ -1187,15 +1190,15 @@ with tab4:
 5. Ссылка на товар"""
 
             st.subheader("💡 Идеи")
-            st.text_area("", ideas, height=200, key="id_out")
+            st.text_area("Идеи", ideas, height=200, key="id_out", label_visibility="collapsed")
             st.download_button("⬇️ Идеи", ideas, file_name=f"{n}_ideas.txt")
 
             st.subheader("🎬 Сценарий")
-            st.text_area("", script, height=350, key="sc_out")
+            st.text_area("Сценарий", script, height=350, key="sc_out", label_visibility="collapsed")
             st.download_button("⬇️ Сценарий", script, file_name=f"{n}_script.txt")
 
             st.subheader("📱 Stories")
-            st.text_area("", stories, height=150, key="st_out")
+            st.text_area("Stories", stories, height=150, key="st_out", label_visibility="collapsed")
             st.download_button("⬇️ Stories", stories, file_name=f"{n}_stories.txt")
 
         st.markdown("---")

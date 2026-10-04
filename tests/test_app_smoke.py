@@ -1,0 +1,67 @@
+"""Open the app and every MAX section in demo mode; none of them may raise.
+
+Skipped automatically when streamlit is not installed (for example in the minimal CI).
+"""
+import os
+import sys
+import unittest
+from pathlib import Path
+
+try:
+    from streamlit.testing.v1 import AppTest
+    HAS_STREAMLIT = True
+except Exception:
+    HAS_STREAMLIT = False
+
+ROOT = Path(__file__).resolve().parents[1]
+MAX_SECTIONS = ["Обзор", "Аккаунт", "Настройки", "AI-продавец", "CRM",
+                "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"]
+
+
+def _max_script():
+    import streamlit as st
+    from saas_core import _set_identity
+    if "saas_demo" not in st.session_state:
+        st.session_state["saas_demo"] = True
+        _set_identity({"id": "demo-user", "email": "demo@example.com"},
+                      {"id": "demo-tenant", "name": "Demo", "plan": "pro", "status": "active"})
+    from ui.max import render_max
+    render_max()
+
+
+@unittest.skipUnless(HAS_STREAMLIT, "streamlit is required")
+class AppSmokeTests(unittest.TestCase):
+    def setUp(self):
+        self._old = {k: os.environ.get(k) for k in ("DEMO_MODE", "SUPABASE_URL", "SUPABASE_ANON_KEY")}
+        os.environ["DEMO_MODE"] = "true"
+        os.environ.pop("SUPABASE_URL", None)
+        os.environ.pop("SUPABASE_ANON_KEY", None)
+        self._cwd = os.getcwd()
+        os.chdir(ROOT)
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        sys.modules.pop("webmcp_tools", None)  # the test runner starts a fresh component registry
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+        for key, value in self._old.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_main_page_renders(self):
+        at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
+        self.assertEqual([e.value for e in at.exception], [])
+
+    def test_every_max_section_renders(self):
+        at = AppTest.from_function(_max_script, default_timeout=120).run()
+        self.assertEqual([e.value for e in at.exception], [])
+        for section in MAX_SECTIONS:
+            with self.subTest(section=section):
+                at.radio(key="max_section").set_value(section).run()
+                self.assertEqual([e.value for e in at.exception], [], section)
+
+
+if __name__ == "__main__":
+    unittest.main()
