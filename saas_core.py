@@ -75,35 +75,44 @@ def _auth_cookies():
         return None
 
 def _read_refresh_token():
-    """Read the refresh token without blocking the Streamlit rerun.
+    """Read the latest refresh token without a long blocking poll.
     
-    Streamlit exposes request cookies synchronously. The previous implementation
-    polled CookieController three times with 350ms sleeps, adding ~1 second to
-    every cold-page session restore before the Supabase refresh request even
-    started. CookieController remains only as a compatibility fallback.
+    CookieController is the source of truth for the client cookie because
+    Supabase rotates refresh tokens after a successful refresh. Streamlit's
+    request-cookie snapshot can briefly contain the previous token on a fresh
+    rerun. Refresh the controller once, then allow a short propagation window.
     """
+    cookies = _auth_cookies()
+    if cookies is not None:
+        try:
+            cookies.refresh()
+        except Exception:
+            pass
+
+        for delay in (0.0, 0.15):
+            if delay:
+                time.sleep(delay)
+            try:
+                all_cookies = cookies.getAll() or {}
+                token = all_cookies.get(_AUTH_COOKIE)
+                if token:
+                    return str(token)
+            except Exception:
+                pass
+            try:
+                token = cookies.get(_AUTH_COOKIE)
+                if token:
+                    return str(token)
+            except Exception:
+                pass
+
+    # Compatibility fallback when the component is unavailable.
     try:
         token = st.context.cookies.get(_AUTH_COOKIE)
         if token:
             return str(token)
     except Exception:
         pass
-
-    cookies = _auth_cookies()
-    if cookies is not None:
-        try:
-            all_cookies = cookies.getAll() or {}
-            token = all_cookies.get(_AUTH_COOKIE)
-            if token:
-                return str(token)
-        except Exception:
-            pass
-        try:
-            token = cookies.get(_AUTH_COOKIE)
-            if token:
-                return str(token)
-        except Exception:
-            pass
     return None
 
 def _persist_refresh_token(refresh_token):
