@@ -1700,6 +1700,7 @@ with tab6:
 # ==================== НАСТРОЙКИ МАГАЗИНА ====================
 SETTINGS_FILE = Path("settings.json")
 DEFAULT_SETTINGS = {
+    "language": "Русский",
     "onboarding_complete": True,
     "store_name": "AI Agent Content Manager",
     "city": "Краснодар",
