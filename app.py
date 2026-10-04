@@ -497,6 +497,16 @@ def render_platform_admin():
         '</div>',
         unsafe_allow_html=True,
     )
+    if not _cfg("SUPABASE_SERVICE_ROLE_KEY"):
+        st.warning(
+            "Админ-панель не может загрузить системные данные: "
+            "SUPABASE_SERVICE_ROLE_KEY не настроен на сервере. "
+            "Добавьте секрет в настройки окружения deployment. "
+            "Ключ не нужно вводить в интерфейсе приложения."
+        )
+        st.info("После добавления секрета нажмите «Обновить данные админ-панели».")
+        return
+
     try:
         tenants, subs, members, users = platform_admin_snapshot()
     except Exception as e:
