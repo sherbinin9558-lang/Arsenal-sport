@@ -86,6 +86,7 @@ class TestP3Suite(unittest.TestCase):
         load_mock.return_value = [row]
         updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         self.assertEqual(updated["status"], "На проверке")
+        updated = p3_suite.update_instagram_draft(row["id"], status="На проверке")
         updated = p3_suite.update_instagram_draft(row["id"], status="Одобрено")
         updated = p3_suite.update_instagram_draft(row["id"], status="Запланировано")
         self.assertEqual(updated["status"], "Запланировано")
