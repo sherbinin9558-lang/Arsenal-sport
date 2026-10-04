@@ -5,7 +5,7 @@ it uses the existing tenant data layer and does not require a paid AI API.
 """
 from __future__ import annotations
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hashlib
 import json
 import uuid
