@@ -954,6 +954,7 @@ def data_save(entity,rows):
                 "RECORD_ALREADY_EXISTS",
             )
         ):
+            _invalidate_entity_cache(entity)
             raise DataConflictError(
                 "Данные изменились в другой сессии. Обновите данные перед сохранением, чтобы не затереть чужие изменения."
             ) from e
