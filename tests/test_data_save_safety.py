@@ -253,5 +253,34 @@ class MaxAndWebMcpConsistencyRegressionTests(unittest.TestCase):
         self.assertIn('"idea"', source)
         self.assertNotIn('"history"', source)
 
+
+class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
+    def test_dashboard_snapshot_is_invalidated_after_local_writes(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        dashboard = (Path(__file__).resolve().parents[1] / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1', source)
+        self.assertIn('st.session_state.pop("max_data_snapshot", None)', source)
+        self.assertIn('_max_data_snapshot_revision', dashboard)
+        self.assertIn('_app_data_revision', dashboard)
+
+    def test_content_plan_uses_atomic_single_record_writes(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn('data_update_record("content_plan"', source)
+        self.assertIn('data_delete_record("content_plan"', source)
+        self.assertIn('expected = existing.get("_saas_updated_at")', source)
+
+    def test_settings_use_baseline_version_for_concurrency(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state["_settings_baseline"]', source)
+        self.assertIn('data_update_record("settings"', source)
+        self.assertIn('expected = baseline.get("updated_at")', source)
+
+    def test_dashboard_quick_actions_are_functional(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state["dashboard_quick_add"] = True', source)
+        self.assertIn('st.session_state["dashboard_quick_plan"] = True', source)
+        self.assertIn('add_plan({', source)
+        self.assertIn('add_product({', source)
+
 if __name__ == "__main__":
     unittest.main()
