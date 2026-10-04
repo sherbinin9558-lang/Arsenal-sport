@@ -498,6 +498,20 @@ def render_platform_admin():
         unsafe_allow_html=True,
     )
     try:
+        admin_service_key = str(st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")) or "").strip()
+    except Exception:
+        admin_service_key = str(os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or "").strip()
+    if not admin_service_key:
+        st.warning(
+            "Админ-панель не может загрузить системные данные: "
+            "SUPABASE_SERVICE_ROLE_KEY не настроен на сервере. "
+            "Добавьте секрет в настройки окружения deployment. "
+            "Ключ не нужно вводить в интерфейсе приложения."
+        )
+        st.info("После добавления секрета нажмите «Обновить данные админ-панели».")
+        return
+
+    try:
         tenants, subs, members, users = platform_admin_snapshot()
     except Exception as e:
         st.error(f"Не удалось загрузить данные админ-панели: {e}")
