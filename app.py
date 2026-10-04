@@ -1729,16 +1729,31 @@ DEFAULT_SETTINGS = {
 def load_settings():
     rows = data_load("settings", [])
     data = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
+    if data.get("_saas_record_id"):
+        st.session_state["_settings_baseline"] = {
+            "record_id": data.get("_saas_record_id"),
+            "updated_at": data.get("_saas_updated_at"),
+        }
     result = DEFAULT_SETTINGS.copy()
     result.update({k: data.get(k, DEFAULT_SETTINGS[k]) for k in DEFAULT_SETTINGS})
     return result
 
 def save_settings(data):
     payload = {k: data.get(k, "") for k in DEFAULT_SETTINGS}
+    baseline = st.session_state.get("_settings_baseline") or {}
+    record_id = baseline.get("record_id")
+    expected = baseline.get("updated_at")
+    if record_id and expected and saas_enabled():
+        data_update_record("settings", record_id, payload, expected)
+        st.session_state.pop("_settings_baseline", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
+        return
     existing = data_load("settings", [])
     if existing and isinstance(existing[0], dict) and existing[0].get("_saas_record_id"):
         payload["_saas_record_id"] = existing[0]["_saas_record_id"]
     data_save("settings", [payload])
+    st.session_state.pop("_settings_baseline", None)
 
 
 
