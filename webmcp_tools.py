@@ -2,6 +2,7 @@
 import streamlit as st
 import streamlit.components.v2 as components
 from saas_core import data_load
+from saas_core import _cfg
 
 _WEBMCP_COMPONENT = components.component(
     name="arsenal_sport_webmcp",
@@ -149,5 +150,12 @@ def _webmcp_data():
 
     return {"settings": settings, "products": products, "content_plan": content_plan}
 
+def webmcp_enabled():
+    """WebMCP loads a third-party script into the app page, so it is opt-in."""
+    return _cfg("ENABLE_WEBMCP", "false").lower() in ("1", "true", "yes", "on")
+
+
 def mount_webmcp_tools():
+    if not webmcp_enabled():
+        return
     _WEBMCP_COMPONENT(data=_webmcp_data(), key="arsenal-sport-webmcp")

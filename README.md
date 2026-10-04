@@ -123,3 +123,5 @@ The application reads credentials from Streamlit Secrets or environment variable
 ## Automated verification
 
 The test suite includes Streamlit `AppTest` smoke coverage for the main application and MAX sections, plus unit/regression coverage for data safety, tenant isolation, concurrency, WebMCP, billing-safe paths, and P2/P3 operations. CI runs Python compilation and the complete unittest suite. Browser/provider smoke checks are read-only and require explicit production secrets before performing live external checks.
+
+> **WebMCP is opt-in.** It loads `@nekuda/webmcp-sdk` from a public CDN into the app page, where the sign-in cookie lives. It is disabled unless `ENABLE_WEBMCP = "true"` is set in Streamlit secrets.

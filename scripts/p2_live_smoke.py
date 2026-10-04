@@ -97,7 +97,9 @@ def browser_webmcp():
         })""")
         browser.close()
     if not result.get("registered"):
+        if os.getenv("EXPECT_WEBMCP","").strip().lower() in ("1","true","yes","on"):
             raise RuntimeError("WebMCP registration marker was not detected.")
+        return {"status":"skipped","reason":"WebMCP is disabled (opt-in via ENABLE_WEBMCP)","result":result}
     return {"status":"ok","result":result}
 
 def main():
