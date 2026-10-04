@@ -37,3 +37,27 @@ jobs:
           E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: python scripts/p2_live_smoke.py
+  provider-smoke:
+    if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' || secrets.VK_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run read-only provider health checks
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+        run: |
+          python - <<'PY'
+          from production_ops import telegram_health, vk_health
+          import json, sys
+          results = [telegram_health(), vk_health()]
+          print(json.dumps(results, ensure_ascii=False))
+          failed = [x for x in results if x.get("status") == "failed"]
+          if failed:
+              sys.exit(1)
+          if all(x.get("status") == "skipped" for x in results):
+              sys.exit(2)
+          PY
