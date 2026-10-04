@@ -75,9 +75,20 @@ def _auth_cookies():
         return None
 
 def _read_refresh_token():
-    # CookieController is asynchronous on a fresh Streamlit session. Explicitly
-    # refresh its browser cache, then allow the component a few render cycles before
-    # falling back to the request cookies.
+    """Read the refresh token without blocking the Streamlit rerun.
+    
+    Streamlit exposes request cookies synchronously. The previous implementation
+    polled CookieController three times with 350ms sleeps, adding ~1 second to
+    every cold-page session restore before the Supabase refresh request even
+    started. CookieController remains only as a compatibility fallback.
+    """
+    try:
+        token = st.context.cookies.get(_AUTH_COOKIE)
+        if token:
+            return str(token)
+    except Exception:
+        pass
+
     cookies = _auth_cookies()
     if cookies is not None:
         try:
@@ -87,32 +98,12 @@ def _read_refresh_token():
                 return str(token)
         except Exception:
             pass
-
-        attempts = 0
-        while attempts < 3:
-            attempts += 1
-            try:
-                cookies.refresh()
-                time.sleep(0.35)
-                all_cookies = cookies.getAll() or {}
-                token = all_cookies.get(_AUTH_COOKIE)
-                if token:
-                    return str(token)
-            except Exception:
-                pass
-
         try:
             token = cookies.get(_AUTH_COOKIE)
             if token:
                 return str(token)
         except Exception:
             pass
-    try:
-        token = st.context.cookies.get(_AUTH_COOKIE)
-        if token:
-            return str(token)
-    except Exception:
-        pass
     return None
 
 def _persist_refresh_token(refresh_token):
@@ -153,7 +144,15 @@ def _establish_session(result):
     previous_user_id = st.session_state.get("saas_user_id")
     selected_tenant_id = st.session_state.get("saas_tenant_id") if previous_user_id == user.get("id") else None
     tenants = user_tenants(token,user.get("id"))
-    tenant = current_tenant(token, user.get("id"), selected_tenant_id)
+    # Reuse the membership response above instead of issuing the same Supabase
+    # query a second time during every session restoration.
+    tenant = None
+    if tenants:
+        selected = str(selected_tenant_id or "").strip()
+        if selected:
+            tenant = next((item for item in tenants if str(item.get("id") or "") == selected), None)
+        if tenant is None and len(tenants) == 1:
+            tenant = tenants[0]
     st.session_state["saas_access_token"] = token
     st.session_state["saas_user_id"] = user.get("id")
     st.session_state["saas_email"] = user.get("email","")
@@ -200,7 +199,14 @@ def _restore_session_from_access_token():
         user = get_user(token)
         selected_tenant_id = st.session_state.get("saas_tenant_id")
         tenants = user_tenants(token,user.get("id"))
-        tenant = current_tenant(token, user.get("id"), selected_tenant_id)
+        # Reuse the membership response instead of issuing a duplicate query.
+        tenant = None
+        if tenants:
+            selected = str(selected_tenant_id or "").strip()
+            if selected:
+                tenant = next((item for item in tenants if str(item.get("id") or "") == selected), None)
+            if tenant is None and len(tenants) == 1:
+                tenant = tenants[0]
         if not tenant and len(tenants) > 1:
             st.session_state["saas_user_id"] = user.get("id")
             st.session_state["saas_email"] = user.get("email","")
@@ -359,7 +365,7 @@ def login_ui():
             else:
                 try:
                     with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
-                    _establish_session(result); time.sleep(1.2); st.rerun()
+                    _establish_session(result); st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
