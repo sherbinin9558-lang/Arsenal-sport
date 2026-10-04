@@ -23,24 +23,40 @@ jobs:
       - run: python -m unittest discover -s tests -p "test_*.py" -v
 
   browser-webmcp:
-    if: ${{ secrets.SAAS_PUBLIC_URL != '' && secrets.E2E_EMAIL != '' && secrets.E2E_PASSWORD != '' }}
     runs-on: ubuntu-latest
+    env:
+      SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
     steps:
+      - name: Skip when browser credentials are not configured
+        if: ${{ env.SAAS_PUBLIC_URL == '' || env.E2E_EMAIL == '' || env.E2E_PASSWORD == '' }}
+        run: echo "NOT_CONFIGURED: browser E2E secrets are absent; no external smoke test was claimed."
       - uses: actions/checkout@v4
+        if: ${{ env.SAAS_PUBLIC_URL != '' && env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' }}
       - uses: actions/setup-python@v5
+        if: ${{ env.SAAS_PUBLIC_URL != '' && env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' }}
         with:
           python-version: "3.11"
       - run: pip install playwright
+        if: ${{ env.SAAS_PUBLIC_URL != '' && env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' }}
       - run: playwright install --with-deps chromium
-      - env:
-          SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
-          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
-          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: python scripts/p2_live_smoke.py
+        if: ${{ env.SAAS_PUBLIC_URL != '' && env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' }}
+      - run: python scripts/p2_live_smoke.py
+        if: ${{ env.SAAS_PUBLIC_URL != '' && env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' }}
   provider-smoke:
-    if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' || secrets.VK_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      VK_TOKEN: ${{ secrets.VK_TOKEN }}
     steps:
+      - name: Report credential state
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] && [ -z "$VK_TOKEN" ]; then
+            echo "NOT_CONFIGURED: Telegram/VK credentials are absent; no external verification was claimed."
+          else
+            echo "Provider credentials configured; running read-only health checks."
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -59,5 +75,5 @@ jobs:
           if failed:
               sys.exit(1)
           if all(x.get("status") == "skipped" for x in results):
-              sys.exit(2)
+              sys.exit(0)
           PY
