@@ -2,7 +2,7 @@ name: Python syntax check
 
 on:
   push:
-    branches: ["main", "real-attribution-v3", "audit-clone-20261004", "audit-test-20261004"]
+    branches: ["main", "real-attribution-v3", "audit-clone-20261004", "audit-test-20261004", "full-audit-reserve-20261004"]
   pull_request:
     branches: ["main", "audit-clone-20261004", "audit-test-20261004"]
   workflow_dispatch:
