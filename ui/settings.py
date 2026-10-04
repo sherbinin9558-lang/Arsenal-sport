@@ -4,6 +4,20 @@ import streamlit as st
 def render_settings(*, load_settings, save_settings, templates, get_logo, save_logo):
     st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация AI Agent Content Manager для контента и работы магазина.</div>', unsafe_allow_html=True)
     settings = load_settings()
+    settings_language = settings.get("language", "Русский")
+    language_options = ["Русский", "English", "Deutsch", "Français", "中文", "Italiano"]
+    if settings_language not in language_options:
+        settings_language = "Русский"
+
+    st.markdown("### 🌐 Язык интерфейса")
+    language = st.selectbox(
+        "Язык панели",
+        language_options,
+        index=language_options.index(settings_language),
+        key="settings_language",
+        help="Выбор языка интерфейса. Перевод всех разделов будет подключаться через единый языковой слой.",
+    )
+    st.caption("Доступны: русский, английский, немецкий, французский, китайский и итальянский.")
     
     st.markdown("### 🏪 Магазин")
     st.markdown("### 🖼️ Логотип магазина")
@@ -99,6 +113,7 @@ def render_settings(*, load_settings, save_settings, templates, get_logo, save_l
             "ai_no_stock_reply": ai_no_stock_reply,
             "ai_escalation_reply": ai_escalation_reply,
             "faq": [{"question": line.split("|",1)[0].strip(), "answer": line.split("|",1)[1].strip()} for line in faq_input.splitlines() if "|" in line and line.split("|",1)[0].strip() and line.split("|",1)[1].strip()],
+            "language": language,
         })
         st.success("Настройки сохранены.")
         st.rerun()
