@@ -13,7 +13,7 @@ from growth_engine import ai_summary, attribution_performance, recommendations a
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
-from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics)
+from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation)
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
@@ -1636,6 +1636,10 @@ with tab8:
     st.markdown('<div class="section-kicker">AI OPERATIONS</div><div class="section-title">Центр автоматизации</div><div class="section-subtitle">CRM-интеллект, задачи команды, уведомления, безопасные AI-действия и очередь Instagram.</div>', unsafe_allow_html=True)
     products = load_products(); plan = load_plan(); leads = load_leads(); orders = load_orders()
     metrics = advanced_analytics(products, leads, orders, plan)
+    try:
+        run_notification_automation(products, leads, orders, plan)
+    except Exception:
+        pass
     k1,k2,k3,k4,k5 = st.columns(5)
     k1.metric("Лиды", metrics["leads"]); k2.metric("Заказы", metrics["orders"]); k3.metric("Выручка", f"{metrics['revenue']:,.0f} ₽".replace(","," ")); k4.metric("Заявка → заказ", f"{metrics['lead_to_order']:.1f}%"); k5.metric("Средний заказ", f"{metrics['revenue_per_order']:,.0f} ₽".replace(","," "))
     a,b = st.columns(2)
