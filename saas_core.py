@@ -156,16 +156,18 @@ def _establish_session(result):
 
 def _restore_session_from_cookie():
     refresh_token = _read_refresh_token()
-    # CookieController is asynchronous. On a fresh Streamlit session the first
-    # component read can be empty even when the browser already has the cookie.
-    # Give it one controlled second chance instead of showing the login screen.
+    # CookieController is browser-backed and can return an empty value during
+    # the first server run after a hard reload. Sleeping here does not reliably
+    # advance the component state, so the previous implementation could fall
+    # through to the login screen even though the browser still had a valid
+    # refresh cookie. Give the component a small, controlled number of reruns.
     if not refresh_token:
         attempts = int(st.session_state.get("_saas_cookie_probe_attempts", 0))
         if attempts < 3:
             st.session_state["_saas_cookie_probe_attempts"] = attempts + 1
-            time.sleep(0.6)
-            refresh_token = _read_refresh_token()
+            st.rerun()
     if not refresh_token:
+        st.session_state.pop("_saas_cookie_probe_attempts", None)
         return False
     try:
         return _establish_session(refresh_session(refresh_token))
