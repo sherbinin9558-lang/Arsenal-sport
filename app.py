@@ -13,10 +13,11 @@ from growth_engine import ai_summary, attribution_performance, recommendations a
 from saas_core import require_saas_access, render_account_bar, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
-from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation)
+from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation, crm_insights, update_instagram_draft)
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
+from production_ops import observability_snapshot, provider_health
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -1712,6 +1713,37 @@ with tab8:
                 try:
                     approve_agent_action(action.get("id"), execute=True); st.rerun()
                 except Exception as e: st.error(str(e))
+    st.markdown("---")
+    st.subheader("CRM 360")
+    crm360 = crm_insights(leads)
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Конверсия", f"{crm360['conversion_rate']:.1f}%")
+    c2.metric("Горячие", crm360["hot_leads"])
+    c3.metric("Просрочен follow-up", crm360["followup_overdue"])
+    c4.metric("Дубли контактов", crm360["duplicate_contacts"])
+    st.caption("Воронка, источники, товары и контроль повторных контактов рассчитываются по данным текущего магазина.")
+
+    st.markdown("---")
+    st.subheader("Надёжность и аудит")
+    ops = observability_snapshot()
+    o1,o2,o3 = st.columns(3)
+    o1.metric("Audit events", ops["audit_events"])
+    o2.metric("Ошибки", ops["audit_errors"])
+    o3.metric("Метрики", ops["metrics"])
+    if st.button("Проверить Telegram / VK", key="p3_provider_health"):
+        try:
+            health = provider_health()
+            for name in ("telegram","vk"):
+                item = health[name]
+                if item["status"] == "ok":
+                    st.success(f"{name.upper()}: подключение подтверждено")
+                elif item["status"] == "skipped":
+                    st.info(f"{name.upper()}: credential не настроен")
+                else:
+                    st.error(f"{name.upper()}: проверка не пройдена")
+        except Exception as e:
+            st.error(f"Проверка провайдера завершилась ошибкой: {e}")
+
     st.markdown("---")
     st.subheader("Instagram automation")
     st.caption("Очередь публикаций: генерация и подготовка безопасны; фактическая публикация требует подключённого API и отдельного подтверждения.")
