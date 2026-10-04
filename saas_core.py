@@ -289,11 +289,21 @@ def _rest_post(path,token,payload,headers=None): return _request("POST",path,tok
 def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
 def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
 
+def _invalidate_identity_caches():
+    for key in ("_saas_user_tenants_cache", "_saas_current_role_cache"):
+        st.session_state.pop(key, None)
+
 def user_tenants(token,user_id=None):
     uid=user_id or st.session_state.get("saas_user_id")
     if not uid: return []
+    cache_key=(str(uid), str(token or ""))
+    cached=st.session_state.get("_saas_user_tenants_cache")
+    if isinstance(cached,dict) and cached.get("key")==cache_key:
+        return list(cached.get("rows") or [])
     rows=_rest_get("/rest/v1/memberships",token,params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}","order":"created_at.asc"})
-    return [row.get("tenants") for row in rows if row.get("tenants")]
+    tenants=[row.get("tenants") for row in rows if row.get("tenants")]
+    st.session_state["_saas_user_tenants_cache"]={"key":cache_key,"rows":tenants}
+    return tenants
 
 def current_tenant(token,user_id=None,selected_tenant_id=None):
     tenants=user_tenants(token,user_id)
@@ -323,6 +333,7 @@ def switch_tenant(tenant):
         raise PermissionError("У вас нет доступа к выбранному магазину.")
     _set_identity({"id":uid,"email":st.session_state.get("saas_email","")},verified)
     _clear_tenant_runtime_cache()
+    _invalidate_identity_caches()
     st.session_state["saas_last_validated_at"]=time.time()
 
 def subscription(token,tenant_id):
@@ -389,7 +400,14 @@ def login_ui():
             except Exception as e: st.error(f"Не удалось отправить письмо: {e}")
 
 def usage_snapshot():
-    return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
+    # Reuse the same per-session entity caches used by the main UI.
+    # This avoids four extra Supabase round trips on every widget interaction.
+    return {
+        "products": len(st.session_state.get("_app_products_cache", data_load("products", []))),
+        "leads": len(st.session_state.get("_app_leads_cache", data_load("leads", []))),
+        "orders": len(st.session_state.get("_app_orders_cache", data_load("orders", []))),
+        "content": len(st.session_state.get("_app_plan_cache", data_load("content_plan", []))),
+    }
 
 def render_tenant_selector():
     token=st.session_state.get("saas_access_token")
@@ -524,8 +542,14 @@ def current_role(token=None):
     if not saas_enabled(): return "owner"
     token=token or st.session_state.get("saas_access_token"); uid=st.session_state.get("saas_user_id"); tid=tenant_id()
     if not token or not uid or not tid: return "viewer"
+    cache_key=(str(uid), str(tid), str(token))
+    cached=st.session_state.get("_saas_current_role_cache")
+    if isinstance(cached,dict) and cached.get("key")==cache_key:
+        return str(cached.get("role") or "viewer")
     rows=_rest_get("/rest/v1/memberships",token,params={"select":"role","tenant_id":f"eq.{tid}","user_id":f"eq.{uid}","limit":"1"})
-    return rows[0].get("role","viewer") if rows else "viewer"
+    role=rows[0].get("role","viewer") if rows else "viewer"
+    st.session_state["_saas_current_role_cache"]={"key":cache_key,"role":role}
+    return role
 
 def team_members():
     token=st.session_state.get("saas_access_token")
@@ -540,7 +564,9 @@ def my_invitations():
 def accept_invitation(invite_id):
     token=st.session_state.get("saas_access_token")
     if not token: raise RuntimeError("Нужно войти в аккаунт.")
-    return _request("POST","/rest/v1/rpc/accept_invitation",token=token,json={"invite_id":invite_id})
+    result = _request("POST","/rest/v1/rpc/accept_invitation",token=token,json={"invite_id":invite_id})
+    _invalidate_identity_caches()
+    return result
 
 def team_invitations():
     token=st.session_state.get("saas_access_token")
@@ -560,7 +586,9 @@ def set_member_role(target_user,new_role):
     if not saas_enabled() or not token: return False
     if not can("manage_roles"): raise PermissionError("Только владелец или администратор может менять роли.")
     if new_role not in ("admin","manager","editor","viewer"): raise ValueError("Недопустимая роль.")
-    return _request("POST","/rest/v1/rpc/set_member_role",token=token,json={"target_tenant":tenant_id(),"target_user":target_user,"new_role":new_role})
+    result = _request("POST","/rest/v1/rpc/set_member_role",token=token,json={"target_tenant":tenant_id(),"target_user":target_user,"new_role":new_role})
+    _invalidate_identity_caches()
+    return result
 
 def create_team_invitation(email,role):
     token=st.session_state.get("saas_access_token")
