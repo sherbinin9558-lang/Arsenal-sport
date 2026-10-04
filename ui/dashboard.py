@@ -214,7 +214,9 @@ def render_dashboard(
                 priority = st.selectbox("Приоритет", ["Обычный", "Высокий", "Срочно"], key="dash_quick_plan_priority")
                 submitted = st.form_submit_button("Добавить в план", type="primary", use_container_width=True)
             if submitted:
-                if not product.strip():
+                if not can_write:
+                    st.error("У вас нет прав на изменение контент-плана.")
+                elif not product.strip():
                     st.error("Укажите товар.")
                 else:
                     try:
