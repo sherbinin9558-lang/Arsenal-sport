@@ -89,6 +89,23 @@ def provider_health(telegram_token: str | None = None, vk_token: str | None = No
     return {"checked_at": now_iso(), "telegram": telegram_health(telegram_token), "vk": vk_health(vk_token)}
 
 
+def _safe_details(details: dict | None) -> dict:
+    """Keep audit payloads small and credential-free."""
+    if not isinstance(details, dict):
+        return {}
+    blocked = ("token", "secret", "password", "authorization", "api_key", "access_token")
+    safe = {}
+    for key, value in details.items():
+        key_s = str(key)[:80]
+        if any(word in key_s.lower() for word in blocked):
+            safe[key_s] = "[REDACTED]"
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            safe[key_s] = str(value)[:500] if isinstance(value, str) else value
+        else:
+            safe[key_s] = str(value)[:500]
+    return safe
+
+
 def audit_event(action: str, target: str = "", outcome: str = "success", details: dict | None = None) -> dict:
     """Write a bounded tenant-scoped audit record; never stores credentials."""
     _write_allowed()
@@ -96,7 +113,7 @@ def audit_event(action: str, target: str = "", outcome: str = "success", details
         "id": f"audit_{int(time.time() * 1000)}_{abs(hash((action, target, time.time_ns()))) % 1000000}",
         "tenant_id": str(tenant_id()), "actor_role": str(current_role() or ""),
         "action": str(action)[:120], "target": str(target)[:200],
-        "outcome": str(outcome)[:40], "details": dict(details or {}),
+        "outcome": str(outcome)[:40], "details": _safe_details(details),
         "created_at": now_iso(),
     }
     rows = _rows(ENTITY_AUDIT)
@@ -107,9 +124,13 @@ def audit_event(action: str, target: str = "", outcome: str = "success", details
 
 def record_metric(name: str, value: float = 1.0, tags: dict | None = None) -> dict:
     _write_allowed()
-    row = {"id": f"metric_{int(time.time()*1000)}_{abs(hash(time.time_ns())) % 1000000}",
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("Значение метрики должно быть числом.")
+    row = {"id": f"metric_{int(time.time()*1000)}_{os.urandom(4).hex()}",
            "tenant_id": str(tenant_id()), "name": str(name)[:120],
-           "value": float(value), "tags": dict(tags or {}), "created_at": now_iso()}
+           "value": numeric, "tags": _safe_details(tags), "created_at": now_iso()}
     rows = _rows(ENTITY_METRICS)
     rows.insert(0, row)
     _write(ENTITY_METRICS, rows[:MAX_METRICS])
@@ -121,9 +142,31 @@ def observability_snapshot() -> dict:
     metrics = _rows(ENTITY_METRICS)
     by_action = Counter(str(x.get("action")) for x in events)
     errors = sum(str(x.get("outcome")).lower() in {"error", "failed"} for x in events)
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    recent_errors = 0
+    for event in events:
+        if str(event.get("outcome")).lower() not in {"error", "failed"}:
+            continue
+        try:
+            created = datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
+            recent_errors += created >= recent_cutoff
+        except (TypeError, ValueError):
+            continue
     return {"audit_events": len(events), "metrics": len(metrics),
-            "audit_errors": errors, "top_actions": dict(by_action.most_common(10)),
-            "latest_event_at": events[0].get("created_at") if events else None}
+            "audit_errors": errors, "recent_errors_24h": int(recent_errors),
+            "top_actions": dict(by_action.most_common(10)),
+            "latest_event_at": events[0].get("created_at") if events else None,
+            "health": "critical" if recent_errors >= 5 else ("warning" if recent_errors else "ok")}
+
+
+def operations_health(telegram_token: str | None = None, vk_token: str | None = None) -> dict:
+    """Read-only production health summary. Provider calls never publish or mutate external systems."""
+    providers = provider_health(telegram_token, vk_token)
+    ops = observability_snapshot()
+    provider_failures = [name for name in ("telegram", "vk") if providers[name].get("status") == "failed"]
+    status = "critical" if provider_failures or ops["health"] == "critical" else ("warning" if ops["health"] == "warning" else "ok")
+    return {"status": status, "checked_at": providers["checked_at"], "providers": providers,
+            "observability": ops, "provider_failures": provider_failures}
 
 
 def validate_agent_payload(action_type: str, payload: dict) -> dict:
@@ -156,6 +199,9 @@ def validate_agent_payload(action_type: str, payload: dict) -> dict:
 def agent_is_expired(created_at: str, ttl_minutes: int = AGENT_TTL_MINUTES) -> bool:
     try:
         created = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
-        return datetime.now(timezone.utc) - created > timedelta(minutes=ttl_minutes)
+        now = datetime.now(timezone.utc)
+        if created > now + timedelta(minutes=2):
+            return True
+        return now - created > timedelta(minutes=ttl_minutes)
     except (TypeError, ValueError):
         return True
