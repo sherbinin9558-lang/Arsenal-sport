@@ -177,13 +177,6 @@ def render_max():
     low = low_stock_products(products)
     cm = conversion_metrics(leads, orders)
 
-    st.markdown(
-        '<div class="max-header">'
-        '<div class="max-header-title">⚡ AI Agent Content Manager <span>MAX</span></div>'
-        '<div class="max-header-subtitle">Центр управления магазином</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
     st.caption("MAX не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
 
     try:
