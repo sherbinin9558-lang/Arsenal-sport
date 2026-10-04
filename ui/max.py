@@ -275,8 +275,8 @@ def render_max():
         st.markdown("### Тарифы")
         st.caption("Тарифы уже заложены в архитектуру. Реальную оплату подключим следующим этапом.")
         p1,p2,p3=st.columns(3)
-        p1.info("STARTER\n\nдо 10 000 товаров\nдо 3 пользователей")
-        p2.info("PRO\n\nдо 10 000 товаров\nдо 10 пользователей")
+        p1.info("STARTER\n\nдо 7 000 товаров\nдо 3 пользователей")
+        p2.info("PRO\n\nдо 7 000 товаров\nдо 10 пользователей")
         p3.info("BUSINESS\n\nдо 100 000 товаров\nдо 50 пользователей")
         st.caption("Смена тарифа вручную отключена: тариф должен меняться через серверную оплату или админку.\n")
         from saas_core import plan_catalog, subscription_snapshot, request_plan_change, set_auto_renew, current_role
