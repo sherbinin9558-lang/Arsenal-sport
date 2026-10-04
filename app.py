@@ -354,6 +354,16 @@ def publish_to_telegram(image_bytes, caption):
         files = {"photo": ("card.png", image_bytes, "image/png")}
         data = {"chat_id": channel, "caption": caption[:1024]}
         resp = requests.post(api_url, files=files, data=data, timeout=60)
+        if resp.status_code == 401:
+            _invalidate_telegram_auth_token(token)
+            retry_token = _telegram_auth_token()
+            if retry_token and retry_token != token:
+                resp = requests.post(
+                    _telegram_api(retry_token, "sendPhoto"),
+                    files=files,
+                    data=data,
+                    timeout=60,
+                )
         if resp.status_code == 200:
             return True, "Пост успешно опубликован!"
         else:
@@ -381,19 +391,30 @@ def _telegram_token():
     return (_telegram_token_candidates() or [""])[0]
 
 def _telegram_auth_token():
-    """Return a token that passes Telegram getMe, falling back to the first configured token."""
+    """Return a validated Telegram token, reusing a short-lived session cache."""
     candidates = _telegram_token_candidates()
     if not candidates:
+        st.session_state.pop("_telegram_auth_token_cache", None)
         return ""
+    cached = str(st.session_state.get("_telegram_auth_token_cache", "") or "").strip()
+    if cached and cached in candidates:
+        return cached
     for candidate in candidates:
         try:
             resp = requests.get(_telegram_api(candidate, "getMe"), timeout=(5, 10))
             result = resp.json()
             if resp.ok and result.get("ok") is True:
+                st.session_state["_telegram_auth_token_cache"] = candidate
                 return candidate
         except (requests.RequestException, ValueError):
             continue
+    st.session_state.pop("_telegram_auth_token_cache", None)
     return candidates[0]
+
+def _invalidate_telegram_auth_token(token):
+    cached = str(st.session_state.get("_telegram_auth_token_cache", "") or "").strip()
+    if cached and cached == str(token or "").strip():
+        st.session_state.pop("_telegram_auth_token_cache", None)
 
 def _telegram_chat_id(raw_channel):
     value = str(raw_channel or "").strip()
@@ -438,6 +459,16 @@ def publish_reel_to_telegram(video_bytes, caption):
             data=data,
             timeout=(20, 300),
         )
+        if resp.status_code == 401:
+            _invalidate_telegram_auth_token(token)
+            retry_token = _telegram_auth_token()
+            if retry_token and retry_token != token:
+                resp = requests.post(
+                    _telegram_api(retry_token, "sendVideo"),
+                    files=files,
+                    data=data,
+                    timeout=(20, 300),
+                )
 
         try:
             result = resp.json()
@@ -1791,7 +1822,7 @@ with tab8:
     o3.metric("Метрики", ops["metrics"])
     if st.button("Проверить Telegram / VK", key="p3_provider_health"):
         try:
-            health = provider_health(_telegram_token(), str(st.secrets.get("VK_TOKEN", "") or ""))
+            health = provider_health(_telegram_auth_token(), str(st.secrets.get("VK_TOKEN", "") or ""))
             for name in ("telegram","vk"):
                 item = health[name]
                 if item["status"] == "ok":
