@@ -7,6 +7,7 @@ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the bot runtime.
 
 import os
 import re
+import time
 import requests
 
 from max_features import product_search, knowledge_answer
@@ -73,8 +74,8 @@ def notify_admin(text):
     if ADMIN_CHAT_ID:
         try:
             send(ADMIN_CHAT_ID, text)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"Admin notification failed: {exc}")
 
 
 def product_title(p):
@@ -229,6 +230,7 @@ def main():
                     handle_message(update["message"])
         except Exception as exc:
             print(f"Telegram polling error: {exc}")
+            time.sleep(5)  # do not hammer the API in a tight loop (bad token, network down)
 
 
 if __name__ == "__main__":
