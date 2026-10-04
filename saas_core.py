@@ -401,12 +401,17 @@ def login_ui():
 
 def usage_snapshot():
     # Reuse the same per-session entity caches used by the main UI.
-    # This avoids four extra Supabase round trips on every widget interaction.
+    # Do not use dict.get(..., data_load(...)): Python evaluates the default
+    # expression eagerly and would still perform the network request.
+    def _cached_or_load(key, entity):
+        if key in st.session_state:
+            return st.session_state[key]
+        return data_load(entity, [])
     return {
-        "products": len(st.session_state.get("_app_products_cache", data_load("products", []))),
-        "leads": len(st.session_state.get("_app_leads_cache", data_load("leads", []))),
-        "orders": len(st.session_state.get("_app_orders_cache", data_load("orders", []))),
-        "content": len(st.session_state.get("_app_plan_cache", data_load("content_plan", []))),
+        "products": len(_cached_or_load("_app_products_cache", "products")),
+        "leads": len(_cached_or_load("_app_leads_cache", "leads")),
+        "orders": len(_cached_or_load("_app_orders_cache", "orders")),
+        "content": len(_cached_or_load("_app_plan_cache", "content_plan")),
     }
 
 def render_tenant_selector():
