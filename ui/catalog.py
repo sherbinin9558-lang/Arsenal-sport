@@ -147,9 +147,9 @@ def render_catalog(
                         updated["original_image"] = p["original_image"]
                     if new_original:
                         import base64, io
-                        from PIL import Image
+                        from image_utils import open_photo
                         original_buf = io.BytesIO()
-                        Image.open(new_original).convert("RGB").save(original_buf, format="JPEG", quality=95)
+                        open_photo(new_original).save(original_buf, format="JPEG", quality=95)
                         updated["original_image"] = base64.b64encode(original_buf.getvalue()).decode("ascii")
                     try:
                         update_product(record_id, updated, existing=p)
