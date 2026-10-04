@@ -1,7 +1,6 @@
 """Dashboard UI. Keeps dashboard rendering outside the application entrypoint."""
 import datetime
 import streamlit as st
-from ui.impeccable_theme import apply_impeccable_theme
 
 def render_dashboard(
     *,
@@ -11,8 +10,6 @@ def render_dashboard(
     attribution_loader, attribution_metrics, add_product, add_plan,
     categories, can_write,
 ):
-    apply_impeccable_theme()
-
     # Reuse the dashboard snapshot only until a successful write invalidates it.
     # This keeps the dashboard fast without showing stale data after edits.
     revision = st.session_state.get("_app_data_revision", 0)

@@ -18,7 +18,6 @@ from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
 from production_ops import observability_snapshot, provider_health
-from ui.impeccable_theme import apply_impeccable_theme
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -691,9 +690,6 @@ from ui.max import render_max
 
 # ==================== ИНТЕРФЕЙС ====================
 st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
-
-# Global visual system: presentation-only; does not alter business logic, data, auth, or WebMCP.
-apply_impeccable_theme()
 
 st.markdown("""
 <style>
