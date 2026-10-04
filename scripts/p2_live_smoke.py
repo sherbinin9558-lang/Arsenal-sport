@@ -61,17 +61,27 @@ def browser_webmcp():
         page.wait_for_timeout(2500)
         email=os.getenv("E2E_EMAIL","").strip()
         password=os.getenv("E2E_PASSWORD","")
-        if email and password and page.get_by_label("Email").count():
-            page.get_by_label("Email").fill(email)
-            page.get_by_label("Пароль").fill(password)
-            page.get_by_role("button", name="Войти").click()
-            page.wait_for_timeout(5000)
+        if not email or not password:
+            raise RuntimeError("E2E credentials are required for authenticated WebMCP smoke.")
+        email_field = page.get_by_label("Email")
+        password_field = page.get_by_label("Пароль")
+        login_button = page.get_by_role("button", name="Войти")
+        if email_field.count() != 1 or password_field.count() != 1 or login_button.count() != 1:
+            raise RuntimeError("Authenticated login form was not found.")
+        email_field.fill(email)
+        password_field.fill(password)
+        login_button.click()
+        page.wait_for_timeout(5000)
+        if page.get_by_role("button", name="Войти").count() > 0:
+            raise RuntimeError("Authenticated login did not complete.")
         result=page.evaluate("""() => ({
           url: location.href,
           hasWebMcpSdk: !!globalThis.__WEBMCP_TELEMETRY__,
           registered: !!globalThis.__ARSENAL_WEBMCP_READY__
         })""")
         browser.close()
+    if not result.get("registered"):
+            raise RuntimeError("WebMCP registration marker was not detected.")
     return {"status":"ok","result":result}
 
 def main():
