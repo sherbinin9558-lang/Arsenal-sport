@@ -949,16 +949,6 @@ def bulk_import_products(uploaded_file, update_existing=False):
     if not can("write_data"):
         raise PermissionError("У вашей роли нет прав на импорт товаров.")
 
-    max_products = None
-    if saas_enabled():
-        max_products = int(feature_allowed("products", len(products) + len(rows)) and len(products) + len(rows) or len(products))
-        # feature_allowed() only answers whether the requested size is allowed;
-        # the exact limit is checked below without mutating the catalog.
-        try:
-            from saas_core import limit as _catalog_limit
-            max_products = int(_catalog_limit("products"))
-        except Exception:
-            max_products = None
 
     for line_no, row in enumerate(rows, start=2):
         name = _bulk_value(row, "name")
@@ -990,7 +980,7 @@ def bulk_import_products(uploaded_file, update_existing=False):
             working_products[existing[key]].update(product)
             updated += 1
         else:
-            if max_products is not None and len(working_products) >= max_products:
+            if not feature_allowed("products", len(working_products) + 1):
                 raise ValueError(f"Лимит каталога тарифа {tenant_plan().upper()} достигнут.")
             working_products.append(product)
             if key:
