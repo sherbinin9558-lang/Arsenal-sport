@@ -42,8 +42,13 @@ def _redact(value: str, keep: int = 4) -> str:
     return value[:keep] + "..." + "*" * min(8, max(3, len(value) - keep))
 
 
-def _http_json(url: str, headers=None, timeout: int = 15):
-    req = Request(url, headers=headers or {"User-Agent": "ArsenalSport-Health/1.0"})
+def _http_json(url: str, headers=None, timeout: int = 15, data: bytes | None = None, method: str | None = None):
+    req = Request(
+        url,
+        data=data,
+        headers=headers or {"User-Agent": "ArsenalSport-Health/1.0"},
+        method=method,
+    )
     started = time.perf_counter()
     try:
         with urlopen(req, timeout=timeout) as response:
@@ -73,8 +78,15 @@ def vk_health(token: str | None = None) -> dict:
     token = (token if token is not None else os.getenv("VK_TOKEN", "")).strip()
     if not token:
         return {"status": "skipped", "provider": "vk", "reason": "credential_not_configured"}
-    url = "https://api.vk.com/method/users.get?access_token=" + token + "&v=5.199"
-    ok, status, elapsed, body = _http_json(url)
+    url = "https://api.vk.com/method/users.get"
+    from urllib.parse import urlencode
+    body_data = urlencode({"access_token": token, "v": "5.199"}).encode("utf-8")
+    ok, status, elapsed, body = _http_json(
+        url,
+        headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "ArsenalSport-Health/1.0"},
+        data=body_data,
+        method="POST",
+    )
     valid = bool(ok and not body.get("error") and isinstance(body.get("response"), list))
     result = {"status": "ok" if valid else "failed", "provider": "vk",
               "http": status, "latency_ms": round(elapsed * 1000, 1)}
