@@ -622,17 +622,15 @@ def render_max():
             if not products:
                 st.info("Сначала добавьте товары в каталог.")
             else:
-                # Clamp the widget bounds defensively. Streamlit rejects a slider when
-                # max_value falls below min_value, so never pass a zero/negative upper bound.
+                # Use a bounded selectbox instead of a min/max widget. This avoids
+                # Streamlit's InvalidMinMaxError entirely while preserving the same
+                # 1..100 product limit and a default of up to 30.
                 content_max = max(1, min(100, len(products)))
                 content_default = max(1, min(30, content_max))
-                # Use a catalog-size-specific widget key so a smaller catalog never reuses
-                # an out-of-range value from a previous Streamlit session state.
-                content_limit = st.slider(
+                content_limit = st.selectbox(
                     "Сколько товаров обработать",
-                    min_value=1,
-                    max_value=content_max,
-                    value=content_default,
+                    options=list(range(1, content_max + 1)),
+                    index=content_default - 1,
                     key=f"auto_content_limit_{content_max}",
                 )
                 if can("write_data") and st.button("✍️ Создать контент для выбранного количества", type="primary", key="auto_content_btn"):
