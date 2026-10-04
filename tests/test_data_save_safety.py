@@ -274,6 +274,7 @@ class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
         self.assertIn('st.session_state["_settings_baseline"]', source)
         self.assertIn('data_update_record("settings"', source)
         self.assertIn('expected = baseline.get("updated_at")', source)
+        self.assertIn('st.session_state.pop("_settings_baseline", None)', source)
 
     def test_dashboard_quick_actions_are_functional(self):
         source = (Path(__file__).resolve().parents[1] / "ui" / "dashboard.py").read_text(encoding="utf-8")
@@ -281,6 +282,7 @@ class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
         self.assertIn('st.session_state["dashboard_quick_plan"] = True', source)
         self.assertIn('add_plan({', source)
         self.assertIn('add_product({', source)
+        self.assertIn('if not can_write:', source)
 
 if __name__ == "__main__":
     unittest.main()
