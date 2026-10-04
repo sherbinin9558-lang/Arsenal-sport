@@ -686,7 +686,6 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
-    @st.fragment(key="max_sidebar_launcher")
     def _max_sidebar_launcher():
         if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
             st.session_state["open_max"] = True
@@ -791,10 +790,6 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
     unsafe_allow_html=True,
 )
 
-# MAX launcher: run the button as an independent fragment so opening the
-# dialog does not rerun the entire application. The dialog itself remains
-# Streamlit's native fragment.
-@st.fragment(key="max_mobile_launcher")
 def _max_mobile_launcher():
     if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
         st.session_state["open_max"] = True
