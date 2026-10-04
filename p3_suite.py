@@ -354,9 +354,16 @@ def instagram_queue() -> list[dict]:
 
 # ---------- Analytics ----------
 
+def _safe_amount(value: Any) -> float:
+    try:
+        raw = str(value or "0").replace(" ", "").replace(",", ".").replace("₽", "")
+        return float(raw or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def advanced_analytics(products: list[dict], leads: list[dict], orders: list[dict], plan: list[dict]) -> dict:
-    revenue = sum(float(str(x.get("amount",0)).replace(" ","").replace(",",".").replace("₽","") or 0)
-                  for x in orders if x.get("status") != "Отменён")
+    revenue = sum(_safe_amount(x.get("amount", 0)) for x in orders if x.get("status") != "Отменён")
     completed = sum(x.get("status") == "Завершён" for x in orders)
     published = sum(x.get("status") == "Опубликовано" for x in plan)
     return {
