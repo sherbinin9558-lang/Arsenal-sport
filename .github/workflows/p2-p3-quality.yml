@@ -1,0 +1,61 @@
+name: P2/P3 quality gate
+
+on:
+  push:
+    branches: ["feat/p2-p3-hardening-20261004"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -m compileall -q .
+      - run: python -m unittest discover -s tests -p "test_*.py" -v
+
+  browser-webmcp:
+    runs-on: ubuntu-latest
+    env:
+      SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install playwright
+      - run: playwright install --with-deps chromium
+      - run: python scripts/p2_live_smoke.py
+
+  provider-smoke:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      VK_TOKEN: ${{ secrets.VK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run read-only provider health checks
+        run: |
+          python - <<'PY'
+          from production_ops import telegram_health, vk_health
+          import json, sys
+          results = [telegram_health(), vk_health()]
+          print(json.dumps(results, ensure_ascii=False))
+          failed = [x for x in results if x.get("status") == "failed"]
+          if failed:
+              sys.exit(1)
+          PY

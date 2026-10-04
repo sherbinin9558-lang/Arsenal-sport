@@ -14,10 +14,19 @@ API_URL="https://securepay.tinkoff.ru/v2"
 
 def _save_checkout(tenant_id, order_id, payment_id, plan):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
-    url=_cfg("SUPABASE_URL")
-    if not key or not url: return
+    url=_cfg("SUPABASE_URL").rstrip("/")
+    if not key or not url:
+        raise RuntimeError("Supabase checkout storage is not configured.")
     h={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json","Prefer":"return=minimal"}
-    requests.post(f"{url}/rest/v1/billing_checkout_sessions",headers=h,json={"tenant_id":str(tenant_id),"provider":"tbank","provider_order_id":str(order_id),"provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created"},timeout=15)
+    r=requests.post(
+        f"{url}/rest/v1/billing_checkout_sessions",
+        headers=h,
+        json={"tenant_id":str(tenant_id),"provider":"tbank","provider_order_id":str(order_id),
+              "provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created"},
+        timeout=15,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
 
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
@@ -68,3 +77,19 @@ def get_state(payment_id):
     if not r.ok or not data.get("Success"):
         raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
     return data
+
+
+def get_checkout_by_order(order_id, tenant_id):
+    key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
+    url=_cfg("SUPABASE_URL").rstrip("/")
+    if not key or not url:
+        raise RuntimeError("Supabase checkout storage is not configured.")
+    h={"apikey":key,"Authorization":f"Bearer {key}","Content-Type":"application/json"}
+    r=requests.get(
+        f"{url}/rest/v1/billing_checkout_sessions", headers=h,
+        params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.tbank",
+                "provider_order_id":f"eq.{order_id}","tenant_id":f"eq.{tenant_id}","limit":"1"}, timeout=15)
+    if not r.ok:
+        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+    rows=r.json()
+    return rows[0] if rows else None

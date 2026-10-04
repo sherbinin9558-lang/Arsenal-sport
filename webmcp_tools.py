@@ -106,7 +106,11 @@ export default function(component) {
     [searchProducts, getProduct, getStoreContext, getContentPlan],
     { telemetry: false }
   );
-  return () => registration.unregister();
+  globalThis.__ARSENAL_WEBMCP_READY__ = true;
+  return () => {
+    globalThis.__ARSENAL_WEBMCP_READY__ = false;
+    registration.unregister();
+  };
 }
 """
 )
@@ -134,7 +138,12 @@ def _webmcp_data():
     except Exception:
         products = []
     try:
-        content_plan = data_load("content_plan", [])
+        raw_plan = data_load("content_plan", [])
+        allowed_plan = ("_saas_record_id", "title", "date", "platform", "product", "type", "status", "priority", "idea")
+        content_plan = [
+            {k: row.get(k) for k in allowed_plan if k in row}
+            for row in raw_plan if isinstance(row, dict)
+        ]
     except Exception:
         content_plan = []
 

@@ -58,7 +58,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
     if not r.ok:
         raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
 
-def get_checkout_by_order(checkout_id):
+def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -67,7 +67,7 @@ def get_checkout_by_order(checkout_id):
     r=requests.get(
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=headers,
-        params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.yookassa","provider_order_id":f"eq.{checkout_id}","limit":"1"},
+        params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.yookassa","provider_order_id":f"eq.{checkout_id}",**({"tenant_id":f"eq.{tenant_id}"} if tenant_id is not None else {}),"limit":"1"},
         timeout=15,
     )
     if not r.ok:

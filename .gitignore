@@ -1,0 +1,28 @@
+# Streamlit local secrets — never commit credentials
+.streamlit/secrets.toml
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local generated/runtime files
+*.log
