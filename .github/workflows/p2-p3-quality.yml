@@ -61,6 +61,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install application dependencies
+        run: pip install -r requirements.txt
       - name: Run read-only provider health checks
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
