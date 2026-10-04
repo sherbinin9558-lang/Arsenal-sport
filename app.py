@@ -103,6 +103,8 @@ def update_product(record_id, prod, existing=None):
         merged.pop("_saas_updated_at", None)
         data_update_record("products", existing["_saas_record_id"], merged, existing["_saas_updated_at"])
         st.session_state.pop("_app_products_cache", None)
+        st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
+        st.session_state.pop("max_data_snapshot", None)
         return
     p = load_products()
     idx = _find_record_index(p, record_id)
