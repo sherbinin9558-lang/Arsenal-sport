@@ -50,7 +50,7 @@ def _approval_allowed() -> None:
 
 # ---------- Notifications ----------
 
-def create_notification(title: str, body: str, level: str = "info", link: str = "") -> dict:
+def create_notification(title: str, body: str, level: str = "info", link: str = "", record_id: str = "") -> dict:
     _write_allowed()
     title = str(title or "").strip()
     body = str(body or "").strip()
@@ -61,6 +61,8 @@ def create_notification(title: str, body: str, level: str = "info", link: str = 
         "body": str(body).strip(), "level": level if level in {"info","success","warning","error"} else "info",
         "link": str(link or ""), "read": False, "created_at": _now(),
     }
+    if record_id:
+        row["_saas_record_id"] = str(record_id)
     rows = _rows(ENTITY_NOTIFICATIONS)
     rows.insert(0, row)
     _write(ENTITY_NOTIFICATIONS, rows[:500])
@@ -200,14 +202,14 @@ def run_notification_automation(products: list[dict], leads: list[dict], orders:
         if 0 < stock <= 2:
             key = f"low-stock:{product.get('_saas_record_id') or product.get('article') or product.get('name')}"
             if key not in keys:
-                row = create_notification("Низкий остаток", f"«{product.get('name','Товар')}» — осталось {stock} шт.", "warning")
+                row = create_notification("Низкий остаток", f"«{product.get('name','Товар')}» — осталось {stock} шт.", "warning", record_id=f"automation_low_stock_{hashlib.sha256(key.encode()).hexdigest()[:24]}")
                 row["automation_key"] = key
                 created.append(row); keys.add(key)
     for lead in [enrich_lead(x) for x in leads]:
         if lead.get("intent") == "Горячий":
             key = f"hot-lead:{lead.get('_saas_record_id') or lead.get('id') or lead.get('name')}"
             if key not in keys:
-                row = create_notification("Горячий лид", f"{lead.get('name') or lead.get('product') or 'Новый клиент'}: {lead.get('next_action')}", "success")
+                row = create_notification("Горячий лид", f"{lead.get('name') or lead.get('product') or 'Новый клиент'}: {lead.get('next_action')}", "success", record_id=f"automation_hot_lead_{hashlib.sha256(key.encode()).hexdigest()[:24]}")
                 row["automation_key"] = key
                 created.append(row); keys.add(key)
     if created:
@@ -281,14 +283,14 @@ def execute_agent_action(action: dict) -> dict:
         return {"status": "executed", "notification_id": row["id"]}
     if kind == "queue_instagram_draft":
         row = queue_instagram_draft(payload.get("caption",""), payload.get("media_ref",""),
-                                    payload.get("product_id",""))
+                                    payload.get("product_id",""), record_id=f"agent_instagram_{action.get('id')}")
         return {"status": "executed", "draft_id": row["id"]}
     return {"status": "blocked", "reason": "Внешнее действие требует отдельного подтверждения и подключённого провайдера."}
 
 
 # ---------- Instagram automation (safe queue, not silent publishing) ----------
 
-def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "") -> dict:
+def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "", record_id: str = "") -> dict:
     _write_allowed()
     caption = str(caption or "").strip()
     if not caption:
@@ -296,6 +298,8 @@ def queue_instagram_draft(caption: str, media_ref: str = "", product_id: str = "
     row = {"id": _id("ig"), "tenant_id": str(tenant_id()), "caption": str(caption).strip(),
            "media_ref": str(media_ref), "product_id": str(product_id), "status": "Черновик",
            "created_at": _now()}
+    if record_id:
+        row["_saas_record_id"] = str(record_id)
     rows = _rows(ENTITY_INSTAGRAM_QUEUE)
     rows.insert(0, row)
     _write(ENTITY_INSTAGRAM_QUEUE, rows[:1000])
