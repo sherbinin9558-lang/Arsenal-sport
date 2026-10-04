@@ -75,11 +75,21 @@ def _auth_cookies():
         return None
 
 def _read_refresh_token():
-    # CookieController is browser-backed and may need one render cycle after a hard reload.
-    # getAll() is more reliable than a single-key read on a fresh Streamlit session.
+    # CookieController is asynchronous on a fresh Streamlit session. Explicitly
+    # refresh its browser cache, then allow the component one render cycle before
+    # falling back to the request cookies.
     cookies = _auth_cookies()
     if cookies is not None:
         try:
+            all_cookies = cookies.getAll() or {}
+            token = all_cookies.get(_AUTH_COOKIE)
+            if token:
+                return str(token)
+        except Exception:
+            pass
+        try:
+            cookies.refresh()
+            time.sleep(1.0)
             all_cookies = cookies.getAll() or {}
             token = all_cookies.get(_AUTH_COOKIE)
             if token:
@@ -106,21 +116,24 @@ def _persist_refresh_token(refresh_token):
     cookies = _auth_cookies()
     if cookies is not None:
         try:
-            expiry = (datetime.now(timezone.utc) + timedelta(days=_AUTH_COOKIE_DAYS)).isoformat()
-            cookies.set(_AUTH_COOKIE, {"value": str(refresh_token), "expiry_date": expiry})
+            expiry = datetime.now() + timedelta(days=_AUTH_COOKIE_DAYS)
+            cookies.set(
+                _AUTH_COOKIE,
+                str(refresh_token),
+                path="/",
+                expires=expiry,
+                secure=True,
+                same_site="lax",
+            )
             return
         except Exception:
-            try:
-                cookies.set(_AUTH_COOKIE, str(refresh_token))
-                return
-            except Exception:
-                pass
+            pass
 
 def _clear_refresh_token():
     cookies = _auth_cookies()
     if cookies is not None:
         try:
-            cookies.remove(_AUTH_COOKIE)
+            cookies.remove(_AUTH_COOKIE, path="/", secure=True, same_site="lax")
         except Exception:
             pass
 
@@ -156,16 +169,6 @@ def _establish_session(result):
 
 def _restore_session_from_cookie():
     refresh_token = _read_refresh_token()
-    # CookieController is browser-backed and can return an empty value during
-    # the first server run after a hard reload. Sleeping here does not reliably
-    # advance the component state, so the previous implementation could fall
-    # through to the login screen even though the browser still had a valid
-    # refresh cookie. Give the component a small, controlled number of reruns.
-    if not refresh_token:
-        attempts = int(st.session_state.get("_saas_cookie_probe_attempts", 0))
-        if attempts < 3:
-            st.session_state["_saas_cookie_probe_attempts"] = attempts + 1
-            st.rerun()
     if not refresh_token:
         st.session_state.pop("_saas_cookie_probe_attempts", None)
         return False
@@ -350,7 +353,7 @@ def login_ui():
             else:
                 try:
                     with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
-                    _establish_session(result); time.sleep(0.8); st.rerun()
+                    _establish_session(result); time.sleep(1.2); st.rerun()
                 except Exception as e: st.error(f"Не удалось войти: {e}")
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
