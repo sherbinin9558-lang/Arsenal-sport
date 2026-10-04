@@ -139,7 +139,7 @@ def _webmcp_data():
         products = []
     try:
         raw_plan = data_load("content_plan", [])
-        allowed_plan = ("_saas_record_id", "date", "platform", "product", "type", "status", "priority", "idea")
+        allowed_plan = ("_saas_record_id", "title", "date", "platform", "product", "type", "status", "priority", "idea")
         content_plan = [
             {k: row.get(k) for k in allowed_plan if k in row}
             for row in raw_plan if isinstance(row, dict)
