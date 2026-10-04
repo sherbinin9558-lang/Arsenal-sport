@@ -38,5 +38,39 @@ class TestP3Suite(unittest.TestCase):
         self.assertEqual(row["status"], "pending_approval")
         self.assertTrue(save_mock.called)
 
+        load_mock.return_value = [row]
+        updated = p3_suite.update_task(row["id"], status="Готово")
+        self.assertEqual(updated["status"], "Готово")
+
+    def test_crm_scoring_is_deterministic(self):
+        hot = p3_suite.enrich_lead({"name":"Иван","message":"Хочу купить кроссовки размер 42","phone":"+7000","product":"Nike"})
+        cold = p3_suite.enrich_lead({"name":"Иван","message":"Просто смотрю"})
+        self.assertGreater(hot["lead_score"], cold["lead_score"])
+        self.assertEqual(hot["intent"], "Горячий")
+
+    @patch("p3_suite.data_load", return_value=[])
+    @patch("p3_suite.data_save")
+    @patch("p3_suite.can", return_value=True)
+    def test_agent_action_requires_approval(self, can_mock, save_mock, load_mock):
+        row = p3_suite.queue_agent_action("create_task", {"title":"Follow-up"})
+        self.assertEqual(row["status"], "pending_approval")
+        self.assertTrue(save_mock.called)
+
 if __name__ == "__main__":
     unittest.main()
+
+    @patch("p3_suite.data_load", return_value=[])
+    @patch("p3_suite.data_save")
+    @patch("p3_suite.can", return_value=True)
+    def test_generated_ids_do_not_collide(self, can_mock, save_mock, load_mock):
+        a = p3_suite.create_notification("A", "A")
+        b = p3_suite.create_notification("B", "B")
+        self.assertNotEqual(a["id"], b["id"])
+
+    @patch("p3_suite.data_load", return_value=[
+        {"id": "t1", "status": "Открыта", "due_date": "2000-01-01"},
+        {"id": "t2", "status": "Готово", "due_date": "2000-01-01"},
+    ])
+    def test_task_metrics_calculates_overdue(self, load_mock):
+        metrics = p3_suite.task_metrics()
+        self.assertEqual(metrics["overdue"], 1)
