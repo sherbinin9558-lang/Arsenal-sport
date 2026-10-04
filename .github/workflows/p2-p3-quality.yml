@@ -34,6 +34,11 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install playwright
+      - name: Require browser smoke credentials
+        run: |
+          test -n "$SAAS_PUBLIC_URL" || { echo "SAAS_PUBLIC_URL is required for the release gate"; exit 1; }
+          test -n "$E2E_EMAIL" || { echo "E2E_EMAIL is required for the release gate"; exit 1; }
+          test -n "$E2E_PASSWORD" || { echo "E2E_PASSWORD is required for the release gate"; exit 1; }
       - run: playwright install --with-deps chromium
       - run: python scripts/p2_live_smoke.py
 
@@ -51,9 +56,6 @@ jobs:
       - name: Require release smoke credentials
         run: |
           test -n "$TELEGRAM_BOT_TOKEN" || { echo "TELEGRAM_BOT_TOKEN is required for the release gate"; exit 1; }
-          test -n "$SAAS_PUBLIC_URL" || { echo "SAAS_PUBLIC_URL is required for the release gate"; exit 1; }
-          test -n "$E2E_EMAIL" || { echo "E2E_EMAIL is required for the release gate"; exit 1; }
-          test -n "$E2E_PASSWORD" || { echo "E2E_PASSWORD is required for the release gate"; exit 1; }
       - name: Run read-only provider health checks
         run: |
           python - <<'PY'
