@@ -106,7 +106,11 @@ export default function(component) {
     [searchProducts, getProduct, getStoreContext, getContentPlan],
     { telemetry: false }
   );
-  return () => registration.unregister();
+  globalThis.__ARSENAL_WEBMCP_READY__ = true;
+  return () => {
+    globalThis.__ARSENAL_WEBMCP_READY__ = false;
+    registration.unregister();
+  };
 }
 """
 )
