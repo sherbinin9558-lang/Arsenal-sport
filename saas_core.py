@@ -466,39 +466,39 @@ def login_ui():
             background: #ffffff;
             box-shadow: 0 8px 24px rgba(30,35,55,.05);
         }
-        .public-shell [data-baseweb="tab-list"] {
+        [data-baseweb="tab-list"] {
             gap: 4px;
             background: transparent !important;
             border: 0 !important;
         }
-        .public-shell button[data-baseweb="tab"] {
+        button[data-baseweb="tab"] {
             border-radius: 11px;
             min-height: 42px;
             font-weight: 800;
             color: #596174 !important;
         }
-        .public-shell button[data-baseweb="tab"][aria-selected="true"] {
+        button[data-baseweb="tab"][aria-selected="true"] {
             color: #4c3bc1 !important;
             background: #efedff !important;
             border: 1px solid #d7d1ff !important;
         }
-        .public-shell [data-testid="stTextInput"],
-        .public-shell [data-testid="stTextArea"] {
+        [data-testid="stTextInput"],
+        [data-testid="stTextArea"] {
             margin-bottom: 2px;
         }
-        .public-shell [data-testid="stTextInput"] input {
+        [data-testid="stTextInput"] input {
             border-radius: 12px;
             border-color: #dfe3ea;
             min-height: 44px;
         }
-        .public-shell .stButton > button[kind="primary"] {
+        .stButton > button[kind="primary"] {
             min-height: 46px;
             border-radius: 12px;
             background: linear-gradient(135deg, #5b5ce2, #7b72ef) !important;
             box-shadow: 0 9px 24px rgba(91,92,226,.20) !important;
             font-weight: 850;
         }
-        .public-shell [data-testid="stCaptionContainer"] {
+        [data-testid="stCaptionContainer"] {
             color: #667080 !important;
         }
         @media (max-width: 768px) {
@@ -531,7 +531,7 @@ def login_ui():
             .public-hero-text {
                 font-size: .88rem;
             }
-            .public-shell button[data-baseweb="tab"] {
+            button[data-baseweb="tab"] {
                 white-space: nowrap;
                 min-width: max-content;
                 padding: 9px 11px;
