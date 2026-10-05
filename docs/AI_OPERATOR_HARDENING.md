@@ -42,3 +42,18 @@ This branch is intentionally isolated from `main`.
 
 ## Merge rule
 No changes from this branch should be merged to `main` until the complete regression checklist is green and the deployed branch is manually verified.
+
+
+## Final integration verification — 2026-10-05
+
+- Integration branch: `integration/final-20261005`.
+- Combined from `ai-operator-hardening-20261005` plus the latest UX/auth work from the separate project branch set: owner guide/mobile MAX cleanup and request-cookie auth restore.
+- GitHub Actions final head: `433a3e3bffb863d01187bd5abe30024e522e7d34`.
+- Branch quality gate: SUCCESS.
+- Python syntax check: SUCCESS.
+- P2/P3 quality gate: SUCCESS.
+- Regression, compileall, pip check and dependency audit: SUCCESS.
+- Browser/WebMCP live smoke: intentionally skipped because integration branch has no configured E2E credentials/public preview; this is not counted as a live-pass.
+- Provider live smoke: intentionally skipped because integration branch has no provider tokens; no external provider data was changed.
+- `main` remains untouched; integration branch is 23 commits ahead of main and 0 behind.
+- Payments remain out of scope.
