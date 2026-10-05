@@ -4,7 +4,11 @@
 No payment is charged and no social post is published by default.
 Set explicit environment variables to enable provider/browser checks.
 """
-import os, sys, time, json, statistics
+import os
+import sys
+import time
+import json
+import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -22,22 +26,44 @@ def http(url, timeout=15):
 
 
 def load_test(url, workers=20, requests_count=100):
+    """Exercise the Streamlit health endpoint concurrently.
+
+    The public Streamlit app root is session/UI traffic and is not a stable
+    load-test target: concurrent root requests can be slow while the app
+    wakes or creates sessions. The authenticated browser smoke separately
+    verifies the real UI. Streamlit documents /_stcore/health as its health
+    endpoint/readiness probe.
+    """
+    target = url.rstrip("/") + "/_stcore/health"
     lat = []
     failures = 0
+    statuses = {}
+    errors = {}
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(http, url, 20) for _ in range(requests_count)]
+        futures = [pool.submit(http, target, 20) for _ in range(requests_count)]
         for f in as_completed(futures):
-            ok, _, elapsed, _ = f.result()
+            ok, status, elapsed, body = f.result()
             lat.append(elapsed)
-            failures += not ok
-    return {
+            statuses[str(status)] = statuses.get(str(status), 0) + 1
+            if not ok or status != 200 or body.strip().lower() != b"ok":
+                failures += 1
+                key = f"{status}:{body.decode('utf-8', 'replace')[:120]}"
+                errors[key] = errors.get(key, 0) + 1
+
+    result = {
+        "target": target,
         "requests": requests_count,
         "workers": workers,
         "failures": int(failures),
+        "statuses": statuses,
         "p50_ms": round(statistics.median(lat) * 1000, 1),
         "p95_ms": round(sorted(lat)[max(0, int(len(lat) * 0.95) - 1)] * 1000, 1),
         "max_ms": round(max(lat) * 1000, 1),
     }
+    if errors:
+        result["errors"] = errors
+    return result
 
 
 def telegram_readonly():
@@ -106,28 +132,44 @@ def browser_webmcp():
             if not email or not password:
                 return {"status": "skipped", "reason": "E2E credentials not set"}
 
-            # Streamlit renders controls from inactive tabs in the DOM too.
-            # Scope the smoke to the first login-tab controls instead of requiring
-            # globally unique labels such as "Email".
-            email_fields = page.get_by_label("Email")
-            password_fields = page.get_by_label("Пароль")
-            login_buttons = page.get_by_role("button", name="Войти")
+            # Streamlit renders controls from inactive tabs too. Activate the
+            # login tab and target only visible controls in the active DOM.
+            login_tab = page.get_by_role("tab", name="Войти", exact=True)
+            if login_tab.count() > 0:
+                login_tab.first.click()
+
+            page.locator('input[type="text"]:visible').first.wait_for(state="visible", timeout=30000)
+            page.locator('input[type="password"]:visible').first.wait_for(state="visible", timeout=30000)
+            page.wait_for_timeout(500)
+
+            email_fields = page.locator('input[type="text"]:visible')
+            password_fields = page.locator('input[type="password"]:visible')
+            login_buttons = page.locator("button:visible").filter(has_text="Войти")
+
+            diagnostics = {
+                "visible_text_inputs": email_fields.count(),
+                "visible_password_inputs": password_fields.count(),
+                "visible_login_buttons": login_buttons.count(),
+            }
             if email_fields.count() < 1 or password_fields.count() < 1 or login_buttons.count() < 1:
-                raise RuntimeError("Authenticated login form was not found.")
+                page.screenshot(path="artifacts/smoke/login-form-missing.png", full_page=True)
+                raise RuntimeError(
+                    "Authenticated login form was not found: "
+                    + json.dumps(diagnostics, ensure_ascii=False)
+                )
 
-            email_field = email_fields.first
-            password_field = password_fields.first
-            login_button = login_buttons.first
+            email_fields.first.fill(email)
+            password_fields.first.fill(password)
+            login_buttons.last.click()
 
-            email_field.fill(email)
-            password_field.fill(password)
-            login_button.click()
             page.wait_for_timeout(5000)
-
             os.makedirs("artifacts/smoke", exist_ok=True)
             page.screenshot(path="artifacts/smoke/authenticated-home.png", full_page=True)
 
-            if page.get_by_role("button", name="Войти").count() > 0:
+            # A successful login must remove the visible password field. This
+            # avoids confusing the inactive login tab's hidden DOM controls
+            # with the authenticated application state.
+            if page.locator('input[type="password"]:visible').count() > 0:
                 raise RuntimeError("Authenticated login did not complete.")
 
             result = page.evaluate("""() => ({
