@@ -372,49 +372,252 @@ def supabase_health():
     except Exception as e: return False, f"Supabase недоступен: {e}"
 
 def login_ui():
-    st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">AI BUSINESS PLATFORM</div><div class="dashboard-hero-title">Ваш магазин. Один рабочий центр.</div><div class="dashboard-hero-text">Каталог, контент, заявки, заказы и AI-помощник MAX — в одном месте.</div></div>',unsafe_allow_html=True)
+    """Render the public SaaS entry screen with product-first branding."""
+    st.markdown(
+        """
+        <style>
+        /* Public SaaS shell: hide Streamlit/developer chrome from customers. */
+        #MainMenu,
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"],
+        [data-testid="stAppDeployButton"],
+        footer,
+        [data-testid="stBottom"],
+        [data-testid="stBottomBlockContainer"],
+        [data-testid="stBottomBlock"] {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        .public-shell {
+            max-width: 760px;
+            margin: 4vh auto 0;
+        }
+        .public-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .public-logo {
+            width: 48px;
+            height: 48px;
+            flex: 0 0 48px;
+            display: grid;
+            place-items: center;
+            border-radius: 14px;
+            color: #11151d;
+            background: linear-gradient(135deg, #5b5ce2 0%, #7b72ef 62%, #b8ff00 100%);
+            box-shadow: 0 10px 28px rgba(91,92,226,.22);
+            font-weight: 950;
+            letter-spacing: -.05em;
+            font-size: 15px;
+        }
+        .public-brand-name {
+            font-size: clamp(1.15rem, 2vw, 1.42rem);
+            line-height: 1.05;
+            font-weight: 950;
+            letter-spacing: -.035em;
+            color: #171a21;
+        }
+        .public-brand-caption {
+            margin-top: 4px;
+            font-size: .72rem;
+            letter-spacing: .12em;
+            font-weight: 850;
+            color: #6d4aff;
+        }
+        .public-hero {
+            padding: 28px 30px;
+            border: 1px solid #e0e4ee;
+            border-radius: 24px;
+            background:
+                radial-gradient(circle at 92% 10%, rgba(184,255,0,.18), transparent 26%),
+                linear-gradient(135deg, #ffffff 0%, #f3f1ff 100%);
+            box-shadow: 0 16px 42px rgba(30,35,55,.08);
+            margin-bottom: 18px;
+        }
+        .public-hero-kicker {
+            font-size: .68rem;
+            letter-spacing: .16em;
+            font-weight: 900;
+            color: #5b5ce2;
+        }
+        .public-hero-title {
+            margin-top: 8px;
+            font-size: clamp(1.7rem, 4vw, 2.55rem);
+            line-height: 1.04;
+            font-weight: 950;
+            letter-spacing: -.045em;
+            color: #171a21;
+        }
+        .public-hero-text {
+            max-width: 680px;
+            margin-top: 10px;
+            font-size: .98rem;
+            line-height: 1.55;
+            color: #596174;
+        }
+        .public-tabs {
+            padding: 6px;
+            border: 1px solid #e0e4ee;
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 8px 24px rgba(30,35,55,.05);
+        }
+        [data-baseweb="tab-list"] {
+            gap: 4px;
+            background: transparent !important;
+            border: 0 !important;
+        }
+        button[data-baseweb="tab"] {
+            border-radius: 11px;
+            min-height: 42px;
+            font-weight: 800;
+            color: #596174 !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            color: #4c3bc1 !important;
+            background: #efedff !important;
+            border: 1px solid #d7d1ff !important;
+        }
+        [data-testid="stTextInput"],
+        [data-testid="stTextArea"] {
+            margin-bottom: 2px;
+        }
+        [data-testid="stTextInput"] input {
+            border-radius: 12px;
+            border-color: #dfe3ea;
+            min-height: 44px;
+        }
+        .stButton > button[kind="primary"] {
+            min-height: 46px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #5b5ce2, #7b72ef) !important;
+            box-shadow: 0 9px 24px rgba(91,92,226,.20) !important;
+            font-weight: 850;
+        }
+        [data-testid="stCaptionContainer"] {
+            color: #667080 !important;
+        }
+        @media (max-width: 768px) {
+            .public-shell {
+                margin: 1.2rem auto 0;
+            }
+            .public-brand {
+                gap: 11px;
+                margin-bottom: 14px;
+            }
+            .public-logo {
+                width: 42px;
+                height: 42px;
+                flex-basis: 42px;
+                border-radius: 12px;
+            }
+            .public-brand-name {
+                font-size: 1.05rem;
+            }
+            .public-brand-caption {
+                font-size: .62rem;
+            }
+            .public-hero {
+                padding: 20px 18px;
+                border-radius: 18px;
+            }
+            .public-hero-title {
+                font-size: 1.62rem;
+            }
+            .public-hero-text {
+                font-size: .88rem;
+            }
+            button[data-baseweb="tab"] {
+                white-space: nowrap;
+                min-width: max-content;
+                padding: 9px 11px;
+                font-size: .78rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if saas_enabled():
-        ok,message=supabase_health()
+        ok, message = supabase_health()
         if not ok:
-            st.error("Не удалось связаться с сервером аккаунтов."); st.caption(message)
-    tab1,tab2,tab3=st.tabs(["Войти","Создать магазин","Восстановить пароль"])
+            st.error("Не удалось связаться с сервером аккаунтов.")
+            st.caption(message)
+
+    st.markdown(
+        '<div class="public-shell">'
+        '<div class="public-brand">'
+        '<div class="public-logo">AI</div>'
+        '<div><div class="public-brand-name">AI Agent Content Manager</div>'
+        '<div class="public-brand-caption">AI BUSINESS PLATFORM</div></div>'
+        '</div>'
+        '<div class="public-hero">'
+        '<div class="public-hero-kicker">ЕДИНЫЙ РАБОЧИЙ ЦЕНТР</div>'
+        '<div class="public-hero-title">Ваш магазин. Один рабочий центр.</div>'
+        '<div class="public-hero-text">Каталог, контент, заявки, заказы и AI-помощник MAX — в одном месте.</div>'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    tab1, tab2, tab3 = st.tabs(["Войти", "Создать магазин", "Восстановить пароль"])
     with tab1:
-        email=st.text_input("Email",key="saas_login_email")
-        password=st.text_input("Пароль",type="password",key="saas_login_password")
-        if st.button("Войти",type="primary",use_container_width=True,key="saas_login"):
-            if not email.strip() or not password: st.error("Введите email и пароль.")
+        email = st.text_input("Email", key="saas_login_email")
+        password = st.text_input("Пароль", type="password", key="saas_login_password")
+        if st.button("Войти", type="primary", use_container_width=True, key="saas_login"):
+            if not email.strip() or not password:
+                st.error("Введите email и пароль.")
             else:
                 try:
-                    with st.spinner("Проверяем аккаунт…"): result=sign_in(email.strip(),password)
-                    _establish_session(result); st.rerun()
-                except Exception as e: st.error(f"Не удалось войти: {e}")
+                    with st.spinner("Проверяем аккаунт…"):
+                        result = sign_in(email.strip(), password)
+                    _establish_session(result)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Не удалось войти: {e}")
+
     with tab2:
         st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
-        store=st.text_input("Название магазина",placeholder="Например, Demo Store",key="saas_signup_store")
-        email=st.text_input("Email владельца",placeholder="you@example.com",key="saas_signup_email")
-        password=st.text_input("Пароль",type="password",placeholder="Минимум 8 символов",key="saas_signup_password")
-        repeat=st.text_input("Повторите пароль",type="password",key="saas_signup_password2")
-        if st.button("Создать магазин и начать",type="primary",use_container_width=True,key="saas_signup"):
-            if len(password)<8: st.error("Пароль должен содержать минимум 8 символов.")
-            elif password!=repeat: st.error("Пароли не совпадают.")
-            elif "@" not in email or "." not in email.split("@")[-1]: st.error("Проверьте email.")
-            elif not store.strip(): st.error("Укажите название магазина.")
+        store = st.text_input("Название магазина", placeholder="Например, Demo Store", key="saas_signup_store")
+        email = st.text_input("Email владельца", placeholder="you@example.com", key="saas_signup_email")
+        password = st.text_input("Пароль", type="password", placeholder="Минимум 8 символов", key="saas_signup_password")
+        repeat = st.text_input("Повторите пароль", type="password", key="saas_signup_password2")
+        if st.button("Создать магазин и начать", type="primary", use_container_width=True, key="saas_signup"):
+            if len(password) < 8:
+                st.error("Пароль должен содержать минимум 8 символов.")
+            elif password != repeat:
+                st.error("Пароли не совпадают.")
+            elif "@" not in email or "." not in email.split("@")[-1]:
+                st.error("Проверьте email.")
+            elif not store.strip():
+                st.error("Укажите название магазина.")
             else:
                 try:
-                    with st.spinner("Создаём магазин…"): result=sign_up(email.strip(),password,store.strip())
-                    token=result.get("access_token")
-                    if not token: st.success("Аккаунт создан. Проверьте почту и подтвердите email. После подтверждения войдите — магазин и тариф Trial создаются автоматически.")
+                    with st.spinner("Создаём магазин…"):
+                        result = sign_up(email.strip(), password, store.strip())
+                    token = result.get("access_token")
+                    if not token:
+                        st.success("Аккаунт создан. Проверьте почту и подтвердите email. После подтверждения войдите — магазин и тариф Trial создаются автоматически.")
                     else:
-                        _establish_session(result); st.rerun()
-                except Exception as e: st.error(f"Не удалось создать магазин: {e}")
+                        _establish_session(result)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Не удалось создать магазин: {e}")
+
     with tab3:
-        email=st.text_input("Email для восстановления",key="saas_recovery_email")
+        email = st.text_input("Email для восстановления", key="saas_recovery_email")
         st.caption("На почту придёт ссылка для смены пароля.")
-        if st.button("Отправить ссылку",type="primary",use_container_width=True,key="saas_recovery"):
+        if st.button("Отправить ссылку", type="primary", use_container_width=True, key="saas_recovery"):
             try:
-                with st.spinner("Отправляем письмо…"): request_password_reset(email)
+                with st.spinner("Отправляем письмо…"):
+                    request_password_reset(email)
                 st.success("Если аккаунт существует, письмо для восстановления отправлено.")
-            except Exception as e: st.error(f"Не удалось отправить письмо: {e}")
+            except Exception as e:
+                st.error(f"Не удалось отправить письмо: {e}")
 
 def usage_snapshot():
     return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
