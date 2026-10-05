@@ -8,12 +8,6 @@ on:
   workflow_dispatch:
     inputs:
       live_smoke:
-        description: "Run authenticated production live smoke"
-        required: true
-        default: true
-        type: boolean
-    inputs:
-      live_smoke:
         description: "Run authenticated live browser/WebMCP/provider smoke"
         required: true
         default: true
@@ -38,6 +32,7 @@ jobs:
         run: pip install pip-audit && pip-audit -r requirements.txt --strict
 
   required-secrets:
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Require production live-smoke secrets
