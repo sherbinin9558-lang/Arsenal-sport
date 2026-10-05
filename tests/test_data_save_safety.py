@@ -220,7 +220,9 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn('CookieController(key="saas_auth_cookie")', source)
         self.assertIn("getAll()", source)
         self.assertIn("_AUTH_COOKIE_DAYS = 30", source)
-        self.assertIn("attempts < 3", source)
+        self.assertIn("_saas_cookie_probe_count", source)
+        self.assertIn("min(probe_count + 1, 2)", source)
+        self.assertIn("Восстанавливаем сессию", source)
 
 
 
