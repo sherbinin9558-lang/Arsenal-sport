@@ -892,6 +892,11 @@ button[aria-label*="Scroll tabs"],
 button[aria-label*="Прокрут"] {
     display: none !important;
 }
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+    visibility: hidden !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
