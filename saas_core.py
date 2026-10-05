@@ -863,18 +863,11 @@ def require_saas_access():
                 login_ui()
                 return False
 
-            # CookieController is a client-side component. On a hard browser
-            # reload its first Python execution can happen before the component
-            # has returned the existing cookie. Do not flash the login screen:
-            # wait for the component's automatic rerun once, then fall back to
-            # the real login screen if no cookie exists.
-            if (
-                not st.session_state.get("_saas_cookie_restore_failed")
-                and int(st.session_state.get("_saas_cookie_probe_count", 0) or 0) == 1
-            ):
-                st.info("Восстанавливаем сессию…")
-                st.stop()
-
+            # Never block the first render waiting for the client-side
+            # CookieController handshake. A stalled component can otherwise
+            # leave Streamlit on an endless loading screen. The request-cookie
+            # fast path in _read_refresh_token() handles normal authenticated
+            # reloads; when no token is available, show the login UI immediately.
             st.session_state.pop("_saas_cookie_probe_count", None)
             st.session_state.pop("_saas_cookie_restore_failed", None)
             login_ui()
