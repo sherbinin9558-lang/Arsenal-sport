@@ -87,6 +87,17 @@ def _read_refresh_token():
     record that first probe so the auth gate can wait for the component's
     automatic rerun instead of flashing the login screen.
     """
+    # Fast path: on a fresh browser request Streamlit already exposes the
+    # current request cookies. Use that before mounting the client-side
+    # CookieController component. This keeps the public/anonymous startup
+    # independent from a third-party component handshake.
+    try:
+        request_token = st.context.cookies.get(_AUTH_COOKIE)
+        if request_token:
+            return str(request_token)
+    except Exception:
+        pass
+
     probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
     st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 2)
 
