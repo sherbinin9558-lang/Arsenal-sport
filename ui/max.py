@@ -44,6 +44,7 @@ from free_automation import (
 from growth_engine import ai_summary, recommendations as growth_recommendations
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
+from max_operator import audit_event, build_business_snapshot, can_execute, plan_action
 from saas_core import (
     activate_paid_subscription,
     can,
@@ -156,6 +157,11 @@ def max_due_content(plan):
     return due, overdue
 
 
+def _max_audit(event):
+    st.session_state.setdefault("max_audit_log", []).insert(0, event)
+    st.session_state["max_audit_log"] = st.session_state["max_audit_log"][:50]
+
+
 @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
@@ -178,6 +184,76 @@ def render_max():
     cm = conversion_metrics(leads, orders)
 
     st.caption("MAX не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
+
+    # Safe AI-operator command center: read actions execute immediately;
+    # write actions require an explicit confirmation and are logged.
+    with st.container(border=True):
+        st.markdown("### MAX — AI-оператор")
+        command = st.text_input(
+            "Что нужно сделать?",
+            placeholder="Например: проанализируй продажи или создай контент-план на 7 дней",
+            key="max_operator_command",
+        )
+        if command:
+            operator_plan = plan_action(command)
+            if operator_plan.action == "unknown":
+                st.warning("Не удалось однозначно определить действие. Уточните команду.")
+            else:
+                st.info(operator_plan.label)
+                if operator_plan.requires_confirmation:
+                    st.caption("Это изменит данные магазина. Сначала проверьте действие, затем подтвердите.")
+                    approve = st.checkbox("Подтверждаю выполнение действия", key="max_operator_approve")
+                else:
+                    approve = False
+
+                if operator_plan.action == "create_7_day_plan":
+                    if can_execute(operator_plan, approve):
+                        if st.button("Выполнить безопасно", type="primary", key="max_operator_execute"):
+                            with st.spinner("MAX формирует план…"):
+                                generated = seven_day_plan(products)
+                                existing = load_plan()
+                                existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
+                                added = 0
+                                for item in generated:
+                                    key = (item.get("date"), item.get("product"), item.get("platform"), item.get("type"))
+                                    if key not in existing_keys:
+                                        existing.append(item)
+                                        added += 1
+                                save_plan(existing)
+                                event = audit_event("create_7_day_plan", "completed", details={"added": added})
+                                _max_audit(event)
+                                st.success(f"Готово. Добавлено элементов: {added}.")
+                                st.session_state["max_operator_approve"] = False
+                                st.session_state["max_data_snapshot"] = None
+                                st.rerun()
+                    elif operator_plan.requires_confirmation:
+                        st.warning("Для изменения данных сначала установите подтверждение.")
+                elif operator_plan.action == "low_stock":
+                    rows = low_stock_products(products)
+                    _max_audit(audit_event("low_stock", "completed", details={"count": len(rows)}))
+                    st.write(f"Товаров с низким остатком: **{len(rows)}**")
+                    for product, qty in rows[:10]:
+                        st.write(f"• {max_product_title(product)} — {qty} шт.")
+                elif operator_plan.action == "sales_summary":
+                    st.write(f"Заказов: **{om['total']}**, активных: **{om['active']}**, выручка: **{om['amount']:,.0f} ₽**".replace(",", " "))
+                    st.write(f"Заявок: **{crm.get('total', 0)}**, конверсия: **{cm['conversion']:.1f}%**")
+                    _max_audit(audit_event("sales_summary", "completed"))
+                elif operator_plan.action == "content_today":
+                    st.write(f"Публикаций на сегодня: **{len(due)}**, просрочено: **{len(overdue)}**")
+                    _max_audit(audit_event("content_today", "completed", details={"today": len(due), "overdue": len(overdue)}))
+                elif operator_plan.action == "store_status":
+                    snap_summary = build_business_snapshot(products, leads, orders, plan)
+                    st.json(snap_summary)
+                    _max_audit(audit_event("store_status", "completed", details=snap_summary))
+                elif operator_plan.action == "refresh_analysis":
+                    st.success("Анализ MAX обновлён по текущему снимку данных.")
+                    _max_audit(audit_event("refresh_analysis", "completed"))
+
+        audit_log = st.session_state.get("max_audit_log", [])
+        if audit_log:
+            with st.expander("Журнал действий MAX"):
+                for event in audit_log[:10]:
+                    st.caption(f"{event['timestamp']} · {event['action']} · {event['status']}")
 
     try:
         max_recs = growth_recommendations(products, leads, orders, plan)
