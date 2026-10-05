@@ -20,5 +20,5 @@ jobs:
         run: python -m py_compile max_operator.py ui/max.py webmcp_tools.py
       - name: Run MAX operator tests
         run: |
-          python -m pip install --disable-pip-version-check pytest
-          pytest -q tests/test_max_operator.py tests/test_webmcp_data.py tests/test_core_regression.py
+          python -m pip install --disable-pip-version-check -r requirements.txt pytest
+          PYTHONPATH=. pytest -q tests/test_max_operator.py tests/test_webmcp_data.py tests/test_core_regression.py
