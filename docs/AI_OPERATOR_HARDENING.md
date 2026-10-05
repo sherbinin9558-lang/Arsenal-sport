@@ -33,5 +33,12 @@ This branch is intentionally isolated from `main`.
 19. Positioning: sell the product as an AI operator, not as a list of modules.
 20. Evidence: collect real-user time saved, actions completed and business outcomes.
 
+## Verification status
+- Static branch inspection: completed.
+- Main isolation check: completed; branch remains ahead of main and has no main-side changes.
+- Automated GitHub workflow execution: not yet confirmed by the available workflow-run query.
+- Live deployed-branch/WebMCP smoke: not yet confirmed.
+- Payment integration: intentionally out of scope.
+
 ## Merge rule
 No changes from this branch should be merged to `main` until the complete regression checklist is green and the deployed branch is manually verified.
