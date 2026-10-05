@@ -660,66 +660,67 @@ def render_tenant_selector():
             st.error(f"Не удалось переключить магазин: {e}")
     return True
 
+def render_sidebar_overview():
+    """Compact operational snapshot for the top of the authenticated sidebar."""
+    try:
+        quick = usage_snapshot()
+        st.markdown(
+            '<div class="sidebar-quick-overview">'
+            '<div class="sidebar-quick-kicker">СЕГОДНЯ В МАГАЗИНЕ</div>'
+            '<div class="sidebar-quick-title">Оперативный обзор</div>'
+            '<div class="sidebar-quick-grid">'
+            f'<div><b>{quick.get("products", 0)}</b><span>товаров</span></div>'
+            f'<div><b>{quick.get("leads", 0)}</b><span>заявок</span></div>'
+            f'<div><b>{quick.get("orders", 0)}</b><span>заказов</span></div>'
+            f'<div><b>{quick.get("content", 0)}</b><span>контент</span></div>'
+            '</div>'
+            '<div class="sidebar-quick-note">MAX помогает найти следующий полезный шаг.</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+
 def render_account_bar():
-    with st.sidebar:
-        # Compact operational snapshot fills the upper sidebar area with
-        # information that is useful at a glance without duplicating the
-        # navigation or MAX controls.
+    """Render tenant/account controls at the bottom of the sidebar."""
+    st.markdown("---")
+    token=st.session_state.get("saas_access_token")
+    uid=st.session_state.get("saas_user_id")
+    if token and uid:
         try:
-            quick = usage_snapshot()
-            st.markdown(
-                '<div class="sidebar-quick-overview">'
-                '<div class="sidebar-quick-kicker">СЕГОДНЯ В МАГАЗИНЕ</div>'
-                '<div class="sidebar-quick-title">Оперативный обзор</div>'
-                '<div class="sidebar-quick-grid">'
-                f'<div><b>{quick.get("products", 0)}</b><span>товаров</span></div>'
-                f'<div><b>{quick.get("leads", 0)}</b><span>заявок</span></div>'
-                f'<div><b>{quick.get("orders", 0)}</b><span>заказов</span></div>'
-                f'<div><b>{quick.get("content", 0)}</b><span>контент</span></div>'
-                '</div>'
-                '<div class="sidebar-quick-note">MAX помогает найти следующий полезный шаг.</div>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-        except Exception:
-            pass
-        st.markdown("---")
+            tenants=user_tenants(token,uid)
+            if len(tenants)>1:
+                labels=[f"{t.get('name','Магазин')} · {str(t.get('slug') or t.get('id',''))[:24]}" for t in tenants]
+                current=str(st.session_state.get("saas_tenant_id") or "")
+                idx=next((i for i,t in enumerate(tenants) if str(t.get("id"))==current),0)
+                choice=st.selectbox("Магазин",labels,index=idx,key="saas_account_tenant_picker")
+                if st.button("Переключить магазин",use_container_width=True,key="saas_account_tenant_switch"):
+                    try:
+                        selected=tenants[labels.index(choice)]
+                        switch_tenant(selected)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Не удалось переключить магазин: {e}")
+        except Exception as e:
+            st.caption(f"Не удалось загрузить список магазинов: {e}")
+    st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
+    plan=str(st.session_state.get('saas_plan','trial')).lower(); st.caption(f"Тариф · {plan.upper()}"); st.caption(f"Роль · {current_role().upper()}")
+    if plan in PLAN_LIMITS:
+        u=usage_snapshot(); max_products=PLAN_LIMITS[plan]["products"]; st.progress(min(1.0,u["products"]/max_products),text=f"Каталог · {u['products']} / {max_products}")
+    if saas_enabled():
+        try:
+            for inv in my_invitations():
+                st.info(f"Приглашение: роль «{inv.get('role')}»")
+                if st.button("Принять приглашение",key=f"accept_inv_{inv.get('id')}",use_container_width=True):
+                    accept_invitation(inv.get("id")); st.success("Приглашение принято."); st.rerun()
+        except Exception: pass
+    if st.button("Выйти",key="saas_logout",use_container_width=True):
         token=st.session_state.get("saas_access_token")
-        uid=st.session_state.get("saas_user_id")
-        if token and uid:
-            try:
-                tenants=user_tenants(token,uid)
-                if len(tenants)>1:
-                    labels=[f"{t.get('name','Магазин')} · {str(t.get('slug') or t.get('id',''))[:24]}" for t in tenants]
-                    current=str(st.session_state.get("saas_tenant_id") or "")
-                    idx=next((i for i,t in enumerate(tenants) if str(t.get("id"))==current),0)
-                    choice=st.selectbox("Магазин",labels,index=idx,key="saas_account_tenant_picker")
-                    if st.button("Переключить магазин",use_container_width=True,key="saas_account_tenant_switch"):
-                        try:
-                            selected=tenants[labels.index(choice)]
-                            switch_tenant(selected)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Не удалось переключить магазин: {e}")
-            except Exception as e:
-                st.caption(f"Не удалось загрузить список магазинов: {e}")
-        st.caption(f"Магазин · {st.session_state.get('saas_tenant_name','')}")
-        plan=str(st.session_state.get('saas_plan','trial')).lower(); st.caption(f"Тариф · {plan.upper()}"); st.caption(f"Роль · {current_role().upper()}")
-        if plan in PLAN_LIMITS:
-            u=usage_snapshot(); max_products=PLAN_LIMITS[plan]["products"]; st.progress(min(1.0,u["products"]/max_products),text=f"Каталог · {u['products']} / {max_products}")
-        if saas_enabled():
-            try:
-                for inv in my_invitations():
-                    st.info(f"Приглашение: роль «{inv.get('role')}»")
-                    if st.button("Принять приглашение",key=f"accept_inv_{inv.get('id')}",use_container_width=True):
-                        accept_invitation(inv.get("id")); st.success("Приглашение принято."); st.rerun()
-            except Exception: pass
-        if st.button("Выйти",key="saas_logout",use_container_width=True):
-            token=st.session_state.get("saas_access_token")
-            if token: sign_out(token)
-            for k in list(st.session_state):
-                if k.startswith("saas_"): del st.session_state[k]
-            st.rerun()
+        if token: sign_out(token)
+        for k in list(st.session_state):
+            if k.startswith("saas_"): del st.session_state[k]
+        st.rerun()
 
 def plan_catalog():
     return {"starter":{"name":"STARTER","products":7000,"users":3,"description":"Для небольшого магазина"},"pro":{"name":"PRO","products":7000,"users":10,"description":"Для растущего бизнеса"},"business":{"name":"BUSINESS","products":100000,"users":50,"description":"Для сети и большого каталога"}}
@@ -873,7 +874,6 @@ def require_saas_access():
                 st.session_state["saas_demo"]=True
                 demo={"id":"demo-user","email":"demo@example.com","tenant_id":"demo-tenant","tenant_name":"Demo Store","plan":"pro","status":"active"}
                 _set_identity(demo,{"id":"demo-tenant","name":"Demo Store","plan":"pro","status":"active"})
-            render_account_bar()
             return True
         st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">PRODUCTION SETUP</div><div class="dashboard-hero-title">Подключите Supabase, чтобы открыть платформу.</div><div class="dashboard-hero-text">Для коммерческого режима нужны SUPABASE_URL и SUPABASE_ANON_KEY. После подключения пользователи смогут регистрировать магазины, входить по паролю и работать изолированно по tenant.</div></div>',unsafe_allow_html=True)
         st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit.")
@@ -944,7 +944,6 @@ def require_saas_access():
         render_onboarding()
         return False
 
-    render_account_bar()
     return True
 
 def tenant_id(): return st.session_state.get("saas_tenant_id","demo-tenant")
