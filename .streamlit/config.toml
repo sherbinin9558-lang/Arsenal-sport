@@ -1,6 +1,9 @@
 [client]
 showSidebarNavigation = false
-toolbarMode = "minimal"
+toolbarMode = "viewer"
+
+[ui]
+hideTopBar = true
 
 [server]
 maxUploadSize = 200
