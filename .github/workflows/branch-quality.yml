@@ -17,8 +17,8 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile changed Python modules
-        run: python -m py_compile max_operator.py ui/max.py
+        run: python -m py_compile max_operator.py ui/max.py webmcp_tools.py
       - name: Run MAX operator tests
         run: |
           python -m pip install --disable-pip-version-check pytest
-          pytest -q tests/test_max_operator.py
+          pytest -q tests/test_max_operator.py tests/test_webmcp_data.py
