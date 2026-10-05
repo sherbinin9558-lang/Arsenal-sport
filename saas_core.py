@@ -1,6 +1,7 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
 import hashlib, json, os, re, time
+from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
@@ -216,10 +217,10 @@ def _restore_session_from_cookie():
             st.session_state["_saas_cookie_restore_failed"] = True
             st.session_state.pop("_saas_cookie_probe_count", None)
             return False
-        st.session_state["saas_auth_error"] = str(e)
+        st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
     except Exception as e:
-        st.session_state["saas_auth_error"] = str(e)
+        st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
 
 def _restore_session_from_access_token():
@@ -274,8 +275,87 @@ def sign_up(email,password,store_name):
     payload={"email":email,"password":password,"data":{"store_name":store_name},"redirect_to":_public_app_url()}
     return _request("POST","/auth/v1/signup",json=payload)
 
+_AUTH_ATTEMPT_WINDOW = 15 * 60
+_AUTH_ATTEMPT_LIMIT = 5
+_AUTH_ATTEMPTS_KEY = "_saas_auth_attempts"
+
+# Process-wide guard complements Supabase Auth rate limits. Streamlit session
+# state alone is not sufficient because an attacker can create fresh sessions.
+# Keys are hashed and never logged or stored in plaintext.
+_AUTH_GLOBAL_ATTEMPTS = defaultdict(deque)
+_AUTH_GLOBAL_LIMIT = 10
+_AUTH_GLOBAL_WINDOW = 15 * 60
+
+def _client_fingerprint():
+    try:
+        headers = st.context.headers
+        forwarded = str(headers.get("X-Forwarded-For", "") or "").split(",")[0].strip()
+        real_ip = str(headers.get("X-Real-IP", "") or "").strip()
+        return forwarded or real_ip or "unknown"
+    except Exception:
+        return "unknown"
+
+def _rate_limit_key(email):
+    raw = f"{_auth_attempt_key(email)}|{_client_fingerprint()}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+def _check_global_auth_attempt_limit(email):
+    now = time.time()
+    key = _rate_limit_key(email)
+    recent = _AUTH_GLOBAL_ATTEMPTS[key]
+    while recent and now - float(recent[0]) >= _AUTH_GLOBAL_WINDOW:
+        recent.popleft()
+    if len(recent) >= _AUTH_GLOBAL_LIMIT:
+        raise SupabaseRequestError("Слишком много попыток входа. Повторите позже.", 429)
+    recent.append(now)
+
+
+
+def _auth_attempt_key(email):
+    return str(email or "").strip().lower()
+
+
+def _check_auth_attempt_limit(email):
+    now = time.time()
+    key = _auth_attempt_key(email)
+    attempts = dict(st.session_state.get(_AUTH_ATTEMPTS_KEY, {}))
+    recent = [stamp for stamp in attempts.get(key, []) if now - float(stamp) < _AUTH_ATTEMPT_WINDOW]
+    if len(recent) >= _AUTH_ATTEMPT_LIMIT:
+        raise SupabaseRequestError("Слишком много попыток входа. Повторите позже.", 429)
+    recent.append(now)
+    attempts[key] = recent
+    st.session_state[_AUTH_ATTEMPTS_KEY] = attempts
+
+
+def _clear_auth_attempts(email):
+    attempts = dict(st.session_state.get(_AUTH_ATTEMPTS_KEY, {}))
+    attempts.pop(_auth_attempt_key(email), None)
+    st.session_state[_AUTH_ATTEMPTS_KEY] = attempts
+
+
+def _safe_auth_error(exc):
+    if isinstance(exc, SupabaseRequestError) and exc.status_code in (400, 401, 403, 422):
+        return "Не удалось выполнить вход. Проверьте email и пароль."
+    if isinstance(exc, SupabaseRequestError) and exc.status_code == 429:
+        return "Слишком много попыток входа. Повторите позже."
+    return "Не удалось восстановить сессию. Повторите попытку позже."
+
+
 def sign_in(email,password):
-    return _request("POST","/auth/v1/token?grant_type=password",json={"email":email,"password":password})
+    _check_auth_attempt_limit(email)
+    _check_global_auth_attempt_limit(email)
+    try:
+        result = _request("POST","/auth/v1/token?grant_type=password",json={"email":email,"password":password})
+    except SupabaseRequestError:
+        raise
+    else:
+        _clear_auth_attempts(email)
+        try:
+            from observability import security_event
+            security_event("login_success", identity=hashlib.sha256(_auth_attempt_key(email).encode("utf-8")).hexdigest()[:16])
+        except Exception:
+            pass
+        return result
 
 def get_user(token): return _request("GET","/auth/v1/user",token=token)
 
@@ -283,6 +363,11 @@ def sign_out(token):
     try: _request("POST","/auth/v1/logout",token=token)
     except Exception: pass
     _clear_refresh_token()
+    try:
+        from observability import security_event
+        security_event("logout", user_id=st.session_state.get("saas_user_id"))
+    except Exception:
+        pass
 
 def request_password_reset(email):
     email=str(email or "").strip().lower()
@@ -584,6 +669,7 @@ def login_ui():
     with tab1:
         email = st.text_input("Email", key="saas_login_email")
         password = st.text_input("Пароль", type="password", key="saas_login_password")
+        st.caption("Сессия входа сохраняется в браузере до 30 дней. Если не заходить в платформу дольше этого срока, потребуется войти снова.")
         if st.button("Войти", type="primary", use_container_width=True, key="saas_login"):
             if not email.strip() or not password:
                 st.error("Введите email и пароль.")
@@ -636,7 +722,75 @@ def login_ui():
                 st.error(f"Не удалось отправить письмо: {e}")
 
 def usage_snapshot():
-    return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
+    if not saas_enabled():
+        return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
+    try:
+        return {
+            "products": data_count("products"),
+            "leads": data_count("leads"),
+            "orders": data_count("orders"),
+            "content": data_count("content_plan"),
+        }
+    except Exception:
+        return {"products":0,"leads":0,"orders":0,"content":0}
+
+
+def dashboard_snapshot():
+    """Return bounded dashboard metrics via an RLS-aware DB aggregation."""
+    if not saas_enabled():
+        products = data_load("products", [])
+        leads = data_load("leads", [])
+        orders = data_load("orders", [])
+        plan = data_load("content_plan", [])
+        low = []
+        for product in products:
+            try:
+                qty = float(product.get("stock", 0) or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty <= 2:
+                low.append((product, qty))
+        low.sort(key=lambda item: (item[1], str(item[0].get("name", ""))))
+        return {
+            "products": {"total": len(products), "low_stock": len(low)},
+            "leads": {"total": len(leads)},
+            "orders": {
+                "total": len(orders),
+                "active": sum(o.get("status") in {"Новая","Связались","Ожидает оплаты","Оплачен","Собирается","Отправлен"} for o in orders),
+                "completed": sum(o.get("status") == "Завершён" for o in orders),
+                "cancelled": sum(o.get("status") == "Отменён" for o in orders),
+                "amount": sum(float(str(o.get("amount",0) or 0).replace(" ","").replace("₽","").replace(",",".")) for o in orders if o.get("status") != "Отменён"),
+            },
+            "content": {
+                "total": len(plan),
+                "review": sum(o.get("status") == "На проверке" for o in plan),
+                "overdue": sum(
+                    o.get("status") != "Опубликовано" and str(o.get("date","")) < __import__("datetime").date.today().isoformat()
+                    for o in plan if o.get("date")
+                ),
+                "due_today": sum(
+                    o.get("status") != "Опубликовано" and str(o.get("date","")) == __import__("datetime").date.today().isoformat()
+                    for o in plan if o.get("date")
+                ),
+            },
+            "low_stock_products": [[p, qty] for p, qty in low[:8]],
+        }
+    token = st.session_state.get("saas_access_token")
+    if not token:
+        raise RuntimeError("Нужна авторизация для dashboard aggregation.")
+    raw = _request(
+        "POST",
+        "/rest/v1/rpc/app_data_dashboard_summary",
+        token=token,
+        json={},
+    )
+    return raw or {
+        "products": {"total": 0, "low_stock": 0},
+        "leads": {"total": 0},
+        "orders": {"total": 0, "active": 0, "completed": 0, "cancelled": 0, "amount": 0},
+        "content": {"total": 0, "review": 0, "overdue": 0, "due_today": 0},
+        "low_stock_products": [],
+    }
 
 def render_tenant_selector():
     token=st.session_state.get("saas_access_token")
@@ -1036,6 +1190,170 @@ def data_load(entity,default):
 
     st.session_state[_data_session_key(entity)] = baseline
     return loaded
+
+
+def export_current_tenant_data():
+    """Build a JSON export containing only the authenticated tenant's data."""
+    if not saas_enabled():
+        raise RuntimeError("Экспорт доступен в production-режиме после подключения Supabase.")
+    token = st.session_state.get("saas_access_token")
+    uid = st.session_state.get("saas_user_id")
+    tid = tenant_id()
+    if not token or not uid or not tid:
+        raise PermissionError("Нужна авторизация.")
+    verified = current_tenant(token, uid, tid)
+    if not verified:
+        raise PermissionError("Нет доступа к выбранному магазину.")
+
+    tenant_rows = _rest_get(
+        "/rest/v1/tenants",
+        token,
+        params={"select":"id,name,slug,plan,status,created_at", "id":f"eq.{tid}", "limit":"1"},
+    )
+    membership_rows = _rest_get(
+        "/rest/v1/memberships",
+        token,
+        params={"select":"user_id,role,created_at", "tenant_id":f"eq.{tid}"},
+    )
+    subscription_rows = _rest_get(
+        "/rest/v1/subscriptions",
+        token,
+        params={"select":"plan,status,provider,current_period_end,auto_renew,cancel_at_period_end", "tenant_id":f"eq.{tid}", "limit":"1"},
+    )
+    app_rows = _rest_get(
+        "/rest/v1/app_data",
+        token,
+        params={"select":"record_id,entity,payload,created_at,updated_at", "tenant_id":f"eq.{tid}", "order":"entity.asc,created_at.asc"},
+    )
+    return {
+        "export_version": 1,
+        "exported_at": _utc_now_iso(),
+        "user": {"id": str(uid), "email": str(st.session_state.get("saas_email") or "")},
+        "tenant": tenant_rows[0] if tenant_rows else verified,
+        "memberships": membership_rows,
+        "subscription": subscription_rows[0] if subscription_rows else None,
+        "app_data": app_rows,
+    }
+
+
+def request_account_deletion(note=""):
+    """Create a tenant-owner deletion request; actual deletion is operator-controlled."""
+    if not saas_enabled():
+        raise RuntimeError("Удаление доступно в production-режиме после подключения Supabase.")
+    token = st.session_state.get("saas_access_token")
+    uid = st.session_state.get("saas_user_id")
+    tid = tenant_id()
+    if not token or not uid or not tid:
+        raise PermissionError("Нужна авторизация.")
+    if current_role(token) != "owner":
+        raise PermissionError("Только владелец магазина может запросить удаление.")
+    existing = _rest_get(
+        "/rest/v1/account_deletion_requests",
+        token,
+        params={"select":"id,status,requested_at", "tenant_id":f"eq.{tid}", "user_id":f"eq.{uid}", "status":"in.(requested,approved,processing)", "order":"requested_at.desc", "limit":"1"},
+    )
+    if existing:
+        return existing[0]
+    return _rest_post(
+        "/rest/v1/account_deletion_requests",
+        token,
+        {
+            "user_id": uid,
+            "tenant_id": tid,
+            "status": "requested",
+            "note": str(note or "").strip()[:1000],
+        },
+    )
+
+def data_count(entity, filters=None):
+    """Return a tenant-scoped row count without loading payloads into Python."""
+    entity = _validate_data_entity(entity)
+    filters = dict(filters or {})
+    if not saas_enabled():
+        rows = data_load(entity, [])
+        return len(rows)
+    token = st.session_state.get("saas_access_token")
+    params = {"select": "record_id", "tenant_id": f"eq.{tenant_id()}", "entity": f"eq.{entity}", "limit": "1"}
+    for key, value in filters.items():
+        if value not in (None, ""):
+            params[str(key)] = str(value)
+    _, total = _rest_get_paged("/rest/v1/app_data", token, params=params)
+    return int(total or 0)
+
+
+def data_group_count(entity, field):
+    """Run an RLS-aware database aggregation instead of loading payload rows."""
+    entity = _validate_data_entity(entity)
+    field = str(field or "").strip()
+    if not field or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", field):
+        raise ValueError("Недопустимое поле агрегации.")
+    if not saas_enabled():
+        counts = {}
+        for row in data_load(entity, []):
+            value = str(row.get(field) or "")
+            counts[value] = counts.get(value, 0) + 1
+        return [{"value": k, "count": v} for k, v in sorted(counts.items(), key=lambda item: (-item[1], item[0]))]
+    token = st.session_state.get("saas_access_token")
+    return _request("POST", "/rest/v1/rpc/app_data_group_count", token=token, json={"p_entity": entity, "p_field": field})
+
+
+def data_load_keyset(entity, page_size=50, cursor=None, search="", category="Все"):
+    """Load the next tenant-scoped page using a stable keyset cursor.
+
+    The cursor is the last (created_at, record_id) pair from the previous page.
+    This avoids OFFSET scans as the catalog grows.
+    """
+    entity = _validate_data_entity(entity)
+    page_size = max(10, min(100, int(page_size or 50)))
+    search = str(search or "").strip()
+    category = str(category or "Все").strip()
+    if not saas_enabled():
+        rows = data_load(entity, [])
+        q = search.lower()
+        if q:
+            rows = [r for r in rows if q in " ".join(str(r.get(k, "")) for k in ("name", "brand", "article")).lower()]
+        if category and category != "Все":
+            rows = [r for r in rows if r.get("category", "Другое") == category]
+        start = 0
+        if cursor:
+            start = int(cursor.get("offset", 0) or 0)
+        chunk = rows[start:start + page_size]
+        return {"rows": chunk, "next_cursor": {"offset": start + len(chunk)} if len(chunk) == page_size else None}
+
+    token = st.session_state.get("saas_access_token")
+    params = {
+        "select": "record_id,payload,created_at,updated_at",
+        "tenant_id": f"eq.{tenant_id()}",
+        "entity": f"eq.{entity}",
+        "order": "created_at.desc,record_id.desc",
+        "limit": str(page_size),
+    }
+    search_or = None
+    if search:
+        q = re.sub(r"[*(),]", " ", search).strip()
+        if q:
+            search_or = f"or(payload->>name.ilike.*{q}*,payload->>brand.ilike.*{q}*,payload->>article.ilike.*{q}*)"
+    if category and category != "Все":
+        params["payload->>category"] = f"eq.{category}"
+    cursor_or = None
+    if cursor:
+        created_at = str(cursor.get("created_at") or "").strip()
+        record_id = str(cursor.get("record_id") or "").strip()
+        if created_at and record_id:
+            cursor_or = f"or(created_at.lt.{created_at},and(created_at.eq.{created_at},record_id.lt.{record_id}))"
+    if search_or and cursor_or:
+        params["and"] = f"({search_or},{cursor_or})"
+    elif search_or:
+        params["or"] = search_or
+    elif cursor_or:
+        params["or"] = cursor_or
+    rows = _rest_get("/rest/v1/app_data", token, params=params)
+    prepared = [_prepare_loaded_payload(row) for row in rows]
+    next_cursor = None
+    if len(rows) == page_size:
+        last = rows[-1]
+        next_cursor = {"created_at": last.get("created_at"), "record_id": str(last.get("record_id"))}
+    return {"rows": prepared, "next_cursor": next_cursor}
 
 
 def data_load_page(entity, page=1, page_size=50, search="", category="Все"):

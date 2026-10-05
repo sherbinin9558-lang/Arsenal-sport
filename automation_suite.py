@@ -4,33 +4,42 @@ from datetime import date, timedelta
 from pathlib import Path
 from saas_core import tenant_id
 from inventory_core import stock_info as _stock_info
+from asset_store import save_asset_bytes
 
 ASSET_ROOT = Path("tenant_assets")
 
+
 def tenant_asset_dir() -> Path:
-    # Never share uploaded media between tenants.
+    # Legacy helper kept for demo tooling; production uploads do not use local disk.
     return ASSET_ROOT / str(tenant_id())
+
 
 def image_dir() -> Path:
     return tenant_asset_dir() / "product_images"
 
+
 def card_dir() -> Path:
     return tenant_asset_dir() / "generated_cards"
+
 
 def safe_slug(value):
     value = re.sub(r"[^a-zA-Zа-яА-ЯёЁ0-9_-]+", "_", str(value or "").strip())
     return value.strip("_")[:100] or "product"
 
+
 def product_key(product, index=0):
     article = str(product.get("article", "")).strip()
     return article or safe_slug(f"{product.get('brand','')}_{product.get('name','')}") or f"product_{index+1}"
+
 
 def ensure_dirs():
     image_dir().mkdir(parents=True, exist_ok=True)
     card_dir().mkdir(parents=True, exist_ok=True)
 
+
 def stock_info(product):
     return _stock_info(product)
+
 
 def low_stock_products(products, threshold=2):
     result = []
@@ -39,6 +48,7 @@ def low_stock_products(products, threshold=2):
         if known and qty is not None and qty <= threshold:
             result.append((p, qty))
     return result
+
 
 def content_for_product(product):
     name = str(product.get("name", "товар")).strip()
@@ -56,8 +66,10 @@ def content_for_product(product):
         "Stories": f"1. {title}\n2. Покажите деталь товара\n3. Опрос: «Как вам вариант?»\n4. CTA: «Напишите Arsenal Sport».",
     }
 
+
 def make_30_day_plan(products, start=None):
-    if not products: return []
+    if not products:
+        return []
     start = start or date.today()
     types = ["Пост", "Reels", "Stories", "Карусель", "Пост", "Reels", "Stories"]
     platforms = ["Instagram", "Telegram", "VK", "Instagram", "Telegram", "VK", "Instagram"]
@@ -73,6 +85,7 @@ def make_30_day_plan(products, start=None):
         })
     return result
 
+
 def bulk_update(products, indexes, field, value):
     changed = 0
     for i in indexes:
@@ -80,6 +93,7 @@ def bulk_update(products, indexes, field, value):
             products[i][field] = value
             changed += 1
     return changed
+
 
 def analytics(products, leads, orders, plan):
     by_category, by_source, by_product = {}, {}, {}
@@ -100,11 +114,21 @@ def analytics(products, leads, orders, plan):
         "top_products": sorted(by_product.items(), key=lambda x: -x[1])[:10],
     }
 
+
 def save_uploaded_photo(uploaded_file, product, index=0):
-    ensure_dirs()
     ext = Path(uploaded_file.name or "").suffix.lower()
     if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
         raise ValueError("Поддерживаются только JPG, JPEG, PNG и WEBP.")
-    path = image_dir() / f"{safe_slug(product_key(product,index))}{ext}"
-    path.write_bytes(uploaded_file.getvalue())
-    return str(path)
+    name = f"{safe_slug(product_key(product, index))}{ext}"
+    content_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }
+    return save_asset_bytes(
+        f"products/{name}",
+        uploaded_file.getvalue(),
+        content_types[ext],
+        local_path=image_dir() / name,
+    )

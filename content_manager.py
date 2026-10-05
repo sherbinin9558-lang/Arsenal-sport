@@ -9,12 +9,12 @@ PLATFORM_ORDER = ["Instagram", "Telegram", "VK"]
 def content_identity(item):
     record_id = str(item.get("_saas_record_id") or "").strip()
     if record_id:
-        return "cnt-" + hashlib.sha1(record_id.encode("utf-8")).hexdigest()[:12]
+        return "cnt-" + hashlib.sha256(record_id.encode("utf-8")).hexdigest()[:12]
     existing_id = str(item.get("content_id") or "").strip()
     if existing_id:
         return existing_id
     raw = "|".join(str(item.get(k, "")) for k in ("date", "platform", "product", "type", "idea"))
-    return "cnt-" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+    return "cnt-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
 def ensure_workflow(item):
     item = dict(item or {})

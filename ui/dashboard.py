@@ -1,6 +1,7 @@
 """Dashboard UI. Keeps dashboard rendering outside the application entrypoint."""
 import datetime
 import streamlit as st
+from saas_core import saas_enabled, data_load_keyset
 
 def _apply_client_first_layout():
     """Tighten global layout without changing application behavior."""
@@ -99,48 +100,99 @@ def _apply_client_first_layout():
 def render_dashboard(
     *,
     load_products, load_plan, load_leads, load_orders,
-    crm_metrics, order_metrics, conversion_metrics, workflow_metrics,
+    dashboard_snapshot=None, crm_metrics=None, order_metrics=None, conversion_metrics=None, workflow_metrics=None,
     low_stock_products, growth_recommendations, max_product_title,
     attribution_loader, attribution_metrics, add_product, add_plan,
     categories, can_write,
 ):
     _apply_client_first_layout()
-    # Reuse the dashboard snapshot only until a successful write invalidates it.
-    # This keeps the dashboard fast without showing stale data after edits.
-    revision = st.session_state.get("_app_data_revision", 0)
-    if (
-        "max_data_snapshot" not in st.session_state
-        or st.session_state.get("_max_data_snapshot_revision") != revision
-    ):
-        st.session_state["max_data_snapshot"] = {
-            "products": load_products(),
-            "plan": load_plan(),
-            "leads": load_leads(),
-            "orders": load_orders(),
-        }
-        st.session_state["_max_data_snapshot_revision"] = revision
-    snap = st.session_state["max_data_snapshot"]
-    products = snap["products"]
-    plan = snap["plan"]
-    leads = snap["leads"]
-    orders = snap["orders"]
-    crm = crm_metrics(leads)
-    om = order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"})
-    cm = conversion_metrics(leads, orders)
-    wm = workflow_metrics(plan)
-    low = low_stock_products(products)
-    due, overdue = [], []
-    today = datetime.date.today()
-    for item in plan:
-        try:
-            item_date = datetime.date.fromisoformat(str(item.get("date", "")))
-            if item.get("status") != "Опубликовано":
-                (overdue if item_date < today else due if item_date == today else []).append(item)
-        except Exception:
-            pass
-    
+    # Production SaaS uses bounded DB aggregates instead of materializing the
+    # tenant's entire catalog/CRM/order/content datasets in Python.
+    if saas_enabled() and dashboard_snapshot:
+        summary = dashboard_snapshot()
+        p_summary = summary.get("products", {}) or {}
+        l_summary = summary.get("leads", {}) or {}
+        o_summary = summary.get("orders", {}) or {}
+        c_summary = summary.get("content", {}) or {}
+        products = data_load_keyset("products", page_size=100).get("rows", [])
+        plan = data_load_keyset("content_plan", page_size=100).get("rows", [])
+        leads = data_load_keyset("leads", page_size=100).get("rows", [])
+        orders = data_load_keyset("orders", page_size=100).get("rows", [])
+        products_total = int(p_summary.get("total", 0) or 0)
+        crm = dict(crm_metrics(leads) or {})
+        crm["total"] = int(l_summary.get("total", 0) or 0)
+        om = dict(order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"}) or {})
+        om.update({
+            "total": int(o_summary.get("total", 0) or 0),
+            "active": int(o_summary.get("active", 0) or 0),
+            "completed": int(o_summary.get("completed", 0) or 0),
+            "cancelled": int(o_summary.get("cancelled", 0) or 0),
+            "amount": float(o_summary.get("amount", 0) or 0),
+        })
+        cm = conversion_metrics(leads, orders)
+        wm = workflow_metrics(plan)
+        low = []
+        for row in summary.get("low_stock_products", []) or []:
+            low.append((row, row.get("stock", 0)))
+        due, overdue = [], []
+        # The aggregate is authoritative for counts; bounded rows are used only
+        # for optional examples/details shown in the dashboard.
+        today = datetime.date.today()
+        for item in plan:
+            try:
+                item_date = datetime.date.fromisoformat(str(item.get("date", "")))
+                if item.get("status") != "Опубликовано":
+                    if item_date < today:
+                        overdue.append(item)
+                    elif item_date == today:
+                        due.append(item)
+            except Exception:
+                pass
+        wm["total"] = int(c_summary.get("total", 0) or 0)
+        wm["overdue"] = int(c_summary.get("overdue", 0) or 0)
+        wm.setdefault("counts", {})["На проверке"] = int(c_summary.get("review", 0) or 0)
+        low_count = int(p_summary.get("low_stock", 0) or 0)
+        due_count = int(c_summary.get("due_today", 0) or 0)
+        overdue_count = int(c_summary.get("overdue", 0) or 0)
+    else:
+        revision = st.session_state.get("_app_data_revision", 0)
+        if (
+            "max_data_snapshot" not in st.session_state
+            or st.session_state.get("_max_data_snapshot_revision") != revision
+        ):
+            st.session_state["max_data_snapshot"] = {
+                "products": load_products(),
+                "plan": load_plan(),
+                "leads": load_leads(),
+                "orders": load_orders(),
+            }
+            st.session_state["_max_data_snapshot_revision"] = revision
+        snap = st.session_state["max_data_snapshot"]
+        products = snap["products"]
+        plan = snap["plan"]
+        leads = snap["leads"]
+        orders = snap["orders"]
+        products_total = len(products)
+        crm = crm_metrics(leads)
+        om = order_metrics(orders, {"Новая", "Связались", "Ожидает оплаты", "Оплачен", "Собирается", "Отправлен"})
+        cm = conversion_metrics(leads, orders)
+        wm = workflow_metrics(plan)
+        low = low_stock_products(products)
+        low_count = len(low)
+        due, overdue = [], []
+        due_count = len(due)
+        overdue_count = len(overdue)
+        today = datetime.date.today()
+        for item in plan:
+            try:
+                item_date = datetime.date.fromisoformat(str(item.get("date", "")))
+                if item.get("status") != "Опубликовано":
+                    (overdue if item_date < today else due if item_date == today else []).append(item)
+            except Exception:
+                pass
+
     store_name = st.session_state.get("saas_tenant_name", "Ваш магазин")
-    first_run = len(products) == 0 and len(leads) == 0 and len(orders) == 0
+    first_run = products_total == 0 and int(crm.get("total", 0) or 0) == 0 and int(om.get("total", 0) or 0) == 0
     try:
         ai_next = growth_recommendations(products, leads, orders, plan)
     except Exception:
@@ -216,7 +268,7 @@ def render_dashboard(
         d2.metric("Заявки", crm.get("total", 0))
         d3.metric("Заказы", om.get("total", 0))
         d4.metric("Конверсия", f'{cm["conversion"]:.1f}%')
-        d5.metric("Товаров", len(products))
+        d5.metric("Товаров", products_total)
     
         q1, q2, q3 = st.columns(3)
         with q1:
@@ -227,11 +279,11 @@ def render_dashboard(
                 st.write("MAX пока собирает данные.")
         with q2:
             st.markdown("### Сегодня")
-            st.write(f"Контент: **{len(due)}** · Просрочено: **{len(overdue)}**")
+            st.write(f"Контент: **{due_count}** · Просрочено: **{overdue_count}**")
             st.write(f"Активные заказы: **{om['active']}**")
         with q3:
             st.markdown("### Состояние")
-            st.write(f"Каталог: **{len(products)}** товаров")
+            st.write(f"Каталог: **{products_total}** товаров")
             st.write(f"Заявки: **{crm.get('total',0)}** · Заказы: **{om.get('total',0)}**")
     
     st.markdown("---")
@@ -243,17 +295,17 @@ def render_dashboard(
         c2.metric("На проверке", wm.get("counts", {}).get("На проверке", 0))
         c3.metric("Просрочено", wm.get("overdue", 0))
         if overdue:
-            st.warning(f"Просроченных публикаций: {len(overdue)}")
+            st.warning(f"Просроченных публикаций: {overdue_count}")
         if due:
-            st.info(f"На сегодня запланировано: {len(due)}")
+            st.info(f"На сегодня запланировано: {due_count}")
         if not overdue and not due:
             st.success("Срочных контент-задач нет.")
     
     with right:
         st.markdown("### Склад")
         s1, s2 = st.columns(2)
-        s1.metric("Позиций в каталоге", len(products))
-        s2.metric("Низкий остаток", len(low))
+        s1.metric("Позиций в каталоге", products_total)
+        s2.metric("Низкий остаток", low_count)
         if low:
             for product, qty in low[:8]:
                 st.write(f'• {max_product_title(product)} — {qty} шт.')

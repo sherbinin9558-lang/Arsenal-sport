@@ -2,10 +2,20 @@ name: P2/P3 quality gate
 
 on:
   push:
-    branches: ["main", "feat/p2-p3-hardening-20261004", "full-audit-repair-20261004", "production-readiness-20261004", "ai-operator-hardening-20261005", "integration/final-20261005"]
+    branches: ["main", "feat/p2-p3-hardening-20261004", "full-audit-repair-20261004", "production-readiness-20261004", "ai-operator-hardening-20261005", "integration/final-20261005", "audit/production-readiness-10of10-20261005"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      live_smoke:
+        description: "Run authenticated live browser/WebMCP/provider smoke"
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -25,7 +35,29 @@ jobs:
       - name: Dependency vulnerability audit
         run: pip install pip-audit && pip-audit -r requirements.txt --strict
 
+  required-secrets:
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require production live-smoke secrets
+        env:
+          SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          missing=0
+          for name in SAAS_PUBLIC_URL E2E_EMAIL E2E_PASSWORD TELEGRAM_BOT_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+
   browser-webmcp:
+    needs: required-secrets
+    environment: production
     runs-on: ubuntu-latest
     env:
       SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
@@ -37,25 +69,32 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install playwright
-      - name: Check browser smoke configuration
-        id: browser_config
+      - run: playwright install --with-deps chromium
+      - name: Run authenticated browser/WebMCP smoke
         run: |
-          if [ -n "$SAAS_PUBLIC_URL" ] && [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Production browser/WebMCP gate is enabled on main but E2E credentials are not configured."
-            exit 1
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Browser/WebMCP live smoke skipped on non-main ref: E2E credentials are not configured."
-          fi
-      - if: steps.browser_config.outputs.enabled == 'true'
-        run: playwright install --with-deps chromium
-      - if: steps.browser_config.outputs.enabled == 'true'
-        run: python scripts/p2_live_smoke.py
+          set -o pipefail
+          python scripts/p2_live_smoke.py 2>&1 | tee live-smoke.log
+        env:
+          LOAD_REQUESTS: "20"
+          LOAD_WORKERS: "5"
+      - name: Generate JUnit report
+        if: always()
+        run: python scripts/p2_smoke_junit.py smoke-report.json smoke-junit.xml
+      - name: Upload live-smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-browser-webmcp-smoke-${{ github.run_id }}
+          path: |
+            smoke-report.json
+            smoke-junit.xml
+            live-smoke.log
+            artifacts/smoke/**
+          if-no-files-found: warn
 
   provider-smoke:
+    needs: required-secrets
+    environment: production
     runs-on: ubuntu-latest
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -66,21 +105,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - name: Check provider smoke configuration
-        id: provider_config
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Production provider gate is enabled on main but TELEGRAM_BOT_TOKEN is not configured."
-            exit 1
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Telegram live smoke skipped on non-main ref: TELEGRAM_BOT_TOKEN is not configured."
-          fi
       - name: Run read-only provider health checks
-        if: steps.provider_config.outputs.enabled == 'true'
         run: |
           python - <<'PY'
           from production_ops import telegram_health, vk_health

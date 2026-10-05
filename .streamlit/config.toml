@@ -6,4 +6,5 @@ toolbarMode = "viewer"
 hideTopBar = true
 
 [server]
+enableXsrfProtection = true
 maxUploadSize = 200

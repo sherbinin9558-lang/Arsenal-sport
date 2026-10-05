@@ -1,0 +1,38 @@
+name: production-observability
+on:
+  push:
+    branches: [audit/production-readiness-10of10-20261005]
+  pull_request:
+    branches: [main]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observability:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m unittest tests.test_observability -v
+      - name: Streamlit health endpoint
+        if: ${{ vars.RUN_LIVE_HEALTHCHECK == 'true' }}
+        env: {SAAS_PUBLIC_URL: '${{ secrets.SAAS_PUBLIC_URL }}'}
+        run: |
+          python - <<'PY'
+          import os, time, urllib.request
+          base=os.environ['SAAS_PUBLIC_URL'].rstrip('/')
+          started=time.perf_counter()
+          req=urllib.request.Request(base+'/_stcore/health',headers={'User-Agent':'AI-Agent-Content-Manager-Health/1.0'})
+          opener=urllib.request.build_opener(urllib.request.HTTPRedirectHandler())
+          try:
+              with opener.open(req,timeout=30) as r:
+                  body=r.read().decode().strip().lower()
+                  assert r.status==200, r.status
+                  assert body=='ok', body
+          except urllib.error.HTTPError as e:
+              raise RuntimeError(f'health endpoint returned HTTP {e.code}; Streamlit Cloud may redirect unauthenticated health probes') from e
+          print('healthcheck latency_ms=',round((time.perf_counter()-started)*1000,1))
+          PY
