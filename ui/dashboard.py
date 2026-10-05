@@ -2,6 +2,79 @@
 import datetime
 import streamlit as st
 
+def _apply_client_first_layout():
+    """Tighten global layout without changing application behavior."""
+    st.markdown(
+        """
+        <style>
+        /* Client-first layout: reduce dead space and establish a clear top edge. */
+        .block-container {
+            padding-top: 1.05rem !important;
+            padding-bottom: 2rem !important;
+        }
+        section[data-testid="stSidebar"] > div:first-child {
+            padding-top: .85rem !important;
+        }
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: .75rem !important;
+        }
+        .main-title {
+            margin-top: 4px !important;
+            margin-bottom: 8px !important;
+        }
+        .dashboard-hero {
+            margin-top: 0 !important;
+        }
+        /* Keep the main navigation close to the product heading. */
+        div[data-baseweb="tab-list"] {
+            margin-top: 0 !important;
+            margin-bottom: 10px !important;
+        }
+        /* Dialog: content should start near the title, not deep below it. */
+        div[data-testid="stDialog"] [role="dialog"] {
+            padding-top: 10px !important;
+        }
+        div[data-testid="stDialog"] [role="dialog"] .block-container {
+            padding-top: .25rem !important;
+            padding-bottom: 1.25rem !important;
+        }
+        div[data-testid="stDialog"] [role="dialog"] .max-ai-plan {
+            margin-top: 4px !important;
+        }
+        /* Sidebar hierarchy: brand -> MAX -> status, with no artificial air. */
+        section[data-testid="stSidebar"] .sidebar-brand {
+            margin-top: 0 !important;
+            margin-bottom: 3px !important;
+            padding-top: 0 !important;
+        }
+        section[data-testid="stSidebar"] .sidebar-max {
+            margin-top: 0 !important;
+            margin-bottom: 7px !important;
+        }
+        @media (max-width: 768px) {
+            .block-container {
+                padding-top: .55rem !important;
+                padding-bottom: 1.25rem !important;
+            }
+            section[data-testid="stSidebar"] > div:first-child {
+                padding-top: .55rem !important;
+            }
+            .main-title {
+                margin-top: 2px !important;
+                margin-bottom: 6px !important;
+            }
+            div[data-baseweb="tab-list"] {
+                margin-bottom: 7px !important;
+            }
+            div[data-testid="stDialog"] [role="dialog"] {
+                padding-top: 6px !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def render_dashboard(
     *,
     load_products, load_plan, load_leads, load_orders,
@@ -10,6 +83,7 @@ def render_dashboard(
     attribution_loader, attribution_metrics, add_product, add_plan,
     categories, can_write,
 ):
+    _apply_client_first_layout()
     # Reuse the dashboard snapshot only until a successful write invalidates it.
     # This keeps the dashboard fast without showing stale data after edits.
     revision = st.session_state.get("_app_data_revision", 0)
@@ -243,4 +317,3 @@ def render_dashboard(
     ]
     for name, ok, detail in checks:
         st.write(("🟢" if ok else "🟡") + f" **{name}** — {detail}")
-    
