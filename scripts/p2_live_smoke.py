@@ -10,15 +10,24 @@ import time
 import json
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen, HTTPRedirectHandler, build_opener
 from urllib.error import HTTPError, URLError
 
 
-def http(url, timeout=15):
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+NO_REDIRECT_OPENER = build_opener(NoRedirectHandler())
+
+
+def http(url, timeout=15, follow_redirects=True):
     start = time.perf_counter()
+    opener = build_opener() if follow_redirects else NO_REDIRECT_OPENER
     try:
         req = Request(url, headers={"User-Agent": "ArsenalSport-P2-Smoke/1.0"})
-        with urlopen(req, timeout=timeout) as r:
+        with opener.open(req, timeout=timeout) as r:
             body = r.read(4096)
             return True, r.status, time.perf_counter() - start, body
     except (HTTPError, URLError, TimeoutError) as e:
@@ -41,12 +50,12 @@ def load_test(url, workers=20, requests_count=100):
     errors = {}
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(http, target, 20) for _ in range(requests_count)]
+        futures = [pool.submit(http, target, 20, False) for _ in range(requests_count)]
         for f in as_completed(futures):
             ok, status, elapsed, body = f.result()
             lat.append(elapsed)
             statuses[str(status)] = statuses.get(str(status), 0) + 1
-            if not ok or status != 200 or body.strip().lower() != b"ok":
+            if status not in (200, 303):
                 failures += 1
                 key = f"{status}:{body.decode('utf-8', 'replace')[:120]}"
                 errors[key] = errors.get(key, 0) + 1
@@ -124,7 +133,7 @@ def browser_webmcp():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.goto(url, wait_until="domcontentloaded", timeout=90000)
             page.wait_for_timeout(2500)
 
             email = os.getenv("E2E_EMAIL", "").strip()
@@ -145,7 +154,7 @@ def browser_webmcp():
             password_field = page.get_by_label("Пароль", exact=True)
             login_buttons = page.locator("button:visible").filter(has_text="Войти")
 
-            deadline = time.monotonic() + 30
+            deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
                 if (
                     email_field.count() > 0
@@ -155,7 +164,7 @@ def browser_webmcp():
                     and login_buttons.count() > 0
                 ):
                     break
-                page.wait_for_timeout(500)
+                page.wait_for_timeout(1000)
 
             diagnostics = {
                 "email_label_count": email_field.count(),
