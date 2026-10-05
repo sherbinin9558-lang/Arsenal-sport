@@ -108,10 +108,12 @@ def _read_refresh_token():
         except Exception:
             pass
 
-        for delay in (0.0, 0.15):
-            if delay:
-                time.sleep(delay)
-            try:
+        # Do not sleep between cookie probes. This function runs during normal
+    # Streamlit reruns, including button clicks, so even a small client-side
+    # wait becomes visible as input latency. The request-cookie fast path above
+    # remains the primary path; the controller is queried immediately as a
+    # best-effort fallback.
+    try:
                 all_cookies = cookies.getAll() or {}
                 token = all_cookies.get(_AUTH_COOKIE)
                 if token:
