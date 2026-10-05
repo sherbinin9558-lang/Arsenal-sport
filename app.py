@@ -768,6 +768,14 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div class="sidebar-owner-guide">'
+        '<div class="sidebar-owner-guide-title">Что здесь можно делать</div>'
+        '<div>Каталог → контент → заявки → заказы → аналитика.</div>'
+        '<div>MAX помогает находить следующий полезный шаг.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     def _max_sidebar_launcher():
         if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
             st.session_state["open_max"] = True
@@ -805,6 +813,7 @@ else:
     .sidebar-max-kicker {color:#5b4bd6;}
     .sidebar-max-title {color:#21164d;}
     .sidebar-max-text {color:#5f6472;}
+.sidebar-owner-guide{margin:10px 0 0;padding:11px 12px;border:1px solid #e6e8ef;border-radius:13px;background:#f8f9fc;color:#737a88;font-size:.68rem;line-height:1.45}.sidebar-owner-guide-title{font-size:.72rem;font-weight:900;color:#3d3568;margin-bottom:4px}.sidebar-owner-guide div+div{margin-top:3px}
     .stApp, .stApp * {color:#17151c;}
     .stApp [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stMarkdownContainer"] li, .stApp [data-testid="stMarkdownContainer"] span, .stApp label, .stApp [data-testid="stCaptionContainer"] {color:#17151c !important;}
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color:#17151c !important;}
