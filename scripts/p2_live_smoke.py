@@ -88,6 +88,8 @@ def browser_webmcp():
         password_field.fill(password)
         login_button.click()
         page.wait_for_timeout(5000)
+        os.makedirs("artifacts/smoke", exist_ok=True)
+        page.screenshot(path="artifacts/smoke/authenticated-home.png", full_page=True)
         if page.get_by_role("button", name="Войти").count() > 0:
             raise RuntimeError("Authenticated login did not complete.")
         result=page.evaluate("""() => ({
@@ -110,6 +112,8 @@ def main():
     report["telegram"]=telegram_readonly()
     report["vk"]=vk_readonly()
     report["webmcp"]=browser_webmcp()
+    with open("smoke-report.json", "w", encoding="utf-8") as fh:
+        json.dump(report, fh, ensure_ascii=False, indent=2)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if all(x.get("status") not in ("failed",) for x in [report["telegram"],report["vk"],report["webmcp"]]) and report["load_test"].get("failures",0)==0 else 1
 
