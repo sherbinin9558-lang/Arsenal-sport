@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      live_smoke:
+        description: "Run authenticated live browser/WebMCP/provider smoke"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -46,6 +52,7 @@ jobs:
 
   browser-webmcp:
     needs: required-secrets
+    environment: production
     runs-on: ubuntu-latest
     env:
       SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
@@ -59,7 +66,9 @@ jobs:
       - run: pip install playwright
       - run: playwright install --with-deps chromium
       - name: Run authenticated browser/WebMCP smoke
-        run: python scripts/p2_live_smoke.py
+        run: |
+          set -o pipefail
+          python scripts/p2_live_smoke.py 2>&1 | tee live-smoke.log
         env:
           LOAD_REQUESTS: "20"
           LOAD_WORKERS: "5"
@@ -74,11 +83,13 @@ jobs:
           path: |
             smoke-report.json
             smoke-junit.xml
+            live-smoke.log
             artifacts/smoke/**
           if-no-files-found: warn
 
   provider-smoke:
     needs: required-secrets
+    environment: production
     runs-on: ubuntu-latest
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
