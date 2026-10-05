@@ -138,28 +138,46 @@ def browser_webmcp():
             if login_tab.count() > 0:
                 login_tab.first.click()
 
-            page.locator('input[type="text"]:visible').first.wait_for(state="visible", timeout=30000)
-            page.locator('input[type="password"]:visible').first.wait_for(state="visible", timeout=30000)
-            page.wait_for_timeout(500)
-
-            email_fields = page.locator('input[type="text"]:visible')
-            password_fields = page.locator('input[type="password"]:visible')
+            # Streamlit can render text inputs with different HTML input types
+            # across versions. Use semantic labels and visibility instead of
+            # assuming the email field is input[type=text].
+            email_field = page.get_by_label("Email", exact=True)
+            password_field = page.get_by_label("Пароль", exact=True)
             login_buttons = page.locator("button:visible").filter(has_text="Войти")
 
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                if (
+                    email_field.count() > 0
+                    and password_field.count() > 0
+                    and email_field.first.is_visible()
+                    and password_field.first.is_visible()
+                    and login_buttons.count() > 0
+                ):
+                    break
+                page.wait_for_timeout(500)
+
             diagnostics = {
-                "visible_text_inputs": email_fields.count(),
-                "visible_password_inputs": password_fields.count(),
+                "email_label_count": email_field.count(),
+                "password_label_count": password_field.count(),
+                "visible_inputs": page.locator("input:visible").count(),
                 "visible_login_buttons": login_buttons.count(),
             }
-            if email_fields.count() < 1 or password_fields.count() < 1 or login_buttons.count() < 1:
+            if (
+                email_field.count() < 1
+                or password_field.count() < 1
+                or not email_field.first.is_visible()
+                or not password_field.first.is_visible()
+                or login_buttons.count() < 1
+            ):
                 page.screenshot(path="artifacts/smoke/login-form-missing.png", full_page=True)
                 raise RuntimeError(
                     "Authenticated login form was not found: "
                     + json.dumps(diagnostics, ensure_ascii=False)
                 )
 
-            email_fields.first.fill(email)
-            password_fields.first.fill(password)
+            email_field.first.fill(email)
+            password_field.first.fill(password)
             login_buttons.last.click()
 
             page.wait_for_timeout(5000)
