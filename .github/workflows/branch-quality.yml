@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - ai-operator-hardening-20261005
+      - integration/final-20261005
   pull_request:
     branches:
       - main
