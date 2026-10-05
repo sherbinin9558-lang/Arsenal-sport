@@ -554,11 +554,14 @@ def login_ui():
         unsafe_allow_html=True,
     )
 
+    notice = str(st.session_state.pop("_saas_login_notice", "") or "").strip()
+    if notice:
+        st.info(notice)
+
     if saas_enabled():
         ok, message = supabase_health()
         if not ok:
-            st.error("Не удалось связаться с сервером аккаунтов.")
-            st.caption(message)
+            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
 
     st.markdown(
         '<div class="public-shell">'
@@ -879,8 +882,20 @@ def require_saas_access():
     if not st.session_state.get("saas_access_token"):
         if not _restore_session_from_cookie():
             if st.session_state.get("saas_auth_error"):
-                st.error("Не удалось восстановить сессию. Проверьте соединение с сервером аккаунтов и обновите страницу.")
-                st.caption(st.session_state["saas_auth_error"])
+                # A failed cookie refresh must never render the legacy/red auth
+                # error screen before the current public login. Keep the public
+                # entry point as the only visible auth UI.
+                auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
+                st.session_state.pop("saas_access_token", None)
+                st.session_state.pop("saas_user_id", None)
+                st.session_state.pop("saas_tenant_id", None)
+                st.session_state.pop("saas_tenant_name", None)
+                st.session_state.pop("saas_tenant_status", None)
+                st.session_state.pop("saas_plan", None)
+                st.session_state["_saas_login_notice"] = (
+                    "Сессию не удалось восстановить автоматически. Войдите снова."
+                    if auth_error else ""
+                )
                 login_ui()
                 return False
 
@@ -896,9 +911,14 @@ def require_saas_access():
 
     if not _restore_session_from_access_token():
         if st.session_state.get("saas_auth_error"):
-            st.error("Сервер аккаунтов временно недоступен. Текущая авторизация не была удалена.")
-            st.caption(st.session_state["saas_auth_error"])
-            return False
+            # Do not expose a red legacy auth error on the public entry path.
+            # Preserve the session error for diagnostics, but keep the visible
+            # surface limited to the current login UI.
+            auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
+            st.session_state["_saas_login_notice"] = (
+                "Не удалось подтвердить текущую сессию. Войдите снова."
+                if auth_error else ""
+            )
         login_ui()
         return False
 
