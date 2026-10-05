@@ -5,6 +5,7 @@ on:
     branches:
       - ai-operator-hardening-20261005
       - integration/final-20261005
+      - fix/startup-loading-gate-20261005
   pull_request:
     branches:
       - main
