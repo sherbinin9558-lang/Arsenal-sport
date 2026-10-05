@@ -846,7 +846,7 @@ section[data-testid="stSidebar"]{display:block!important;visibility:visible!impo
 /* 3) Sidebar MAX. */
 button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.42)!important;font-weight:900!important;letter-spacing:.01em!important;} button[key="sidebar_max"]:hover{transform:translateY(-1px)!important;box-shadow:0 0 0 1px rgba(184,255,0,.75),0 0 24px rgba(184,255,0,.58)!important;}
 /* 4) Mobile/tablet MAX: normal document flow; never fixed/sticky. */
-.mobile-max-launcher{display:none!important;}
+.mobile-max-launcher{display:none!important;}.ai-workspace-label{margin:0 0 10px;padding:0 2px;font-size:.76rem;font-weight:800;letter-spacing:.02em;color:#697386;}
 @media (max-width:1100px){.mobile-max-launcher{display:block!important;width:100%!important;margin:0 0 10px!important;}.mobile-max-launcher button{width:100%!important;min-height:46px!important;border-radius:12px!important;background:linear-gradient(135deg,#7cff00,#b8ff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 14px rgba(184,255,0,.45)!important;font-weight:900!important;}}
 /* Main layout. */
 .block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
