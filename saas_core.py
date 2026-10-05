@@ -660,11 +660,9 @@ def render_tenant_selector():
             st.error(f"Не удалось переключить магазин: {e}")
     return True
 
-def render_account_bar():
+def render_sidebar_overview():
+    """Compact operational snapshot for the top of the authenticated sidebar."""
     with st.sidebar:
-        # Compact operational snapshot fills the upper sidebar area with
-        # information that is useful at a glance without duplicating the
-        # navigation or MAX controls.
         try:
             quick = usage_snapshot()
             st.markdown(
@@ -683,6 +681,11 @@ def render_account_bar():
             )
         except Exception:
             pass
+
+
+def render_account_bar():
+    """Render tenant/account controls at the bottom of the sidebar."""
+    with st.sidebar:
         st.markdown("---")
         token=st.session_state.get("saas_access_token")
         uid=st.session_state.get("saas_user_id")
@@ -873,7 +876,6 @@ def require_saas_access():
                 st.session_state["saas_demo"]=True
                 demo={"id":"demo-user","email":"demo@example.com","tenant_id":"demo-tenant","tenant_name":"Demo Store","plan":"pro","status":"active"}
                 _set_identity(demo,{"id":"demo-tenant","name":"Demo Store","plan":"pro","status":"active"})
-            render_account_bar()
             return True
         st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">PRODUCTION SETUP</div><div class="dashboard-hero-title">Подключите Supabase, чтобы открыть платформу.</div><div class="dashboard-hero-text">Для коммерческого режима нужны SUPABASE_URL и SUPABASE_ANON_KEY. После подключения пользователи смогут регистрировать магазины, входить по паролю и работать изолированно по tenant.</div></div>',unsafe_allow_html=True)
         st.error("Платформа не запускается в демо-режиме. Добавьте Supabase Secrets в настройках Streamlit.")
@@ -944,7 +946,6 @@ def require_saas_access():
         render_onboarding()
         return False
 
-    render_account_bar()
     return True
 
 def tenant_id(): return st.session_state.get("saas_tenant_id","demo-tenant")
