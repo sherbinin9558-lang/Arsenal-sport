@@ -768,6 +768,14 @@ with st.sidebar:
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div class="sidebar-owner-guide">'
+        '<div class="sidebar-owner-guide-title">Что здесь можно делать</div>'
+        '<div>Каталог → контент → заявки → заказы → аналитика.</div>'
+        '<div>MAX помогает находить следующий полезный шаг.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     def _max_sidebar_launcher():
         if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
             st.session_state["open_max"] = True
@@ -805,6 +813,7 @@ else:
     .sidebar-max-kicker {color:#5b4bd6;}
     .sidebar-max-title {color:#21164d;}
     .sidebar-max-text {color:#5f6472;}
+.sidebar-owner-guide{margin:10px 0 0;padding:11px 12px;border:1px solid #e6e8ef;border-radius:13px;background:#f8f9fc;color:#737a88;font-size:.68rem;line-height:1.45}.sidebar-owner-guide-title{font-size:.72rem;font-weight:900;color:#3d3568;margin-bottom:4px}.sidebar-owner-guide div+div{margin-top:3px}
     .stApp, .stApp * {color:#17151c;}
     .stApp [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stMarkdownContainer"] li, .stApp [data-testid="stMarkdownContainer"] span, .stApp label, .stApp [data-testid="stCaptionContainer"] {color:#17151c !important;}
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color:#17151c !important;}
@@ -846,7 +855,7 @@ section[data-testid="stSidebar"]{display:block!important;visibility:visible!impo
 /* 3) Sidebar MAX. */
 button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.42)!important;font-weight:900!important;letter-spacing:.01em!important;} button[key="sidebar_max"]:hover{transform:translateY(-1px)!important;box-shadow:0 0 0 1px rgba(184,255,0,.75),0 0 24px rgba(184,255,0,.58)!important;}
 /* 4) Mobile/tablet MAX: normal document flow; never fixed/sticky. */
-.mobile-max-launcher{display:none!important;}
+.mobile-max-launcher{display:none!important;}.ai-workspace-label{margin:0 0 10px;padding:0 2px;font-size:.76rem;font-weight:800;letter-spacing:.02em;color:#697386;}
 @media (max-width:1100px){.mobile-max-launcher{display:block!important;width:100%!important;margin:0 0 10px!important;}.mobile-max-launcher button{width:100%!important;min-height:46px!important;border-radius:12px!important;background:linear-gradient(135deg,#7cff00,#b8ff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 14px rgba(184,255,0,.45)!important;font-weight:900!important;}}
 /* Main layout. */
 .block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
@@ -866,18 +875,13 @@ div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:rel
 div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;}button[data-baseweb="tab"]{border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;}button[data-baseweb="tab"] *{color:#252b3a!important;opacity:1!important;}button[data-baseweb="tab"][aria-selected="true"]{background:transparent!important;color:#4c1d95!important;border-color:transparent!important;}button[data-baseweb="tab"][aria-selected="true"] *{color:#4c1d95!important;opacity:1!important;}
 [data-testid="stHorizontalBlock"]{width:100%!important;}[data-testid="stTextInput"],[data-testid="stTextArea"],[data-testid="stSelectbox"],[data-testid="stNumberInput"],[data-testid="stDateInput"],[data-testid="stFileUploader"]{width:100%!important;}.stat-box{background:linear-gradient(135deg,#171c26 0%,#211f35 100%);border:1px solid #30364a;color:#f5f7fa;padding:20px;border-radius:16px;text-align:center;margin:5px;box-shadow:0 8px 24px rgba(0,0,0,.12);}.stat-number{font-size:2.35rem;font-weight:900;margin:0;color:#f5f7fa;}.stat-label{font-size:.9rem;color:#aeb5c2;margin:0;}
 .section-kicker{color:#6d4aff!important;text-shadow:0 0 7px rgba(109,74,255,.20);}.section-title{color:#21164d!important;}.stMarkdown h1,.stMarkdown h2,.stMarkdown h3{color:#21164d!important;}[data-testid="stText"],[data-testid="stCaptionContainer"]{color:#596174!important;}
-@media (min-width:769px){section[data-testid="stSidebar"]{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;transform:none!important;width:280px!important;min-width:280px!important;max-width:280px!important;left:0!important;}section[data-testid="stSidebar"]>div:first-child{width:280px!important;max-width:280px!important;}[data-testid="stAppViewContainer"] .main{width:calc(100vw - 280px)!important;max-width:calc(100vw - 280px)!important;}[data-testid="stAppViewContainer"] .main .block-container{width:100%!important;max-width:none!important;margin:0!important;}[data-testid="stSidebarCollapseButton"]{display:block!important;visibility:visible!important;}}
+@media (min-width:769px){section[data-testid="stSidebar"]{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;transform:none!important;width:280px!important;min-width:280px!important;max-width:280px!important;left:0!important;}section[data-testid="stSidebar"]>div:first-child{width:280px!important;max-width:280px!important;}[data-testid="stAppViewContainer"] .main{width:calc(100vw - 280px)!important;max-width:calc(100vw - 280px)!important;}[data-testid="stAppViewContainer"] .main .block-container{width:100%!important;max-width:none!important;margin:0!important;}[data-testid="stSidebarCollapseButton"]{display:none!important;visibility:hidden!important;}[data-testid="stSidebarCollapsedControl"]{display:none!important;visibility:hidden!important;}}
 @media (max-width:768px){.dashboard-hero{padding:20px 18px;border-radius:18px;margin-bottom:12px;}.dashboard-hero-title{font-size:1.55rem;}.dashboard-hero-text{font-size:.86rem;}.first-run-card{padding:17px 16px;border-radius:17px;}.first-run-title{font-size:1.12rem;}.max-ai-plan{padding:14px 15px;border-radius:16px;}.max-ai-plan-item{font-size:.82rem;}.mobile-nav-hint{display:block;}.main-title{font-size:1.35rem!important;line-height:1.15!important;margin:8px 0 7px!important;}.block-container{padding:.65rem .7rem 1.2rem!important;}.stButton>button,button[kind="primary"]{min-height:46px!important;width:100%!important;}[data-testid="stHorizontalBlock"]{flex-direction:column!important;gap:.55rem!important;}[data-testid="stHorizontalBlock"]>[data-testid="column"]{width:100%!important;min-width:100%!important;max-width:100%!important;flex:1 1 100%!important;}div[data-baseweb="tab-list"]{overflow-x:auto!important;overflow-y:hidden!important;flex-wrap:nowrap!important;scrollbar-width:none!important;-webkit-overflow-scrolling:touch!important;}button[data-baseweb="tab"]{flex:0 0 auto!important;min-width:max-content!important;white-space:nowrap!important;padding:9px 11px!important;font-size:.78rem!important;background:#f4f5f8!important;border:1px solid #e1e4eb!important;}button[data-baseweb="tab"][aria-selected="true"]{color:#4c1d95!important;background:linear-gradient(135deg,#eee9ff,#e5deff)!important;border-color:#c9bfff!important;}section[data-testid="stSidebar"]{width:min(78vw,280px)!important;}section[data-testid="stSidebar"]>div:first-child{width:min(78vw,280px)!important;}.sidebar-ai-agent{font-size:.95rem!important;}.sidebar-max{padding:9px 10px 7px!important;}.sidebar-max-title{font-size:1.05rem!important;}.sidebar-max-text{font-size:.68rem!important;}[data-baseweb="select"],[data-baseweb="input"],[data-testid="stTextArea"]{font-size:16px!important;}[data-testid="stDataFrame"],[data-testid="stTable"]{width:100%!important;overflow-x:auto!important;}.stMarkdown,.stCaption{overflow-wrap:anywhere!important;}}
 [data-testid="stSidebar"] [data-testid="stToggle"] label,[data-testid="stSidebar"] [data-baseweb="checkbox"] label{color:#b8ff00!important;text-shadow:0 0 7px rgba(184,255,0,.65)!important;}</style>""",
     unsafe_allow_html=True,
 )
 
-def _max_mobile_launcher():
-    if st.button("⚡ MAX", key="mobile_max_launcher", type="primary"):
-        st.session_state["open_max"] = True
-        render_max()
-
-_max_mobile_launcher()
+st.markdown('<div class="ai-workspace-label">AI-помощник магазина · быстрый доступ к аналитике, CRM и автоматизации</div>', unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
@@ -896,6 +900,11 @@ st.markdown("""
 button[aria-label*="Scroll tabs"],
 button[aria-label*="Прокрут"] {
     display: none !important;
+}
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+    visibility: hidden !important;
 }
 </style>
 """, unsafe_allow_html=True)

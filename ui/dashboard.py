@@ -25,6 +25,21 @@ def _apply_client_first_layout():
         .dashboard-hero {
             margin-top: 0 !important;
         }
+        .owner-guide-card {
+            margin: 0 0 14px !important;
+            padding: 15px 18px !important;
+            border: 1px solid #e2e5ee !important;
+            border-radius: 16px !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f7f7ff 100%) !important;
+            box-shadow: 0 6px 22px rgba(37, 31, 82, .05) !important;
+        }
+        .owner-guide-kicker { font-size: .68rem !important; font-weight: 900 !important; letter-spacing: .12em !important; color: #5b4bd6 !important; margin-bottom: 4px !important; }
+        .owner-guide-title { font-size: 1rem !important; font-weight: 850 !important; color: #21164d !important; margin-bottom: 10px !important; }
+        .owner-guide-grid { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
+        .owner-guide-grid > div { padding: 9px 10px !important; border-radius: 11px !important; background: rgba(255,255,255,.78) !important; border: 1px solid #e8e9f1 !important; }
+        .owner-guide-grid b { display: block !important; font-size: .76rem !important; color: #26203f !important; margin-bottom: 2px !important; }
+        .owner-guide-grid span { display: block !important; font-size: .7rem !important; line-height: 1.35 !important; color: #6b7280 !important; }
+        .owner-guide-note { margin-top: 9px !important; font-size: .72rem !important; line-height: 1.4 !important; color: #697386 !important; }
         /* Keep the main navigation close to the product heading. */
         div[data-baseweb="tab-list"] {
             margin-top: 0 !important;
@@ -63,6 +78,12 @@ def _apply_client_first_layout():
                 margin-top: 2px !important;
                 margin-bottom: 6px !important;
             }
+            .owner-guide-card { margin-bottom: 10px !important; padding: 12px 13px !important; }
+            .owner-guide-title { font-size: .92rem !important; margin-bottom: 8px !important; }
+            .owner-guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px !important; }
+            .owner-guide-grid > div { padding: 8px !important; }
+            .owner-guide-grid span { font-size: .68rem !important; }
+            .owner-guide-note { font-size: .69rem !important; margin-top: 8px !important; }
             div[data-baseweb="tab-list"] {
                 margin-bottom: 7px !important;
             }
@@ -131,6 +152,22 @@ def render_dashboard(
         f'<div class="dashboard-hero-title">Добро пожаловать в {store_name}</div>'
         f'<div class="dashboard-hero-text">MAX смотрит на каталог, контент и продажи и помогает решить следующую задачу — без лишней рутины.</div>'
         f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    
+    st.markdown(
+        '<div class="owner-guide-card">'
+        '<div class="owner-guide-kicker">КАК РАБОТАЕТ ПЛАТФОРМА</div>'
+        '<div class="owner-guide-title">Один рабочий центр вместо десятка разрозненных инструментов</div>'
+        '<div class="owner-guide-grid">'
+        '<div><b>1 · Каталог</b><span>Товары, остатки и карточки в одном месте.</span></div>'
+        '<div><b>2 · Контент</b><span>Тексты, Reels и контент-план без ручной рутины.</span></div>'
+        '<div><b>3 · Продажи</b><span>CRM, заявки и заказы связаны с магазином.</span></div>'
+        '<div><b>4 · AI</b><span>MAX анализирует данные и предлагает следующий шаг.</span></div>'
+        '</div>'
+        '<div class="owner-guide-note">Вы управляете бизнесом, а платформа берёт на себя повторяющиеся операции и помогает принимать решения.</div>'
+        '</div>',
         unsafe_allow_html=True,
     )
     

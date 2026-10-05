@@ -1,0 +1,26 @@
+name: Branch quality gate
+
+on:
+  push:
+    branches:
+      - ai-operator-hardening-20261005
+      - integration/final-20261005
+      - fix/startup-loading-gate-20261005
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  python-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile changed Python modules
+        run: python -m py_compile max_operator.py ui/max.py webmcp_tools.py
+      - name: Run MAX operator tests
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt pytest
+          PYTHONPATH=. pytest -q tests/test_max_operator.py tests/test_webmcp_data.py tests/test_core_regression.py
