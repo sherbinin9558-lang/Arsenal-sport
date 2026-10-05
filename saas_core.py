@@ -659,6 +659,27 @@ def render_tenant_selector():
 
 def render_account_bar():
     with st.sidebar:
+        # Compact operational snapshot fills the upper sidebar area with
+        # information that is useful at a glance without duplicating the
+        # navigation or MAX controls.
+        try:
+            quick = usage_snapshot()
+            st.markdown(
+                '<div class="sidebar-quick-overview">'
+                '<div class="sidebar-quick-kicker">СЕГОДНЯ В МАГАЗИНЕ</div>'
+                '<div class="sidebar-quick-title">Оперативный обзор</div>'
+                '<div class="sidebar-quick-grid">'
+                f'<div><b>{quick.get("products", 0)}</b><span>товаров</span></div>'
+                f'<div><b>{quick.get("leads", 0)}</b><span>заявок</span></div>'
+                f'<div><b>{quick.get("orders", 0)}</b><span>заказов</span></div>'
+                f'<div><b>{quick.get("content", 0)}</b><span>контент</span></div>'
+                '</div>'
+                '<div class="sidebar-quick-note">MAX помогает найти следующий полезный шаг.</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            pass
         st.markdown("---")
         token=st.session_state.get("saas_access_token")
         uid=st.session_state.get("saas_user_id")
