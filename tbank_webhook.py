@@ -19,6 +19,10 @@ from billing import get_payment
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
 
+class RequestBodyTooLarge(Exception):
+    """Raised when an incoming webhook body exceeds the hard limit."""
+    pass
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
