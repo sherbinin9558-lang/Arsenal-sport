@@ -12,7 +12,7 @@ import os
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 from tbank_billing import get_state, _token
 from billing import get_payment
@@ -30,17 +30,54 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+class RequestSizeLimitMiddleware:
+    """ASGI body-size guard; also covers chunked requests without Content-Length."""
     MAX_BODY_BYTES = 256 * 1024
-    async def dispatch(self, request, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length:
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length = headers.get(b"content-length")
+        if content_length is not None:
             try:
                 if int(content_length) > self.MAX_BODY_BYTES:
-                    return JSONResponse(status_code=413, content={"detail": "Request too large"})
+                    response = JSONResponse(status_code=413, content={"detail": "Request too large"})
+                    await response(scope, receive, send)
+                    return
             except ValueError:
-                return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
-        return await call_next(request)
+                response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+                await response(scope, receive, send)
+                return
+
+        total = 0
+        finished = False
+
+        async def limited_receive():
+            nonlocal total, finished
+            if finished:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message.get("type") == "http.request":
+                chunk = message.get("body", b"")
+                total += len(chunk)
+                if total > self.MAX_BODY_BYTES:
+                    finished = True
+                    raise RequestBodyTooLarge()
+                if not message.get("more_body", False):
+                    finished = True
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            response = JSONResponse(status_code=413, content={"detail": "Request too large"})
+            await response(scope, receive, send)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware)
@@ -156,11 +193,22 @@ def _process_billing_event(provider, event_key, payment_id, status, tenant_id, p
 
 
 def _verify_webhook_secret(request: Request, env_name):
+    """Validate an optional configured Bearer layer.
+
+    T-Bank notifications have their own signed Token. If a Bearer secret is
+    configured for the T-Bank webhook API, a supplied Bearer header is checked;
+    its absence is not rejected because the provider Token is independently
+    verified below.
+    """
     expected = _env(env_name)
     if not expected:
         return False
-    auth = request.headers.get("authorization", "")
-    supplied = auth[7:] if auth.lower().startswith("bearer ") else ""
+    auth = request.headers.get("authorization", "").strip()
+    if not auth:
+        return False
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    supplied = auth[7:].strip()
     if not supplied or not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
@@ -221,13 +269,7 @@ async def payment_status(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Billing state transition failed")
 
-    return {
-        "ok": True,
-        "payment_id": payment_id,
-        "status": status,
-        "plan": plan,
-        "duplicate": bool((result or {}).get("duplicate")),
-    }
+    return PlainTextResponse("OK")
 
 
 @app.post("/webhooks/yookassa")
