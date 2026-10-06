@@ -39,7 +39,7 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertIn("Unauthorized", str(ctx.exception))
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_constant_time_secret_path(self):
+    def test_tbank_accepts_provider_token_without_optional_bearer(self):
         request = self._request(headers={"authorization": "Bearer unit-test-secret"})
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
@@ -49,10 +49,38 @@ class WebhookSecurityTests(unittest.TestCase):
              patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
             response = asyncio.run(tbank_webhook.payment_status(request))
-        self.assertTrue(response["ok"])
-        self.assertEqual(response["payment_id"], "123")
-        self.assertEqual(response["status"], "CONFIRMED")
-        self.assertFalse(response["duplicate"])
+        self.assertEqual(response.body, b"OK")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, "text/plain")
+
+    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
+    def test_tbank_accepts_provider_token_without_optional_bearer(self):
+        request = self._request(headers={})
+        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
+             patch.object(tbank_webhook, "_token", return_value="signed"), \
+             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
+                 "tenant_id": "tenant-1",
+                 "plan": "starter",
+             }), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
+            response = asyncio.run(tbank_webhook.payment_status(request))
+        self.assertEqual(response.body, b"OK")
+
+    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
+    def test_tbank_rejects_invalid_optional_bearer(self):
+        request = self._request(headers={"authorization": "Bearer wrong"})
+        with self.assertRaises(Exception) as ctx:
+            tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
+        self.assertIn("Unauthorized", str(ctx.exception))
+
+    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
+    def test_tbank_rejects_missing_provider_auth_when_token_absent(self):
+        request = self._request(headers={})
+        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}):
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.payment_status(request))
+        self.assertIn("Webhook authentication required", str(ctx.exception))
 
     @patch.dict(os.environ, {"SUPABASE_URL": "https://example.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "x"}, clear=False)
     def test_ready_requires_webhook_auth_configuration(self):
