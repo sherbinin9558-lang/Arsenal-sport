@@ -58,7 +58,8 @@ class AuthHardeningTests(unittest.TestCase):
         def rerun():
             calls["rerun"] += 1
 
-        with patch.object(saas_core, "_restore_session_from_cookie", side_effect=restore), \\
+        with patch.object(saas_core, "saas_enabled", return_value=True), \\
+             patch.object(saas_core, "_restore_session_from_cookie", side_effect=restore), \\
              patch.object(saas_core.st, "rerun", side_effect=rerun), \\
              patch.object(saas_core.time, "sleep"), \\
              patch.object(saas_core, "login_ui", side_effect=lambda: calls.__setitem__("login", calls["login"] + 1)):
