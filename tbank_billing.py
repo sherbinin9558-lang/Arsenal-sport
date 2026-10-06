@@ -32,7 +32,7 @@ def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
 
 def _token(data):
-    values={k:v for k,v in data.items() if k not in ("Token","Receipt","DATA","Shops","Items") and v is not None}
+    values={k:v for k,v in data.items() if k not in ("Token","Receipt","DATA","Data","ForeignReceiver","Shops","Items") and v is not None}
     values["Password"]=PASSWORD
     raw="".join(str(values[k]) for k in sorted(values))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -41,6 +41,44 @@ def plan_price(plan):
     raw=_cfg(f"SAAS_{plan.upper()}_PRICE")
     try: return float(raw.replace(",", "."))
     except Exception: return 0.0
+
+def _receipt_for_checkout(plan, amount_kopecks):
+    """Build a compliant receipt only when the merchant explicitly enables it."""
+    enabled = _cfg("TBANK_RECEIPT_REQUIRED", "0").lower() in ("1", "true", "yes")
+    if not enabled:
+        return None
+
+    taxation = _cfg("TBANK_RECEIPT_TAXATION")
+    tax = _cfg("TBANK_RECEIPT_TAX", "none")
+    contact_email = _cfg("TBANK_RECEIPT_EMAIL")
+    contact_phone = _cfg("TBANK_RECEIPT_PHONE")
+    if not taxation:
+        raise RuntimeError("TBANK_RECEIPT_REQUIRED=1 требует TBANK_RECEIPT_TAXATION.")
+    if not contact_email and not contact_phone:
+        raise RuntimeError("TBANK_RECEIPT_REQUIRED=1 требует TBANK_RECEIPT_EMAIL или TBANK_RECEIPT_PHONE.")
+    if tax not in ("none","vat0","vat5","vat7","vat10","vat22","vat105","vat107","vat110","vat122"):
+        raise RuntimeError("Недопустимый TBANK_RECEIPT_TAX.")
+
+    item = {
+        "Name": f"Подписка AI Agent Content Manager · {plan.upper()}",
+        "Price": int(amount_kopecks),
+        "Quantity": 1,
+        "Amount": int(amount_kopecks),
+        "PaymentMethod": _cfg("TBANK_RECEIPT_PAYMENT_METHOD", "full_payment"),
+        "PaymentObject": _cfg("TBANK_RECEIPT_PAYMENT_OBJECT", "service"),
+        "Tax": tax,
+    }
+    receipt = {
+        "Taxation": taxation,
+        "Items": [item],
+        "Payments": {"Electronic": int(amount_kopecks)},
+    }
+    if contact_email:
+        receipt["Email"] = contact_email
+    else:
+        receipt["Phone"] = contact_phone
+    return receipt
+
 
 def create_checkout(plan, tenant_id):
     price=plan_price(plan)
@@ -57,7 +95,13 @@ def create_checkout(plan, tenant_id):
         "FailURL":f"{PUBLIC_URL}/?billing=tbank_fail&order_id={order_id}",
         "DATA":{"tenant_id":str(tenant_id),"plan":plan},
     }
-    # T-Bank signs root scalar fields; nested DATA is not included in Token.
+    receipt = _receipt_for_checkout(plan, int(round(price*100)))
+    if receipt is not None:
+        payload["Receipt"] = receipt
+    notification_url = _cfg("TBANK_NOTIFICATION_URL")
+    if notification_url:
+        payload["NotificationURL"] = notification_url
+    # T-Bank signs root scalar fields; nested DATA/Receipt are not included in Token.
     payload["Token"]=_token(payload)
     r=requests.post(f"{API_URL}/Init",json=payload,timeout=20)
     try: data=r.json()

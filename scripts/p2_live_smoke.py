@@ -79,7 +79,7 @@ def load_test(url, workers=20, requests_count=100):
 def telegram_readonly():
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
-        return {"status": "skipped", "reason": "TELEGRAM_BOT_TOKEN not set"}
+        return {"status": "failed", "reason": "TELEGRAM_BOT_TOKEN not set"}
     ok, status, elapsed, body = http(f"https://api.telegram.org/bot{token}/getMe")
     return {
         "status": "ok" if ok else "failed",
@@ -92,7 +92,9 @@ def telegram_readonly():
 def vk_readonly():
     token = os.getenv("VK_TOKEN", "").strip()
     if not token:
-        return {"status": "skipped", "reason": "VK_TOKEN not set"}
+        if os.getenv("VK_REQUIRED", "1").strip().lower() in ("0", "false", "no"):
+            return {"status": "disabled", "reason": "VK smoke explicitly disabled"}
+        return {"status": "failed", "reason": "VK_TOKEN not set"}
     import urllib.parse
 
     req = Request(
@@ -124,11 +126,11 @@ def vk_readonly():
 def browser_webmcp():
     url = os.getenv("SAAS_PUBLIC_URL", "").strip()
     if not url:
-        return {"status": "skipped", "reason": "SAAS_PUBLIC_URL not set"}
+        return {"status": "failed", "reason": "SAAS_PUBLIC_URL not set"}
     try:
         from playwright.sync_api import sync_playwright
     except Exception:
-        return {"status": "skipped", "reason": "playwright not installed"}
+        return {"status": "failed", "reason": "playwright not installed"}
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--disable-http2", "--disable-dev-shm-usage"])
@@ -170,7 +172,7 @@ def browser_webmcp():
             email = os.getenv("E2E_EMAIL", "").strip()
             password = os.getenv("E2E_PASSWORD", "")
             if not email or not password:
-                return {"status": "skipped", "reason": "E2E credentials not set"}
+                return {"status": "failed", "reason": "E2E credentials not set"}
 
             # Streamlit Cloud can expose the rendered app in a child frame while
             # the outer document remains only a shell. Search every frame for the
@@ -339,7 +341,7 @@ def main():
             int(os.getenv("LOAD_REQUESTS", "100")),
         )
     else:
-        report["load_test"] = {"status": "skipped", "reason": "SAAS_PUBLIC_URL not set"}
+        report["load_test"] = {"status": "failed", "reason": "SAAS_PUBLIC_URL not set"}
 
     report["telegram"] = telegram_readonly()
     report["vk"] = vk_readonly()
@@ -353,12 +355,13 @@ def main():
         json.dump(report, fh, ensure_ascii=False, indent=2)
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return (
-        0
-        if all(x.get("status") != "failed" for x in [report["telegram"], report["vk"], report["webmcp"]])
+    live_statuses = [report["telegram"], report["vk"], report["webmcp"]]
+    live_ok = all(x.get("status") in ("ok", "disabled") for x in live_statuses)
+    load_ok = (
+        report["load_test"].get("status", "ok") not in ("failed", "skipped")
         and report["load_test"].get("failures", 0) == 0
-        else 1
     )
+    return 0 if live_ok and load_ok else 1
 
 
 if __name__ == "__main__":

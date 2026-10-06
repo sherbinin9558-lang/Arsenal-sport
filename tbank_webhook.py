@@ -12,12 +12,16 @@ import os
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 from tbank_billing import get_state, _token
 from billing import get_payment
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
+
+class RequestBodyTooLarge(Exception):
+    """Raised when an incoming webhook body exceeds the hard limit."""
+    pass
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -30,17 +34,54 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+class RequestSizeLimitMiddleware:
+    """ASGI body-size guard; also covers chunked requests without Content-Length."""
     MAX_BODY_BYTES = 256 * 1024
-    async def dispatch(self, request, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length:
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length = headers.get(b"content-length")
+        if content_length is not None:
             try:
                 if int(content_length) > self.MAX_BODY_BYTES:
-                    return JSONResponse(status_code=413, content={"detail": "Request too large"})
+                    response = JSONResponse(status_code=413, content={"detail": "Request too large"})
+                    await response(scope, receive, send)
+                    return
             except ValueError:
-                return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
-        return await call_next(request)
+                response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+                await response(scope, receive, send)
+                return
+
+        total = 0
+        finished = False
+
+        async def limited_receive():
+            nonlocal total, finished
+            if finished:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message.get("type") == "http.request":
+                chunk = message.get("body", b"")
+                total += len(chunk)
+                if total > self.MAX_BODY_BYTES:
+                    finished = True
+                    raise RequestBodyTooLarge()
+                if not message.get("more_body", False):
+                    finished = True
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            response = JSONResponse(status_code=413, content={"detail": "Request too large"})
+            await response(scope, receive, send)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware)
@@ -56,9 +97,17 @@ async def readyz():
     url, key = _supabase()
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
-    if not _env("TBANK_WEBHOOK_SECRET") and not _env("YOOKASSA_WEBHOOK_SECRET"):
-        raise HTTPException(status_code=503, detail="Webhook authentication is not configured")
-    return {"ok": True, "service": "billing-webhook", "supabase": "configured"}
+    tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
+    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
+    if not tbank_ready and not yookassa_ready:
+        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+    return {
+        "ok": True,
+        "service": "billing-webhook",
+        "supabase": "configured",
+        "tbank": "configured" if tbank_ready else "disabled",
+        "yookassa": "configured" if yookassa_ready else "disabled",
+    }
 
 
 def _env(name, default=""):
@@ -156,11 +205,22 @@ def _process_billing_event(provider, event_key, payment_id, status, tenant_id, p
 
 
 def _verify_webhook_secret(request: Request, env_name):
+    """Validate an optional configured Bearer layer.
+
+    T-Bank notifications have their own signed Token. If a Bearer secret is
+    configured for the T-Bank webhook API, a supplied Bearer header is checked;
+    its absence is not rejected because the provider Token is independently
+    verified below.
+    """
     expected = _env(env_name)
     if not expected:
         return False
-    auth = request.headers.get("authorization", "")
-    supplied = auth[7:] if auth.lower().startswith("bearer ") else ""
+    auth = request.headers.get("authorization", "").strip()
+    if not auth:
+        return False
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    supplied = auth[7:].strip()
     if not supplied or not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
@@ -221,30 +281,34 @@ async def payment_status(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Billing state transition failed")
 
-    return {
-        "ok": True,
-        "payment_id": payment_id,
-        "status": status,
-        "plan": plan,
-        "duplicate": bool((result or {}).get("duplicate")),
-    }
+    return PlainTextResponse("OK")
 
 
 @app.post("/webhooks/yookassa")
 async def yookassa_payment_status(request: Request):
-    _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET")
+    if not _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET"):
+        raise HTTPException(status_code=401, detail="Webhook authentication required")
     body = await _read_body(request)
     event = str(body.get("event") or "").lower()
     obj = body.get("object") or {}
-    payment_id = str(obj.get("id") or "")
+
+    # Refund notifications contain the refund id in object.id and the original
+    # payment id in object.payment_id. Never treat the refund id as a payment id.
+    is_refund = event.startswith("refund.")
+    payment_id = str((obj.get("payment_id") if is_refund else obj.get("id")) or "")
     if not payment_id:
         raise HTTPException(status_code=400, detail="Payment id is required")
 
-    # Authenticate the event by querying the payment directly with YooKassa.
+    # Query YooKassa directly so the webhook body cannot forge payment state.
     payment = get_payment(payment_id)
-    status = str(payment.get("status") or "").lower()
-    if status != "succeeded":
-        return {"ok": True, "payment_id": payment_id, "status": status}
+    provider_status = str(payment.get("status") or "").lower()
+    if is_refund:
+        if event == "refund.succeeded":
+            status = "refunded"
+        else:
+            status = "refund_pending"
+    else:
+        status = provider_status
 
     checkout = _checkout_by_provider_payment("yookassa", payment_id)
     if not checkout:
@@ -257,7 +321,7 @@ async def yookassa_payment_status(request: Request):
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
-    event_key = f"yookassa:{event or 'payment.succeeded'}:{payment_id}:{status}"
+    event_key = f"yookassa:{event or 'payment.status'}:{payment_id}:{status}"
 
     try:
         result = _process_billing_event(
@@ -278,6 +342,7 @@ async def yookassa_payment_status(request: Request):
         "event": event,
         "payment_id": payment_id,
         "status": status,
+        "provider_status": provider_status,
         "plan": plan,
         "duplicate": bool((result or {}).get("duplicate")),
     }
