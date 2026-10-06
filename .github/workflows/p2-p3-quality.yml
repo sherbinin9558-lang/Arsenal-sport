@@ -45,6 +45,7 @@ jobs:
           E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
         run: |
           missing=0
           for name in SAAS_PUBLIC_URL E2E_EMAIL E2E_PASSWORD TELEGRAM_BOT_TOKEN VK_TOKEN; do
