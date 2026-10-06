@@ -37,6 +37,21 @@ class BillingLifecycleSqlTests(unittest.TestCase):
         sql = open("supabase/migrations/20261006090000_billing_refund_lifecycle.sql", encoding="utf-8").read()
         self.assertIn("('partial_refunded','partial_reversed')", sql)
 
+    def test_tbank_notification_token_excludes_nested_data(self):
+        import tbank_billing
+        with patch.object(tbank_billing, "PASSWORD", "secret"):
+            token = tbank_billing._token({
+                "TerminalKey": "TBankTest",
+                "PaymentId": "123",
+                "Status": "CONFIRMED",
+                "Data": {"tenant_id": "must-not-be-signed"},
+                "Token": "ignored",
+            })
+        expected = __import__("hashlib").sha256(
+            "123CONFIRMEDTBankTestsecret".encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(token, expected)
+
 
 if __name__ == "__main__":
     unittest.main()
