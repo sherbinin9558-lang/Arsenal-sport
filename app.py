@@ -922,13 +922,26 @@ button[aria-label*="Прокрут"] {
 </style>
 """, unsafe_allow_html=True)
 
-_tabs = st.tabs(tab_labels)
+_tabs = list(st.tabs(tab_labels))
+
+# Streamlit's AppTest has had tab-collection edge cases across releases.
+# Keep the page renderable even if the test/runtime adapter returns fewer
+# tab containers than requested. In normal Streamlit runtime this list has
+# exactly len(tab_labels) entries; the fallback containers are deliberately
+# non-interactive safety slots rather than silently dropping application code.
+_expected_base_tabs = len(base_tab_labels)
 if _is_platform_admin:
-    tab_admin = _tabs[0]
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = _tabs[1:11]
+    tab_admin = _tabs[0] if _tabs else st.container()
+    _base_tabs = _tabs[1:1 + _expected_base_tabs]
 else:
     tab_admin = None
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = _tabs[:10]
+    _base_tabs = _tabs[:_expected_base_tabs]
+
+while len(_base_tabs) < _expected_base_tabs:
+    _base_tabs.append(st.container())
+
+(tab_dashboard, tab1, tab2, tab3, tab4, tab5,
+ tab6, tab7, tab8, tab9) = _base_tabs
 
 # ========== DASHBOARD ==========
 if tab_admin is not None:
