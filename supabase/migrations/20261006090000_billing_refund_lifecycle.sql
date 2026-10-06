@@ -27,8 +27,8 @@ begin
   end if;
 
   -- Never revoke a newer subscription because an old payment later changes state.
-  if current_sub.provider <> p_provider
-     or current_sub.provider_payment_id <> p_provider_payment_id then
+  if current_sub.provider is distinct from p_provider
+     or current_sub.provider_payment_id is distinct from p_provider_payment_id then
     return false;
   end if;
 
