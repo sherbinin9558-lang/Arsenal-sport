@@ -286,19 +286,29 @@ async def payment_status(request: Request):
 
 @app.post("/webhooks/yookassa")
 async def yookassa_payment_status(request: Request):
-    _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET")
+    if not _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET"):
+        raise HTTPException(status_code=401, detail="Webhook authentication required")
     body = await _read_body(request)
     event = str(body.get("event") or "").lower()
     obj = body.get("object") or {}
-    payment_id = str(obj.get("id") or "")
+
+    # Refund notifications contain the refund id in object.id and the original
+    # payment id in object.payment_id. Never treat the refund id as a payment id.
+    is_refund = event.startswith("refund.")
+    payment_id = str((obj.get("payment_id") if is_refund else obj.get("id")) or "")
     if not payment_id:
         raise HTTPException(status_code=400, detail="Payment id is required")
 
-    # Authenticate the event by querying the payment directly with YooKassa.
+    # Query YooKassa directly so the webhook body cannot forge payment state.
     payment = get_payment(payment_id)
-    status = str(payment.get("status") or "").lower()
-    if status != "succeeded":
-        return {"ok": True, "payment_id": payment_id, "status": status}
+    provider_status = str(payment.get("status") or "").lower()
+    if is_refund:
+        if event == "refund.succeeded":
+            status = "refunded"
+        else:
+            status = "refund_pending"
+    else:
+        status = provider_status
 
     checkout = _checkout_by_provider_payment("yookassa", payment_id)
     if not checkout:
@@ -311,7 +321,7 @@ async def yookassa_payment_status(request: Request):
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
-    event_key = f"yookassa:{event or 'payment.succeeded'}:{payment_id}:{status}"
+    event_key = f"yookassa:{event or 'payment.status'}:{payment_id}:{status}"
 
     try:
         result = _process_billing_event(
@@ -332,6 +342,7 @@ async def yookassa_payment_status(request: Request):
         "event": event,
         "payment_id": payment_id,
         "status": status,
+        "provider_status": provider_status,
         "plan": plan,
         "duplicate": bool((result or {}).get("duplicate")),
     }
