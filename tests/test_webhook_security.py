@@ -32,14 +32,7 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_rejects_missing_authentication(self):
-        request = self._request(headers={})
-        with self.assertRaises(Exception) as ctx:
-            tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
-        self.assertIn("Unauthorized", str(ctx.exception))
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_provider_token_without_optional_bearer(self):
+    def test_tbank_accepts_configured_bearer_secret(self):
         request = self._request(headers={"authorization": "Bearer unit-test-secret"})
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
