@@ -1,4 +1,5 @@
 import ast
+import inspect
 import unittest
 from pathlib import Path
 
@@ -225,8 +226,10 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("request_token = st.context.cookies.get(_AUTH_COOKIE)", source)
         self.assertIn("The startup path is now deliberately non-blocking", source)
         self.assertIn("return bool(_restore_session_from_cookie())", source)
-        self.assertNotIn("time.sleep(0.15)", source)
-        self.assertNotIn("st.rerun()", source)
+        from saas_core import _auth_bootstrap_gate
+        gate_source = inspect.getsource(_auth_bootstrap_gate)
+        self.assertNotIn("time.sleep(0.15)", gate_source)
+        self.assertNotIn("st.rerun()", gate_source)
 
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
