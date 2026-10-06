@@ -223,8 +223,10 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("_saas_cookie_probe_count", source)
         self.assertIn("min(probe_count + 1, 2)", source)
         self.assertIn("request_token = st.context.cookies.get(_AUTH_COOKIE)", source)
-        self.assertIn("Never block the first render", source)
-        self.assertNotIn("Восстанавливаем сессию", source)
+        self.assertIn("The startup path is now deliberately non-blocking", source)
+        self.assertIn("return bool(_restore_session_from_cookie())", source)
+        self.assertNotIn("time.sleep(0.15)", source)
+        self.assertNotIn("st.rerun()", source)
 
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
