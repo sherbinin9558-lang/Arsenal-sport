@@ -11,7 +11,7 @@ SAAS_BUSINESS_PRICE
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
 """
-import os, uuid, requests
+import os, time, uuid, requests
 import streamlit as st
 
 PLANS = {
@@ -119,7 +119,25 @@ def create_checkout(plan, tenant_id):
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
-    _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
+    # The provider payment already exists at this point. Retry the durable
+    # local record a small, bounded number of times so a transient Supabase
+    # failure does not strand a real payment without an application record.
+    save_error = None
+    for attempt in range(3):
+        try:
+            _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
+            save_error = None
+            break
+        except Exception as exc:
+            save_error = exc
+            if attempt < 2:
+                time.sleep(0.5 * (2 ** attempt))
+    if save_error is not None:
+        raise RuntimeError(
+            "Платёж в ЮKassa создан, но не удалось сохранить checkout-сессию. "
+            f"Идентификатор checkout: {checkout_id}; payment: {data.get('id')}. "
+            "Повторите синхронизацию checkout после восстановления Supabase."
+        ) from save_error
     return data
 
 def get_payment(payment_id):
