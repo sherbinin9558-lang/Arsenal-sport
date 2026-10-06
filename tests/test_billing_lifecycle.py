@@ -48,7 +48,7 @@ class BillingLifecycleSqlTests(unittest.TestCase):
                 "Token": "ignored",
             })
         expected = __import__("hashlib").sha256(
-            "123CONFIRMEDTBankTestsecret".encode("utf-8")
+            "secret123CONFIRMEDTBankTest".encode("utf-8")
         ).hexdigest()
         self.assertEqual(token, expected)
 
