@@ -10,14 +10,19 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
-from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
+from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_load_keyset, data_count, dashboard_snapshot, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
 from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation, crm_insights, update_instagram_draft)
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.settings import render_settings
+from ui.legal import render_legal
 from production_ops import observability_snapshot, provider_health
+from observability import configure_observability, install_exception_hook
+
+configure_observability()
+install_exception_hook()
 
 # ==================== КОНФИГУРАЦИЯ ====================
 PRODUCTS_FILE = Path("products.json")
@@ -895,7 +900,7 @@ st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobil
 
 base_tab_labels = [
     "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
-    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр"
+    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр", "⚖ Правовая"
 ]
 _is_platform_admin = platform_admin_enabled()
 tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
@@ -920,10 +925,10 @@ button[aria-label*="Прокрут"] {
 _tabs = st.tabs(tab_labels)
 if _is_platform_admin:
     tab_admin = _tabs[0]
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = _tabs[1:10]
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = _tabs[1:11]
 else:
     tab_admin = None
-    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = _tabs[:9]
+    tab_dashboard, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = _tabs[:10]
 
 # ========== DASHBOARD ==========
 if tab_admin is not None:
@@ -933,7 +938,7 @@ if tab_admin is not None:
 with tab_dashboard:
     render_dashboard(
         load_products=load_products, load_plan=load_plan, load_leads=load_leads, load_orders=load_orders,
-        crm_metrics=crm_metrics, order_metrics=order_metrics, conversion_metrics=conversion_metrics,
+        dashboard_snapshot=dashboard_snapshot, crm_metrics=crm_metrics, order_metrics=order_metrics, conversion_metrics=conversion_metrics,
         workflow_metrics=workflow_metrics, low_stock_products=low_stock_products,
         growth_recommendations=_cached_growth_recommendations, max_product_title=max_product_title,
         attribution_loader=load_attribution, attribution_metrics=attribution_metrics,
@@ -1762,7 +1767,7 @@ DEFAULT_SETTINGS = {
 }
 
 def load_settings():
-    rows = data_load("settings", [])
+    rows = data_load_keyset("settings", page_size=1)["rows"]
     data = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
     if data.get("_saas_record_id"):
         st.session_state["_settings_baseline"] = {
@@ -1786,7 +1791,7 @@ def save_settings(data):
         st.session_state["_app_data_revision"] = st.session_state.get("_app_data_revision", 0) + 1
         st.session_state.pop("max_data_snapshot", None)
         return
-    existing = data_load("settings", [])
+    existing = data_load_keyset("settings", page_size=1)["rows"]
     if existing and isinstance(existing[0], dict) and existing[0].get("_saas_record_id"):
         payload["_saas_record_id"] = existing[0]["_saas_record_id"]
     data_save("settings", [payload])
@@ -1844,7 +1849,8 @@ with tab8:
             try:
                 queue_agent_action("create_task", {"title":"AI follow-up по горячим лидам","priority":"Высокий"}); st.rerun()
             except Exception as e: st.error(str(e))
-        actions = [x for x in data_load("agent_actions", []) if x.get("status") == "pending_approval"]
+        actions = data_load_keyset("agent_actions", page_size=10, search="")["rows"]
+        actions = [x for x in actions if x.get("status") == "pending_approval"]
         for action in actions[:10]:
             st.write(f"**{action.get('action')}** · {action.get('id')}")
             if st.button("Подтвердить и выполнить", key=f"p3_approve_{action.get('id')}"):
@@ -1888,6 +1894,10 @@ with tab8:
     iq = instagram_queue()
     if iq: st.dataframe(iq[:20], use_container_width=True, hide_index=True)
     else: st.info("Очередь Instagram пока пуста.")
+
+# ========== 9: ПРАВОВАЯ ИНФОРМАЦИЯ ==========
+with tab9:
+    render_legal()
 
 # ========== 7: НАСТРОЙКИ ==========
 with tab7:
