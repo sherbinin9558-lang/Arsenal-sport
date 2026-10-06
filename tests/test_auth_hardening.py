@@ -48,9 +48,7 @@ class AuthHardeningTests(unittest.TestCase):
             self.assertTrue(saas_core._auth_bootstrap_gate())
         self.assertNotIn("_saas_auth_bootstrap_done", saas_core.st.session_state)
 
-    def test_auth_bootstrap_waits_without_rendering_login_during_cookie_handshake(self):
-        for key in ("saas_access_token", "_saas_auth_bootstrap_done", "_saas_auth_bootstrap_started_at", "_saas_auth_bootstrap_attempts", "_saas_cookie_restore_failed", "saas_auth_error"):
-            saas_core.st.session_state.pop(key, None)
+    def test_auth_bootstrap_falls_back_to_login_without_rerun_loop(self):
         calls = {"restore": 0, "rerun": 0, "login": 0}
 
         def restore():
@@ -66,22 +64,21 @@ class AuthHardeningTests(unittest.TestCase):
               patch.object(saas_core.st, "rerun", side_effect=rerun),
               patch.object(saas_core.time, "sleep"),
               patch.object(saas_core, "login_ui", side_effect=lambda: calls.__setitem__("login", calls["login"] + 1))):
-            with self.assertRaisesRegex(RuntimeError, "rerun"):
-                saas_core.require_saas_access()
+            saas_core.require_saas_access()
 
-        self.assertGreater(calls["restore"], 0)
-        self.assertGreater(calls["rerun"], 0)
-        self.assertEqual(calls["login"], 0)
-        self.assertFalse(saas_core.st.session_state.get("_saas_auth_bootstrap_done", False))
+        self.assertEqual(calls["restore"], 1)
+        self.assertEqual(calls["rerun"], 0)
+        self.assertEqual(calls["login"], 1)
 
-    def test_auth_bootstrap_timeout_releases_control_to_login(self):
-        saas_core.st.session_state["_saas_auth_bootstrap_started_at"] = 100.0
-        saas_core.st.session_state["_saas_auth_bootstrap_attempts"] = 6
-        with (patch.object(saas_core, "_restore_session_from_cookie", return_value=False),
-              patch.object(saas_core.time, "time", return_value=103.0)):
+    def test_auth_bootstrap_anonymous_path_is_non_blocking(self):
+        saas_core.st.session_state.pop("_saas_auth_bootstrap_done", None)
+        saas_core.st.session_state.pop("_saas_auth_bootstrap_started_at", None)
+        saas_core.st.session_state.pop("_saas_auth_bootstrap_attempts", None)
+        with patch.object(saas_core, "_restore_session_from_cookie", return_value=False):
             self.assertFalse(saas_core._auth_bootstrap_gate())
-        self.assertTrue(saas_core.st.session_state.get("_saas_auth_bootstrap_done"))
-        self.assertNotIn("saas_auth_error", saas_core.st.session_state)
+        self.assertNotIn("_saas_auth_bootstrap_done", saas_core.st.session_state)
+        self.assertNotIn("_saas_auth_bootstrap_started_at", saas_core.st.session_state)
+        self.assertNotIn("_saas_auth_bootstrap_attempts", saas_core.st.session_state)
 
     def test_auth_bootstrap_terminal_cookie_failure_does_not_leak_stale_error_to_login(self):
         saas_core.st.session_state["saas_auth_error"] = "stale backend detail"
@@ -90,11 +87,11 @@ class AuthHardeningTests(unittest.TestCase):
             self.assertFalse(saas_core._auth_bootstrap_gate())
         self.assertNotIn("saas_auth_error", saas_core.st.session_state)
 
-    def test_auth_bootstrap_marks_terminal_cookie_failure_without_auth_error(self):
+    def test_auth_bootstrap_keeps_terminal_cookie_failure_free_of_legacy_state(self):
         saas_core.st.session_state["_saas_cookie_restore_failed"] = True
         with patch.object(saas_core, "_restore_session_from_cookie", return_value=False):
             self.assertFalse(saas_core._auth_bootstrap_gate())
-        self.assertTrue(saas_core.st.session_state.get("_saas_auth_bootstrap_done"))
+        self.assertNotIn("_saas_auth_bootstrap_done", saas_core.st.session_state)
         self.assertNotIn("saas_auth_error", saas_core.st.session_state)
 
 
