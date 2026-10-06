@@ -1086,14 +1086,8 @@ def _auth_bootstrap_gate():
     elapsed = now - started
     if attempts < max_attempts and elapsed < timeout_seconds:
         st.session_state["_saas_auth_bootstrap_attempts"] = attempts + 1
-        st.markdown(
-            '<div style="padding:3rem 1rem;text-align:center;opacity:.78">'
-            '<div style="font-size:1.1rem;font-weight:700">Восстанавливаем сессию…</div>'
-            '<div style="margin-top:.45rem;font-size:.9rem">Проверяем сохранённый вход.</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        time.sleep(0.25)
+        # Never block the first render with the public login surface while the cookie handshake is pending.
+        time.sleep(0.15)
         st.rerun()
 
     st.session_state["_saas_auth_bootstrap_done"] = True
