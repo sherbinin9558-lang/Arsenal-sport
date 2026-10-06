@@ -900,7 +900,7 @@ st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobil
 
 base_tab_labels = [
     "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
-    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр"
+    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр", "⚖ Правовая"
 ]
 _is_platform_admin = platform_admin_enabled()
 tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
