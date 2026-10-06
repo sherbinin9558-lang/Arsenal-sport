@@ -49,6 +49,8 @@ class AuthHardeningTests(unittest.TestCase):
         self.assertNotIn("_saas_auth_bootstrap_done", saas_core.st.session_state)
 
     def test_auth_bootstrap_waits_without_rendering_login_during_cookie_handshake(self):
+        for key in ("saas_access_token", "_saas_auth_bootstrap_done", "_saas_auth_bootstrap_started_at", "_saas_auth_bootstrap_attempts", "_saas_cookie_restore_failed", "saas_auth_error"):
+            saas_core.st.session_state.pop(key, None)
         calls = {"restore": 0, "rerun": 0, "login": 0}
 
         def restore():
