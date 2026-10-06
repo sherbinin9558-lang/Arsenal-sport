@@ -285,6 +285,24 @@ _AUTH_ATTEMPTS_KEY = "_saas_auth_attempts"
 _AUTH_GLOBAL_ATTEMPTS = defaultdict(deque)
 _AUTH_GLOBAL_LIMIT = 10
 _AUTH_GLOBAL_WINDOW = 15 * 60
+_AUTH_GLOBAL_MAX_KEYS = 10000
+
+def _prune_global_auth_attempts(now):
+    """Bound process-local limiter memory under high-cardinality attacks."""
+    stale = [
+        key for key, attempts in _AUTH_GLOBAL_ATTEMPTS.items()
+        if not attempts or now - float(attempts[-1]) >= _AUTH_GLOBAL_WINDOW
+    ]
+    for key in stale:
+        _AUTH_GLOBAL_ATTEMPTS.pop(key, None)
+    if len(_AUTH_GLOBAL_ATTEMPTS) <= _AUTH_GLOBAL_MAX_KEYS:
+        return
+    oldest = sorted(
+        _AUTH_GLOBAL_ATTEMPTS.items(),
+        key=lambda item: float(item[1][-1]) if item[1] else 0.0,
+    )
+    for key, _ in oldest[:len(_AUTH_GLOBAL_ATTEMPTS) - _AUTH_GLOBAL_MAX_KEYS]:
+        _AUTH_GLOBAL_ATTEMPTS.pop(key, None)
 
 def _client_fingerprint():
     try:
@@ -301,6 +319,7 @@ def _rate_limit_key(email):
 
 def _check_global_auth_attempt_limit(email):
     now = time.time()
+    _prune_global_auth_attempts(now)
     key = _rate_limit_key(email)
     recent = _AUTH_GLOBAL_ATTEMPTS[key]
     while recent and now - float(recent[0]) >= _AUTH_GLOBAL_WINDOW:
