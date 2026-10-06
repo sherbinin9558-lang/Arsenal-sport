@@ -58,11 +58,11 @@ class AuthHardeningTests(unittest.TestCase):
         def rerun():
             calls["rerun"] += 1
 
-        with patch.object(saas_core, "saas_enabled", return_value=True), \\
-             patch.object(saas_core, "_restore_session_from_cookie", side_effect=restore), \\
-             patch.object(saas_core.st, "rerun", side_effect=rerun), \\
-             patch.object(saas_core.time, "sleep"), \\
-             patch.object(saas_core, "login_ui", side_effect=lambda: calls.__setitem__("login", calls["login"] + 1)):
+        with (patch.object(saas_core, "saas_enabled", return_value=True),
+              patch.object(saas_core, "_restore_session_from_cookie", side_effect=restore),
+              patch.object(saas_core.st, "rerun", side_effect=rerun),
+              patch.object(saas_core.time, "sleep"),
+              patch.object(saas_core, "login_ui", side_effect=lambda: calls.__setitem__("login", calls["login"] + 1))):
             saas_core.require_saas_access()
 
         self.assertGreater(calls["restore"], 0)
@@ -73,8 +73,8 @@ class AuthHardeningTests(unittest.TestCase):
     def test_auth_bootstrap_timeout_releases_control_to_login(self):
         saas_core.st.session_state["_saas_auth_bootstrap_started_at"] = 100.0
         saas_core.st.session_state["_saas_auth_bootstrap_attempts"] = 6
-        with patch.object(saas_core, "_restore_session_from_cookie", return_value=False), \\
-             patch.object(saas_core.time, "time", return_value=103.0):
+        with (patch.object(saas_core, "_restore_session_from_cookie", return_value=False),
+              patch.object(saas_core.time, "time", return_value=103.0)):
             self.assertFalse(saas_core._auth_bootstrap_gate())
         self.assertTrue(saas_core.st.session_state.get("_saas_auth_bootstrap_done"))
         self.assertNotIn("saas_auth_error", saas_core.st.session_state)
