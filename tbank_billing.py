@@ -32,7 +32,7 @@ def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
 
 def _token(data):
-    values={k:v for k,v in data.items() if k not in ("Token","Receipt","DATA","Shops","Items") and v is not None}
+    values={k:v for k,v in data.items() if k not in ("Token","Receipt","DATA","Data","ForeignReceiver","Shops","Items") and v is not None}
     values["Password"]=PASSWORD
     raw="".join(str(values[k]) for k in sorted(values))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
