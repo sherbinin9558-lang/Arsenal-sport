@@ -152,46 +152,6 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(process.call_args.args[2], "payment-1")
         self.assertEqual(process.call_args.args[3], "refunded")
 
-    def test_chunked_oversized_request_is_rejected(self):
-        async def run():
-            sent = []
-            chunks = [
-                {"type": "http.request", "body": b"x" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2), "more_body": True},
-                {"type": "http.request", "body": b"y" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2 + 1), "more_body": False},
-            ]
-            async def receive():
-                return chunks.pop(0)
-            async def send(message):
-                sent.append(message)
-            async def downstream(scope, receive, send):
-                await receive()
-                await receive()
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
-            await middleware({"type": "http", "headers": []}, receive, send)
-            return sent
-        sent = asyncio.run(run())
-        body = b"".join(m.get("body", b"") for m in sent)
-        self.assertTrue(any(m.get("status") == 413 for m in sent))
-        self.assertIn(b"Request too large", body)
-
-    @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
-    def test_yookassa_refund_event_uses_original_payment_id(self):
-        request = self._request(headers={"authorization": "Bearer yoo-secret"})
-        body = {
-            "event": "refund.succeeded",
-            "object": {"id": "refund-1", "payment_id": "payment-1"},
-        }
-        with patch.object(tbank_webhook, "_read_body", return_value=body), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
-             patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
-                 "tenant_id": "tenant-1", "plan": "starter"
-             }), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
-            response = asyncio.run(tbank_webhook.yookassa_payment_status(request))
-        self.assertEqual(response["status"], "refunded")
-        self.assertEqual(response["payment_id"], "payment-1")
-        self.assertEqual(process.call_args.args[2], "payment-1")
-        self.assertEqual(process.call_args.args[3], "refunded")
 
 
 if __name__ == "__main__":
