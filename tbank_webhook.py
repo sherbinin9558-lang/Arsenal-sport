@@ -93,9 +93,17 @@ async def readyz():
     url, key = _supabase()
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
-    if not _env("TBANK_WEBHOOK_SECRET") and not _env("YOOKASSA_WEBHOOK_SECRET"):
-        raise HTTPException(status_code=503, detail="Webhook authentication is not configured")
-    return {"ok": True, "service": "billing-webhook", "supabase": "configured"}
+    tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
+    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
+    if not tbank_ready and not yookassa_ready:
+        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+    return {
+        "ok": True,
+        "service": "billing-webhook",
+        "supabase": "configured",
+        "tbank": "configured" if tbank_ready else "disabled",
+        "yookassa": "configured" if yookassa_ready else "disabled",
+    }
 
 
 def _env(name, default=""):
