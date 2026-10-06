@@ -1042,6 +1042,61 @@ def render_onboarding():
             st.session_state["saas_onboarding_complete"]=True; st.success("Магазин настроен. MAX готов к работе."); st.rerun()
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
+def _auth_bootstrap_gate():
+    """Keep the public auth surface hidden while a browser reload restores its cookie.
+
+    Streamlit can execute Python before CookieController has returned the browser
+    cookie. During that short handshake, rendering login_ui() creates a visible
+    login flash and a second rerun can briefly expose a stale auth error. The
+    bootstrap gate therefore owns the first few reload cycles and renders only a
+    neutral status until cookie restoration succeeds or the bounded timeout is
+    reached. It never changes Supabase data or credentials.
+    """
+    if st.session_state.get("saas_access_token"):
+        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
+        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
+        st.session_state.pop("_saas_auth_bootstrap_done", None)
+        return True
+
+    if st.session_state.get("_saas_auth_bootstrap_done"):
+        return False
+
+    now = time.time()
+    started = float(st.session_state.get("_saas_auth_bootstrap_started_at", 0) or 0)
+    if not started:
+        started = now
+        st.session_state["_saas_auth_bootstrap_started_at"] = started
+    attempts = int(st.session_state.get("_saas_auth_bootstrap_attempts", 0) or 0)
+    max_attempts = 6
+    timeout_seconds = 2.5
+
+    if _restore_session_from_cookie():
+        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
+        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
+        st.session_state.pop("_saas_auth_bootstrap_done", None)
+        return True
+
+    if st.session_state.get("_saas_cookie_restore_failed"):
+        st.session_state["_saas_auth_bootstrap_done"] = True
+        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
+        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
+        st.session_state.pop("saas_auth_error", None)
+        return False
+
+    elapsed = now - started
+    if attempts < max_attempts and elapsed < timeout_seconds:
+        st.session_state["_saas_auth_bootstrap_attempts"] = attempts + 1
+        # Never block the first render with the public login surface while the cookie handshake is pending.
+        time.sleep(0.15)
+        st.rerun()
+
+    st.session_state["_saas_auth_bootstrap_done"] = True
+    st.session_state.pop("_saas_auth_bootstrap_started_at", None)
+    st.session_state.pop("_saas_auth_bootstrap_attempts", None)
+    st.session_state.pop("saas_auth_error", None)
+    return False
+
+
 def require_saas_access():
     if not saas_enabled():
         if demo_mode_enabled():
@@ -1055,40 +1110,24 @@ def require_saas_access():
         return False
 
     if not st.session_state.get("saas_access_token"):
-        if not _restore_session_from_cookie():
+        if not _auth_bootstrap_gate():
             if st.session_state.get("saas_auth_error"):
-                # A failed cookie refresh must never render the legacy/red auth
-                # error screen before the current public login. Keep the public
-                # entry point as the only visible auth UI.
                 auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
-                st.session_state.pop("saas_access_token", None)
-                st.session_state.pop("saas_user_id", None)
-                st.session_state.pop("saas_tenant_id", None)
-                st.session_state.pop("saas_tenant_name", None)
-                st.session_state.pop("saas_tenant_status", None)
-                st.session_state.pop("saas_plan", None)
                 st.session_state["_saas_login_notice"] = (
                     "Сессию не удалось восстановить автоматически. Войдите снова."
                     if auth_error else ""
                 )
-                login_ui()
-                return False
-
-            # Never block the first render waiting for the client-side
-            # CookieController handshake. A stalled component can otherwise
-            # leave Streamlit on an endless loading screen. The request-cookie
-            # fast path in _read_refresh_token() handles normal authenticated
-            # reloads; when no token is available, show the login UI immediately.
-            st.session_state.pop("_saas_cookie_probe_count", None)
-            st.session_state.pop("_saas_cookie_restore_failed", None)
+            st.session_state.pop("saas_access_token", None)
+            st.session_state.pop("saas_user_id", None)
+            st.session_state.pop("saas_tenant_id", None)
+            st.session_state.pop("saas_tenant_name", None)
+            st.session_state.pop("saas_tenant_status", None)
+            st.session_state.pop("saas_plan", None)
             login_ui()
             return False
 
     if not _restore_session_from_access_token():
         if st.session_state.get("saas_auth_error"):
-            # Do not expose a red legacy auth error on the public entry path.
-            # Preserve the session error for diagnostics, but keep the visible
-            # surface limited to the current login UI.
             auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
             st.session_state["_saas_login_notice"] = (
                 "Не удалось подтвердить текущую сессию. Войдите снова."

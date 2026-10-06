@@ -25,8 +25,6 @@ configure_observability()
 install_exception_hook()
 
 # ==================== КОНФИГУРАЦИЯ ====================
-PRODUCTS_FILE = Path("products.json")
-CONTENT_PLAN_FILE = Path("content_plan.json")
 CARD_SIZE = (1080, 1350)
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -55,19 +53,6 @@ CATEGORY_EMOJI = {
 }
 
 # ==================== ДАННЫЕ ====================
-def load_json(path, default):
-    if path.exists():
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return default
-    return default
-
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
 def max_product_title(product):
     """Return a safe short product title for dashboard/MAX summaries."""
     if not isinstance(product, dict):
