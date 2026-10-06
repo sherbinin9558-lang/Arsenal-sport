@@ -43,5 +43,18 @@ class AuthHardeningTests(unittest.TestCase):
         )
 
 
+    def test_auth_bootstrap_accepts_restored_cookie_without_login_ui(self):
+        with patch.object(saas_core, "_restore_session_from_cookie", return_value=True):
+            self.assertTrue(saas_core._auth_bootstrap_gate())
+        self.assertNotIn("_saas_auth_bootstrap_done", saas_core.st.session_state)
+
+    def test_auth_bootstrap_marks_terminal_cookie_failure_without_auth_error(self):
+        saas_core.st.session_state["_saas_cookie_restore_failed"] = True
+        with patch.object(saas_core, "_restore_session_from_cookie", return_value=False):
+            self.assertFalse(saas_core._auth_bootstrap_gate())
+        self.assertTrue(saas_core.st.session_state.get("_saas_auth_bootstrap_done"))
+        self.assertNotIn("saas_auth_error", saas_core.st.session_state)
+
+
 if __name__ == "__main__":
     unittest.main()
