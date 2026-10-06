@@ -47,7 +47,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           missing=0
-          for name in SAAS_PUBLIC_URL E2E_EMAIL E2E_PASSWORD TELEGRAM_BOT_TOKEN; do
+          for name in SAAS_PUBLIC_URL E2E_EMAIL E2E_PASSWORD TELEGRAM_BOT_TOKEN VK_TOKEN; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing required secret: $name"
               missing=1
@@ -77,6 +77,8 @@ jobs:
         env:
           LOAD_REQUESTS: "20"
           LOAD_WORKERS: "5"
+          SMOKE_STRICT: "1"
+          VK_REQUIRED: "1"
       - name: Generate JUnit report
         if: always()
         run: python scripts/p2_smoke_junit.py smoke-report.json smoke-junit.xml
@@ -99,6 +101,7 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       VK_TOKEN: ${{ secrets.VK_TOKEN }}
+      VK_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
