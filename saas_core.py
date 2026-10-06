@@ -1043,58 +1043,26 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Keep the public auth surface hidden while a browser reload restores its cookie.
+    """Restore an existing session without blocking the public startup path.
 
-    Streamlit can execute Python before CookieController has returned the browser
-    cookie. During that short handshake, rendering login_ui() creates a visible
-    login flash and a second rerun can briefly expose a stale auth error. The
-    bootstrap gate therefore owns the first few reload cycles and renders only a
-    neutral status until cookie restoration succeeds or the bounded timeout is
-    reached. It never changes Supabase data or credentials.
+    CookieController is client-side, so a hard reload can race its first
+    response. The previous implementation solved that by sleeping and forcing
+    repeated Streamlit reruns. That made startup depend on a timing loop and
+    could leave the app appearing to load indefinitely on some runtimes.
+
+    The startup path is now deliberately non-blocking: try the cookie once and
+    immediately fall back to the normal login UI when no valid session exists.
+    A real cookie is restored normally; anonymous users never need a bootstrap
+    wait. This function does not change Supabase data or credentials.
     """
     if st.session_state.get("saas_access_token"):
-        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
-        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
-        st.session_state.pop("_saas_auth_bootstrap_done", None)
-        return True
-
-    if st.session_state.get("_saas_auth_bootstrap_done"):
-        return False
-
-    now = time.time()
-    started = float(st.session_state.get("_saas_auth_bootstrap_started_at", 0) or 0)
-    if not started:
-        started = now
-        st.session_state["_saas_auth_bootstrap_started_at"] = started
-    attempts = int(st.session_state.get("_saas_auth_bootstrap_attempts", 0) or 0)
-    max_attempts = 6
-    timeout_seconds = 2.5
-
-    if _restore_session_from_cookie():
-        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
-        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
-        st.session_state.pop("_saas_auth_bootstrap_done", None)
         return True
 
     if st.session_state.get("_saas_cookie_restore_failed"):
-        st.session_state["_saas_auth_bootstrap_done"] = True
-        st.session_state.pop("_saas_auth_bootstrap_started_at", None)
-        st.session_state.pop("_saas_auth_bootstrap_attempts", None)
         st.session_state.pop("saas_auth_error", None)
         return False
 
-    elapsed = now - started
-    if attempts < max_attempts and elapsed < timeout_seconds:
-        st.session_state["_saas_auth_bootstrap_attempts"] = attempts + 1
-        # Never block the first render with the public login surface while the cookie handshake is pending.
-        time.sleep(0.15)
-        st.rerun()
-
-    st.session_state["_saas_auth_bootstrap_done"] = True
-    st.session_state.pop("_saas_auth_bootstrap_started_at", None)
-    st.session_state.pop("_saas_auth_bootstrap_attempts", None)
-    st.session_state.pop("saas_auth_error", None)
-    return False
+    return bool(_restore_session_from_cookie())
 
 
 def require_saas_access():
