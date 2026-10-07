@@ -24,6 +24,19 @@ from saas_admin import (
 def _supabase_config():
     return supabase_config()
 
+
+def _headers(token=None):
+    """Build Supabase REST/Auth headers for anonymous or authenticated calls."""
+    _, anon_key = _supabase_config()
+    if not anon_key:
+        raise SupabaseRequestError("SUPABASE_ANON_KEY не настроен.")
+    access_token = str(token or anon_key)
+    return {
+        "apikey": anon_key,
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
 class SupabaseRequestError(RuntimeError):
     def __init__(self, message, status_code=None):
         super().__init__(message)
