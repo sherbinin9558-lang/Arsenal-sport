@@ -1,8 +1,10 @@
 name: Supabase RLS audit gate
 
 on:
+  push:
+    branches: [main, 'work/**']
   pull_request:
-    branches: ["main"]
+    branches: [main]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
@@ -20,8 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        with: {python-version: "3.11"}
       - name: Require Supabase integration-test credentials
         run: |
           missing=0
@@ -29,7 +30,6 @@ jobs:
           [ -n "$SUPABASE_ANON_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_ANON_KEY"; missing=1; }
           [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_SERVICE_ROLE_KEY"; missing=1; }
           [ "$missing" -eq 0 ]
-      - name: Install test dependency
-        run: pip install "requests>=2.32.0"
+      - run: pip install "requests>=2.32.0"
       - name: Run real authenticated RLS matrix
         run: python scripts/supabase_rls_integration.py
