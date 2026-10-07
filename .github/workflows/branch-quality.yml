@@ -6,6 +6,7 @@ on:
       - ai-operator-hardening-20261005
       - integration/final-20261005
       - 'fix/**'
+      - 'work/**'
   pull_request:
     branches:
       - main
