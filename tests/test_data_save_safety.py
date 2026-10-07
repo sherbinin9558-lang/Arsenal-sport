@@ -81,7 +81,7 @@ class ProductStockRegressionTests(unittest.TestCase):
         self.assertIn('"total_stock": p.get("total_stock", p.get("stock", 0))', source)
 
     def test_product_and_content_updates_merge_existing_fields(self):
-        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "app_data.py").read_text(encoding="utf-8")
         self.assertIn("existing = dict(p[idx] or {})", source)
         self.assertIn("existing.update(updated)", source)
         self.assertIn('existing.pop("_saas_record_id", None)', source)
@@ -167,9 +167,10 @@ class DemoModeRecordRegressionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         catalog = (root / "ui" / "catalog.py").read_text(encoding="utf-8")
         app = (root / "app.py").read_text(encoding="utf-8")
+        app_data = (root / "app_data.py").read_text(encoding="utf-8")
         self.assertIn('record_id = p.get("_saas_record_id") or local_i', catalog)
         self.assertIn("render_catalog(", app)
-        self.assertIn("def _find_record_index(", app)
+        self.assertIn("def _find_record_index(", app_data)
 
 
 class CatalogPlanLimitRegressionTests(unittest.TestCase):
@@ -299,7 +300,7 @@ class MaxWriteInvalidationRegressionTests(unittest.TestCase):
 
 class DashboardWriteInvalidationRegressionTests(unittest.TestCase):
     def test_product_atomic_writes_invalidate_dashboard_snapshot(self):
-        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "app_data.py").read_text(encoding="utf-8")
         self.assertIn('st.session_state["_app_data_revision"]', source)
         self.assertIn('data_update_record("products"', source)
         self.assertIn('data_delete_record("products"', source)
@@ -324,7 +325,7 @@ class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
         self.assertIn('_app_data_revision', dashboard)
 
     def test_content_plan_uses_atomic_single_record_writes(self):
-        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "app_data.py").read_text(encoding="utf-8")
         self.assertIn('data_update_record("content_plan"', source)
         self.assertIn('data_delete_record("content_plan"', source)
         self.assertIn('expected = existing.get("_saas_updated_at")', source)
