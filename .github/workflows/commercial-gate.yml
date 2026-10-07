@@ -35,5 +35,5 @@ jobs:
           PYTHONPATH=. pytest -q             tests/test_max_operator.py             tests/test_ai_gateway.py             tests/test_webmcp_data.py             tests/test_core_regression.py             tests/test_observability.py
       - name: Production configuration gate
         run: |
-          test -f supabase/migrations/20261007190000_revoke_anon_saas_grants.sql
+          test -f supabase/migrations/20261007182130_revoke_anon_saas_grants.sql
           test -f supabase/migrations/20261007180000_ai_usage_rls_initplan.sql
