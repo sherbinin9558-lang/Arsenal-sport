@@ -3,7 +3,7 @@ name: decomposition-contract
 on:
   push:
     branches:
-      - 'work/decompose-app-core-20261007'
+      - 'work/decompose-*'
 
 jobs:
   test:
@@ -14,4 +14,4 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: pytest -q tests/test_app_data_module.py
+      - run: pytest -q tests/test_app_data_module.py tests/test_saas_config.py tests/test_saas_admin.py
