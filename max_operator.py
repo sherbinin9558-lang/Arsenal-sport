@@ -30,6 +30,17 @@ ACTIONS = {
     "auto_bulk_apply": {"mode": WRITE, "label": "Применить изменения к товарам"},
     "auto_stock_save": {"mode": WRITE, "label": "Сохранить остатки"},
     "auto_run_all": {"mode": WRITE, "label": "Запустить автоматизацию"},
+    "crm_update_status": {"mode": WRITE, "label": "Изменить статус заявки"},
+    "crm_add_note": {"mode": WRITE, "label": "Добавить заметку в CRM"},
+    "create_order": {"mode": WRITE, "label": "Создать заказ"},
+    "update_order_status": {"mode": WRITE, "label": "Изменить статус заказа"},
+    "account_auto_renew": {"mode": WRITE, "label": "Изменить автопродление"},
+    "account_plan_request": {"mode": WRITE, "label": "Запросить смену тарифа"},
+    "team_set_role": {"mode": WRITE, "label": "Изменить роль сотрудника"},
+    "team_invite": {"mode": WRITE, "label": "Создать приглашение сотруднику"},
+    "billing_tbank_checkout": {"mode": WRITE, "label": "Создать платёж Т‑Банк"},
+    "billing_yookassa_checkout": {"mode": WRITE, "label": "Создать платёж ЮKassa"},
+    "account_save_settings": {"mode": WRITE, "label": "Сохранить настройки магазина"},
 }
 
 _PATTERNS = (
