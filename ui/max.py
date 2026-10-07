@@ -612,13 +612,15 @@ def render_max():
                     disabled=not can("write_data"),
                 )
                 if ns != current_status:
-                    update_lead(lead.get("id"), status=ns)
-                    st.rerun()
+                    result = execute_write("crm_update_status", True, lambda: update_lead(lead.get("id"), status=ns), details={"lead_id": lead.get("id"), "status": ns})
+                    if result["ok"]:
+                        st.rerun()
                 note = st.text_input("Добавить заметку/контакт", key=f"max_note_{lead.get('id')}", disabled=not can("write_data"))
                 if can("write_data") and st.button("💾 Сохранить заметку", key=f"max_note_btn_{lead.get('id')}"):
                     if note.strip():
-                        add_lead_interaction(lead.get("id"), note.strip(), "manager")
-                        st.rerun()
+                        result = execute_write("crm_add_note", True, lambda: add_lead_interaction(lead.get("id"), note.strip(), "manager"), details={"lead_id": lead.get("id")})
+                        if result["ok"]:
+                            st.rerun()
         st.markdown("---")
         history_q = st.text_input("Найти историю клиента по имени/контакту", key="max_history_q")
         if history_q:
@@ -648,8 +650,9 @@ def render_max():
                 if selected_content != "Не привязывать":
                     idx = content_choices.index(selected_content) - 1
                     content_id = attribution_items[idx].get("content_id", "")
-                create_order(customer, contact, product_name, amount=amount, status=status, source=source, content_id=content_id)
-                st.success("Заказ создан.")
+                result = execute_write("create_order", True, lambda: create_order(customer, contact, product_name, amount=amount, status=status, source=source, content_id=content_id), details={"source": source})
+                if result["ok"]:
+                    st.success("Заказ создан.")
                 st.rerun()
 
         if not orders:
@@ -664,8 +667,9 @@ def render_max():
                                   key=f"max_order_status_{order.get('id')}",
                                   disabled=not can("write_data"))
                 if ns != current:
-                    update_order(order.get("id"), status=ns)
-                    st.rerun()
+                    result = execute_write("update_order_status", True, lambda: update_order(order.get("id"), status=ns), details={"order_id": order.get("id"), "status": ns})
+                    if result["ok"]:
+                        st.rerun()
 
     elif section == "Автоматизация":
         st.subheader("🚀 Центр автоматизации AI Agent Content Manager")
@@ -727,8 +731,9 @@ def render_max():
                             skipped.append(f"{f.name}: ошибка обработки ({e})")
                             continue
                         matched += 1
-                    save_products(products_now)
-                    st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
+                    result = execute_write("auto_match_photos", True, lambda: save_products(products_now), details={"matched": matched, "skipped": len(skipped)})
+                    if result["ok"]:
+                        st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
                     if skipped:
                         st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
                     st.rerun()
@@ -776,9 +781,10 @@ def render_max():
                     if key not in existing_keys:
                         existing.append(item)
                         added += 1
-                save_plan(existing)
-                st.success(f"Добавлено {added} публикаций без дублей.")
-                st.rerun()
+                result = execute_write("auto_30_day_plan", True, lambda: save_plan(existing), details={"added": added})
+                if result["ok"]:
+                    st.success(f"Добавлено {added} публикаций без дублей.")
+                    st.rerun()
 
         with auto_tab3:
             st.markdown("### Массовое редактирование")
@@ -805,8 +811,9 @@ def render_max():
                             if current_index is not None:
                                 indexes.append(current_index)
                         changed = bulk_update(products_now, indexes, field, value.strip())
-                        save_products(products_now)
-                        st.success(f"Изменено товаров: {changed}.")
+                        result = execute_write("auto_bulk_apply", True, lambda: save_products(products_now), details={"changed": changed, "field": field})
+                        if result["ok"]:
+                            st.success(f"Изменено товаров: {changed}.")
                         st.rerun()
             else:
                 st.info("Каталог пуст.")
@@ -841,8 +848,9 @@ def render_max():
                         st.stop()
                     products_now[current_stock_idx]["stock_by_size"] = stock
                     products_now[current_stock_idx]["total_stock"] = sum(stock.values())
-                    save_products(products_now)
-                    st.success("Остатки сохранены.")
+                    result = execute_write("auto_stock_save", True, lambda: save_products(products_now), details={"product_id": stock_record_id})
+                    if result["ok"]:
+                        st.success("Остатки сохранены.")
                     st.rerun()
 
         with auto_tab4:
