@@ -1,0 +1,39 @@
+name: Commercial gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: commercial-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Commercial readiness gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --disable-pip-version-check -r requirements.txt pytest
+      - name: Compile critical Python modules
+        run: |
+          python -m py_compile max_operator.py ai_gateway.py ui/max.py webmcp_tools.py
+      - name: Regression and security-focused tests
+        run: |
+          PYTHONPATH=. pytest -q             tests/test_max_operator.py             tests/test_ai_gateway.py             tests/test_webmcp_data.py             tests/test_core_regression.py             tests/test_observability.py
+      - name: Production configuration gate
+        run: |
+          test -f supabase/migrations/20261007190000_revoke_anon_saas_grants.sql
+          test -f supabase/migrations/20261007180000_ai_usage_rls_initplan.sql
