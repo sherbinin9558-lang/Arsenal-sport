@@ -44,7 +44,7 @@ from free_automation import (
 from growth_engine import ai_summary, recommendations as growth_recommendations
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
-from max_operator import audit_event, build_business_snapshot, can_execute, plan_action
+from max_operator import audit_event, build_business_snapshot, can_execute, execute_write, plan_action
 from ai_usage import usage_summary
 from saas_core import (
     activate_paid_subscription,
@@ -338,20 +338,33 @@ def render_max():
         else:
             qa, qb = st.columns(2)
             with qa:
+                quick_approve = st.checkbox(
+                    "Подтвердить изменение данных",
+                    key="max_quick_plan_approve",
+                    disabled=not can("write_data"),
+                )
                 if can("write_data") and st.button("✨ Создать 7 идей контента", use_container_width=True, key="max_quick_plan"):
-                    with st.spinner("MAX готовит план…"):
-                        suggestions = seven_day_plan(products)
-                        existing = load_plan()
-                        existing_keys = {(x.get("date"), x.get("product")) for x in existing}
-                        added = 0
-                        for item in suggestions:
-                            key = (item.get("date"), item.get("product"))
-                            if key not in existing_keys:
-                                existing.append(item); added += 1
-                        save_plan(existing)
-                    st.session_state.pop("max_data_snapshot", None)
-                    st.success(f"Готово: добавлено {added} идей.")
-                    st.rerun()
+                    if not quick_approve:
+                        st.warning("Сначала подтвердите изменение данных.")
+                    else:
+                        with st.spinner("MAX готовит план…"):
+                            suggestions = seven_day_plan(products)
+                            existing = load_plan()
+                            existing_keys = {(x.get("date"), x.get("product")) for x in existing}
+                            added = 0
+                            for item in suggestions:
+                                key = (item.get("date"), item.get("product"))
+                                if key not in existing_keys:
+                                    existing.append(item); added += 1
+                            result = execute_write(
+                                "quick_content_plan",
+                                quick_approve,
+                                lambda: save_plan(existing),
+                                details={"added": added},
+                            )
+                        if result["ok"]:
+                            st.success(f"Готово: добавлено {added} идей.")
+                            st.rerun()
             with qb:
                 if st.button("↻ Обновить анализ MAX", use_container_width=True, key="max_refresh"):
                     st.session_state.pop("max_data_snapshot", None)
@@ -915,15 +928,29 @@ def render_max():
             for channel, text_value in bundle.items():
                 st.markdown(f"**{channel}**")
                 st.text_area(channel, text_value, height=110, key=f"max_bundle_{channel}")
+            plan_approve = st.checkbox(
+                "Подтвердить добавление в контент-план",
+                key="max_plan_suggest_approve",
+                disabled=not can("write_data"),
+            )
             if can("write_data") and st.button("✨ Создать 7 идей и добавить в план", type="primary", key="max_plan_suggest"):
-                suggestions = seven_day_plan(products)
-                existing = load_plan()
-                for item in suggestions:
-                    if not any(x.get("date") == item["date"] and x.get("product") == item["product"] for x in existing):
-                        existing.append(item)
-                save_plan(existing)
-                st.success("План на 7 дней добавлен без дублей.")
-                st.rerun()
+                if not plan_approve:
+                    st.warning("Сначала подтвердите изменение данных.")
+                else:
+                    suggestions = seven_day_plan(products)
+                    existing = load_plan()
+                    for item in suggestions:
+                        if not any(x.get("date") == item["date"] and x.get("product") == item["product"] for x in existing):
+                            existing.append(item)
+                    result = execute_write(
+                        "max_content_suggest",
+                        plan_approve,
+                        lambda: save_plan(existing),
+                        details={"source": "content_section"},
+                    )
+                    if result["ok"]:
+                        st.success("План на 7 дней добавлен без дублей.")
+                        st.rerun()
 
     else:
         st.subheader("Контент → продажи → AI")
