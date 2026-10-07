@@ -1,5 +1,5 @@
 """T-Bank (formerly Tinkoff) Internet Acquiring checkout."""
-import hashlib, os, uuid, requests
+import hashlib, os, time, uuid, requests
 import streamlit as st
 
 def _cfg(name, default=""):
@@ -120,7 +120,6 @@ def create_checkout(plan, tenant_id):
         except Exception as exc:
             save_error = exc
             if attempt < 2:
-                import time
                 time.sleep(0.5 * (2 ** attempt))
     if save_error is not None:
         raise RuntimeError(
