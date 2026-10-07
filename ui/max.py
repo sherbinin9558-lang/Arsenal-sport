@@ -507,7 +507,8 @@ def render_max():
                     if plan_for_payment not in ("starter","pro","business"):
                         plan_for_payment="starter"
                     try:
-                        payment=tbank_create_checkout(plan_for_payment, st.session_state.get("saas_tenant_id"))
+                        result = execute_write("billing_tbank_checkout", True, lambda: tbank_create_checkout(plan_for_payment, st.session_state.get("saas_tenant_id")), details={"plan": plan_for_payment})
+                        payment = result.get("result") if result["ok"] else {}
                         st.session_state["tbank_payment_id"]=payment.get("PaymentId")
                         st.session_state["tbank_order_id"]=payment.get("OrderId")
                         st.session_state["tbank_url"]=payment.get("PaymentURL")
@@ -528,11 +529,13 @@ def render_max():
                     st.caption(f"{price:.2f} ₽ / месяц" if price else "Цена не настроена")
                     if can("billing") and st.button(f"Оплатить {pinfo['name']}", key=f"pay_{pkey}", use_container_width=True):
                         try:
-                            payment=create_checkout(pkey, st.session_state.get("saas_tenant_id"))
-                            st.session_state["billing_payment_id"]=payment.get("id")
-                            st.session_state["billing_plan"]=pkey
-                            st.session_state["billing_url"]=payment["confirmation"]["confirmation_url"]
-                            st.success("Платёж создан.")
+                            result = execute_write("billing_yookassa_checkout", True, lambda: create_checkout(pkey, st.session_state.get("saas_tenant_id")), details={"plan": pkey})
+                            if result["ok"]:
+                                payment = result["result"]
+                                st.session_state["billing_payment_id"]=payment.get("id")
+                                st.session_state["billing_plan"]=pkey
+                                st.session_state["billing_url"]=payment["confirmation"]["confirmation_url"]
+                                st.success("Платёж создан.")
                         except Exception as e:
                             st.error(str(e))
             if st.session_state.get("billing_url"):
