@@ -22,6 +22,14 @@ ACTIONS = {
     "prepare_today": {"mode": WRITE, "label": "Подготовить контент на сегодня"},
     "create_7_day_plan": {"mode": WRITE, "label": "Создать контент-план на 7 дней"},
     "refresh_analysis": {"mode": READ, "label": "Обновить анализ магазина"},
+    "quick_content_plan": {"mode": WRITE, "label": "Создать 7 идей контента"},
+    "max_content_suggest": {"mode": WRITE, "label": "Добавить идеи в контент-план"},
+    "auto_match_photos": {"mode": WRITE, "label": "Привязать фото к товарам"},
+    "auto_content": {"mode": WRITE, "label": "Создать контент"},
+    "auto_30_day_plan": {"mode": WRITE, "label": "Создать 30-дневный контент-план"},
+    "auto_bulk_apply": {"mode": WRITE, "label": "Применить изменения к товарам"},
+    "auto_stock_save": {"mode": WRITE, "label": "Сохранить остатки"},
+    "auto_run_all": {"mode": WRITE, "label": "Запустить автоматизацию"},
 }
 
 _PATTERNS = (
@@ -80,6 +88,29 @@ def plan_action(command: str) -> ActionPlan:
 
 def can_execute(plan: ActionPlan, approved: bool = False) -> bool:
     return plan.action in ACTIONS and (plan.mode == READ or approved)
+
+
+def execute_write(
+    action: str,
+    approved: bool,
+    operation,
+    *,
+    actor: str = "MAX",
+    details: Optional[dict] = None,
+) -> Dict[str, Any]:
+    """Single confirmation/audit boundary for MAX write operations."""
+    plan = ActionPlan(
+        action,
+        ACTIONS.get(action, {}).get("mode", WRITE),
+        ACTIONS.get(action, {}).get("label", action),
+        "MAX write boundary",
+        True,
+    )
+    if not can_execute(plan, approved):
+        return {"ok": False, "status": "not_approved", "action": action}
+    result = operation()
+    event = audit_event(action, "completed", actor=actor, details=details)
+    return {"ok": True, "status": "completed", "action": action, "result": result, "audit": event}
 
 
 def build_business_snapshot(
