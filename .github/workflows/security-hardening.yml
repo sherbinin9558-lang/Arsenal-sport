@@ -2,11 +2,9 @@ name: Security hardening
 
 on:
   push:
-    branches:
-      - audit/production-readiness-10of10-20261005
+    branches: [main, 'work/**']
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -22,24 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
+        with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+        with: {python-version: "3.11"}
       - name: Install security tooling
         run: |
           python -m pip install --upgrade pip
           python -m pip install "bandit>=1.8.6,<2" "pip-audit>=2.9.0,<3"
-
       - name: Bandit SAST
         run: bandit -r . -x tests,.git -lll -iii
-
       - name: Dependency vulnerability audit
         run: pip-audit -r requirements.txt
-
       - name: Gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
         env:
