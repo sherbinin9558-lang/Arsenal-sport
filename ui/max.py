@@ -698,53 +698,51 @@ def render_max():
                 names = [f.name for f in photo_files]
                 st.write("Файлов загружено:", len(names))
                 if can("write_data") and st.button("📸 Привязать фото к товарам", type="primary", key="auto_match_photos"):
-                    products_now = load_products()
-                    matched = 0
-                    skipped = []
-                    articles = {str(p.get("article","")).strip().lower(): i for i,p in enumerate(products_now) if str(p.get("article","")).strip()}
-                    for f in photo_files:
-                        stem = Path(f.name).stem.strip().lower()
-                        idx = articles.get(stem)
-                        if idx is None:
-                            for i,p in enumerate(products_now):
-                                key = product_key(p, i).lower()
-                                if stem == key or stem in key:
-                                    idx = i
-                                    break
-                        if idx is None:
-                            skipped.append(f.name)
-                            continue
-                        try:
-                            source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
-                            path = save_uploaded_photo(f, products_now[idx], idx)
-                            products_now[idx]["original_image"] = path
-                            p_now = products_now[idx]
-                            card_img = generate_card(
-                                source_img,
-                                p_now.get("name",""),
-                                p_now.get("brand",""),
-                                p_now.get("article",""),
-                                p_now.get("sizes",""),
-                                p_now.get("color",""),
-                                p_now.get("description",""),
-                                p_now.get("specs",""),
-                                p_now.get("category","Другое"),
-                                "Dark Premium",
-                                get_logo(),
-                            )
-                            card_buf = io.BytesIO()
-                            card_img.save(card_buf, format="PNG")
-                            products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
-                        except Exception as e:
-                            skipped.append(f"{f.name}: ошибка обработки ({e})")
-                            continue
-                        matched += 1
-                    result = execute_write("auto_match_photos", True, lambda: save_products(products_now), details={"matched": matched, "skipped": len(skipped)})
+                    def _match_photos():
+                        products_now = load_products()
+                        matched = 0
+                        skipped = []
+                        articles = {str(p.get("article","")).strip().lower(): i for i,p in enumerate(products_now) if str(p.get("article","")).strip()}
+                        for f in photo_files:
+                            stem = Path(f.name).stem.strip().lower()
+                            idx = articles.get(stem)
+                            if idx is None:
+                                for i,p in enumerate(products_now):
+                                    key = product_key(p, i).lower()
+                                    if stem == key or stem in key:
+                                        idx = i
+                                        break
+                            if idx is None:
+                                skipped.append(f.name)
+                                continue
+                            try:
+                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
+                                path = save_uploaded_photo(f, products_now[idx], idx)
+                                products_now[idx]["original_image"] = path
+                                p_now = products_now[idx]
+                                card_img = generate_card(
+                                    source_img,
+                                    p_now.get("name",""), p_now.get("brand",""), p_now.get("article",""),
+                                    p_now.get("sizes",""), p_now.get("color",""), p_now.get("description",""),
+                                    p_now.get("specs",""), p_now.get("category","Другое"), "Dark Premium", get_logo(),
+                                )
+                                card_buf = io.BytesIO()
+                                card_img.save(card_buf, format="PNG")
+                                products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
+                            except Exception as e:
+                                skipped.append(f"{f.name}: ошибка обработки ({e})")
+                                continue
+                            matched += 1
+                        save_products(products_now)
+                        return matched, skipped
+                    result = execute_write("auto_match_photos", True, _match_photos)
                     if result["ok"]:
+                        matched, skipped = result["result"]
                         st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
-                    if skipped:
-                        st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
-                    st.rerun()
+                        if skipped:
+                            st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
+                        st.rerun()
+
 
         with auto_tab2:
             st.markdown("### Массовый контент")
@@ -818,10 +816,13 @@ def render_max():
                             current_index = _current_product_index(products_now, record_id, fallback_index)
                             if current_index is not None:
                                 indexes.append(current_index)
-                        changed = bulk_update(products_now, indexes, field, value.strip())
-                        result = execute_write("auto_bulk_apply", True, lambda: save_products(products_now), details={"changed": changed, "field": field})
+                        def _bulk_apply():
+                            changed = bulk_update(products_now, indexes, field, value.strip())
+                            save_products(products_now)
+                            return changed
+                        result = execute_write("auto_bulk_apply", True, _bulk_apply, details={"field": field})
                         if result["ok"]:
-                            st.success(f"Изменено товаров: {changed}.")
+                            st.success(f"Изменено товаров: {result['result']}.")
                         st.rerun()
             else:
                 st.info("Каталог пуст.")
