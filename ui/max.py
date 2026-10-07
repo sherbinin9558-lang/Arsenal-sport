@@ -405,8 +405,9 @@ def render_max():
             if current_role() in ("owner","admin"):
                 auto=st.toggle("Автоматически продлевать подписку", value=auto_default, key="billing_auto_renew")
                 if auto != auto_default:
-                    set_auto_renew(auto)
-                    st.success("Настройка автопродления сохранена.")
+                    result = execute_write("account_auto_renew", True, lambda: set_auto_renew(auto), details={"auto_renew": auto})
+                    if result["ok"]:
+                        st.success("Настройка автопродления сохранена.")
             else:
                 st.caption("Изменять автопродление может только владелец или администратор.")
         except Exception as e:
@@ -429,8 +430,9 @@ def render_max():
                 if key == tenant_plan():
                     col.success("Текущий тариф")
                 elif can("billing") and st.button(f"Выбрать {info['name']}", key=f"choose_plan_{key}", use_container_width=True):
-                    request_plan_change(key)
-                    st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
+                    result = execute_write("account_plan_request", True, lambda: request_plan_change(key), details={"plan": key})
+                    if result["ok"]:
+                        st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
         requested=st.session_state.get("requested_plan")
         if requested:
             st.info(f"Подготовлен переход на тариф **{plans[requested]['name']}**. Реальная активация произойдёт после подтверждения оплаты.")
@@ -460,8 +462,9 @@ def render_max():
                 with rc3:
                     if st.button("Сохранить",key=f"member_role_save_{member_id}"):
                         try:
-                            set_member_role(member_id,new_role)
-                            st.success("Роль обновлена.")
+                            result = execute_write("team_set_role", True, lambda: set_member_role(member_id,new_role), details={"member_id": member_id, "role": new_role})
+                            if result["ok"]:
+                                st.success("Роль обновлена.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Не удалось изменить роль: {e}")
@@ -478,8 +481,9 @@ def render_max():
                         st.warning("Укажите корректный email.")
                     else:
                         try:
-                            create_team_invitation(invite_email, invite_role)
-                            st.success("Приглашение создано. Отправка письма подключается через серверный invite-механизм.")
+                            result = execute_write("team_invite", True, lambda: create_team_invitation(invite_email, invite_role), details={"role": invite_role})
+                            if result["ok"]:
+                                st.success("Приглашение создано. Отправка письма подключается через серверный invite-механизм.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Не удалось создать приглашение: {e}")
@@ -557,8 +561,9 @@ def render_max():
                            "instagram":instagram.strip(),"shipping":shipping,"onboarding_complete":True}
                 if current.get("_saas_record_id"):
                     payload["_saas_record_id"] = current["_saas_record_id"]
-                data_save("settings",[payload])
-                st.success("Настройки сохранены.")
+                result = execute_write("account_save_settings", True, lambda: data_save("settings",[payload]), details={"section": "settings"})
+                if result["ok"]:
+                    st.success("Настройки сохранены.")
                 st.rerun()
 
         if not can_settings:
@@ -901,7 +906,9 @@ def render_max():
                     key = (item["date"], item["product"], item["platform"], item["type"])
                     if key not in existing_keys:
                         existing.append(item)
-                save_plan(existing)
+                result = execute_write("auto_run_all", True, lambda: save_plan(existing), details={"generated": len(generated)})
+                if not result["ok"]:
+                    st.stop()
                 st.session_state["auto_content_bundles"] = {
                     str(i): {"product": max_product_title(p), "content": content_for_product(p)}
                     for i,p in enumerate(products)
