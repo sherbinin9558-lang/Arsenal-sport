@@ -44,7 +44,7 @@ from free_automation import (
 from growth_engine import ai_summary, recommendations as growth_recommendations
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
-from max_operator import audit_event, build_business_snapshot, can_execute, plan_action
+from max_operator import audit_event, build_business_snapshot, can_execute, execute_write, plan_action
 from ai_usage import usage_summary
 from saas_core import (
     activate_paid_subscription,
@@ -338,20 +338,33 @@ def render_max():
         else:
             qa, qb = st.columns(2)
             with qa:
+                quick_approve = st.checkbox(
+                    "Подтвердить изменение данных",
+                    key="max_quick_plan_approve",
+                    disabled=not can("write_data"),
+                )
                 if can("write_data") and st.button("✨ Создать 7 идей контента", use_container_width=True, key="max_quick_plan"):
-                    with st.spinner("MAX готовит план…"):
-                        suggestions = seven_day_plan(products)
-                        existing = load_plan()
-                        existing_keys = {(x.get("date"), x.get("product")) for x in existing}
-                        added = 0
-                        for item in suggestions:
-                            key = (item.get("date"), item.get("product"))
-                            if key not in existing_keys:
-                                existing.append(item); added += 1
-                        save_plan(existing)
-                    st.session_state.pop("max_data_snapshot", None)
-                    st.success(f"Готово: добавлено {added} идей.")
-                    st.rerun()
+                    if not quick_approve:
+                        st.warning("Сначала подтвердите изменение данных.")
+                    else:
+                        with st.spinner("MAX готовит план…"):
+                            suggestions = seven_day_plan(products)
+                            existing = load_plan()
+                            existing_keys = {(x.get("date"), x.get("product")) for x in existing}
+                            added = 0
+                            for item in suggestions:
+                                key = (item.get("date"), item.get("product"))
+                                if key not in existing_keys:
+                                    existing.append(item); added += 1
+                            result = execute_write(
+                                "quick_content_plan",
+                                quick_approve,
+                                lambda: save_plan(existing),
+                                details={"added": added},
+                            )
+                        if result["ok"]:
+                            st.success(f"Готово: добавлено {added} идей.")
+                            st.rerun()
             with qb:
                 if st.button("↻ Обновить анализ MAX", use_container_width=True, key="max_refresh"):
                     st.session_state.pop("max_data_snapshot", None)
@@ -392,8 +405,9 @@ def render_max():
             if current_role() in ("owner","admin"):
                 auto=st.toggle("Автоматически продлевать подписку", value=auto_default, key="billing_auto_renew")
                 if auto != auto_default:
-                    set_auto_renew(auto)
-                    st.success("Настройка автопродления сохранена.")
+                    result = execute_write("account_auto_renew", True, lambda: set_auto_renew(auto), details={"auto_renew": auto})
+                    if result["ok"]:
+                        st.success("Настройка автопродления сохранена.")
             else:
                 st.caption("Изменять автопродление может только владелец или администратор.")
         except Exception as e:
@@ -416,8 +430,9 @@ def render_max():
                 if key == tenant_plan():
                     col.success("Текущий тариф")
                 elif can("billing") and st.button(f"Выбрать {info['name']}", key=f"choose_plan_{key}", use_container_width=True):
-                    request_plan_change(key)
-                    st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
+                    result = execute_write("account_plan_request", True, lambda: request_plan_change(key), details={"plan": key})
+                    if result["ok"]:
+                        st.info(f"Выбран {info['name']}. Подключение оплаты будет выполнено через серверный checkout.")
         requested=st.session_state.get("requested_plan")
         if requested:
             st.info(f"Подготовлен переход на тариф **{plans[requested]['name']}**. Реальная активация произойдёт после подтверждения оплаты.")
@@ -447,8 +462,9 @@ def render_max():
                 with rc3:
                     if st.button("Сохранить",key=f"member_role_save_{member_id}"):
                         try:
-                            set_member_role(member_id,new_role)
-                            st.success("Роль обновлена.")
+                            result = execute_write("team_set_role", True, lambda: set_member_role(member_id,new_role), details={"member_id": member_id, "role": new_role})
+                            if result["ok"]:
+                                st.success("Роль обновлена.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Не удалось изменить роль: {e}")
@@ -465,8 +481,9 @@ def render_max():
                         st.warning("Укажите корректный email.")
                     else:
                         try:
-                            create_team_invitation(invite_email, invite_role)
-                            st.success("Приглашение создано. Отправка письма подключается через серверный invite-механизм.")
+                            result = execute_write("team_invite", True, lambda: create_team_invitation(invite_email, invite_role), details={"role": invite_role})
+                            if result["ok"]:
+                                st.success("Приглашение создано. Отправка письма подключается через серверный invite-механизм.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Не удалось создать приглашение: {e}")
@@ -490,7 +507,8 @@ def render_max():
                     if plan_for_payment not in ("starter","pro","business"):
                         plan_for_payment="starter"
                     try:
-                        payment=tbank_create_checkout(plan_for_payment, st.session_state.get("saas_tenant_id"))
+                        result = execute_write("billing_tbank_checkout", True, lambda: tbank_create_checkout(plan_for_payment, st.session_state.get("saas_tenant_id")), details={"plan": plan_for_payment})
+                        payment = result.get("result") if result["ok"] else {}
                         st.session_state["tbank_payment_id"]=payment.get("PaymentId")
                         st.session_state["tbank_order_id"]=payment.get("OrderId")
                         st.session_state["tbank_url"]=payment.get("PaymentURL")
@@ -511,11 +529,13 @@ def render_max():
                     st.caption(f"{price:.2f} ₽ / месяц" if price else "Цена не настроена")
                     if can("billing") and st.button(f"Оплатить {pinfo['name']}", key=f"pay_{pkey}", use_container_width=True):
                         try:
-                            payment=create_checkout(pkey, st.session_state.get("saas_tenant_id"))
-                            st.session_state["billing_payment_id"]=payment.get("id")
-                            st.session_state["billing_plan"]=pkey
-                            st.session_state["billing_url"]=payment["confirmation"]["confirmation_url"]
-                            st.success("Платёж создан.")
+                            result = execute_write("billing_yookassa_checkout", True, lambda: create_checkout(pkey, st.session_state.get("saas_tenant_id")), details={"plan": pkey})
+                            if result["ok"]:
+                                payment = result["result"]
+                                st.session_state["billing_payment_id"]=payment.get("id")
+                                st.session_state["billing_plan"]=pkey
+                                st.session_state["billing_url"]=payment["confirmation"]["confirmation_url"]
+                                st.success("Платёж создан.")
                         except Exception as e:
                             st.error(str(e))
             if st.session_state.get("billing_url"):
@@ -544,8 +564,9 @@ def render_max():
                            "instagram":instagram.strip(),"shipping":shipping,"onboarding_complete":True}
                 if current.get("_saas_record_id"):
                     payload["_saas_record_id"] = current["_saas_record_id"]
-                data_save("settings",[payload])
-                st.success("Настройки сохранены.")
+                result = execute_write("account_save_settings", True, lambda: data_save("settings",[payload]), details={"section": "settings"})
+                if result["ok"]:
+                    st.success("Настройки сохранены.")
                 st.rerun()
 
         if not can_settings:
@@ -599,13 +620,15 @@ def render_max():
                     disabled=not can("write_data"),
                 )
                 if ns != current_status:
-                    update_lead(lead.get("id"), status=ns)
-                    st.rerun()
+                    result = execute_write("crm_update_status", True, lambda: update_lead(lead.get("id"), status=ns), details={"lead_id": lead.get("id"), "status": ns})
+                    if result["ok"]:
+                        st.rerun()
                 note = st.text_input("Добавить заметку/контакт", key=f"max_note_{lead.get('id')}", disabled=not can("write_data"))
                 if can("write_data") and st.button("💾 Сохранить заметку", key=f"max_note_btn_{lead.get('id')}"):
                     if note.strip():
-                        add_lead_interaction(lead.get("id"), note.strip(), "manager")
-                        st.rerun()
+                        result = execute_write("crm_add_note", True, lambda: add_lead_interaction(lead.get("id"), note.strip(), "manager"), details={"lead_id": lead.get("id")})
+                        if result["ok"]:
+                            st.rerun()
         st.markdown("---")
         history_q = st.text_input("Найти историю клиента по имени/контакту", key="max_history_q")
         if history_q:
@@ -635,8 +658,9 @@ def render_max():
                 if selected_content != "Не привязывать":
                     idx = content_choices.index(selected_content) - 1
                     content_id = attribution_items[idx].get("content_id", "")
-                create_order(customer, contact, product_name, amount=amount, status=status, source=source, content_id=content_id)
-                st.success("Заказ создан.")
+                result = execute_write("create_order", True, lambda: create_order(customer, contact, product_name, amount=amount, status=status, source=source, content_id=content_id), details={"source": source})
+                if result["ok"]:
+                    st.success("Заказ создан.")
                 st.rerun()
 
         if not orders:
@@ -651,8 +675,9 @@ def render_max():
                                   key=f"max_order_status_{order.get('id')}",
                                   disabled=not can("write_data"))
                 if ns != current:
-                    update_order(order.get("id"), status=ns)
-                    st.rerun()
+                    result = execute_write("update_order_status", True, lambda: update_order(order.get("id"), status=ns), details={"order_id": order.get("id"), "status": ns})
+                    if result["ok"]:
+                        st.rerun()
 
     elif section == "Автоматизация":
         st.subheader("🚀 Центр автоматизации AI Agent Content Manager")
@@ -673,52 +698,51 @@ def render_max():
                 names = [f.name for f in photo_files]
                 st.write("Файлов загружено:", len(names))
                 if can("write_data") and st.button("📸 Привязать фото к товарам", type="primary", key="auto_match_photos"):
-                    products_now = load_products()
-                    matched = 0
-                    skipped = []
-                    articles = {str(p.get("article","")).strip().lower(): i for i,p in enumerate(products_now) if str(p.get("article","")).strip()}
-                    for f in photo_files:
-                        stem = Path(f.name).stem.strip().lower()
-                        idx = articles.get(stem)
-                        if idx is None:
-                            for i,p in enumerate(products_now):
-                                key = product_key(p, i).lower()
-                                if stem == key or stem in key:
-                                    idx = i
-                                    break
-                        if idx is None:
-                            skipped.append(f.name)
-                            continue
-                        try:
-                            source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
-                            path = save_uploaded_photo(f, products_now[idx], idx)
-                            products_now[idx]["original_image"] = path
-                            p_now = products_now[idx]
-                            card_img = generate_card(
-                                source_img,
-                                p_now.get("name",""),
-                                p_now.get("brand",""),
-                                p_now.get("article",""),
-                                p_now.get("sizes",""),
-                                p_now.get("color",""),
-                                p_now.get("description",""),
-                                p_now.get("specs",""),
-                                p_now.get("category","Другое"),
-                                "Dark Premium",
-                                get_logo(),
-                            )
-                            card_buf = io.BytesIO()
-                            card_img.save(card_buf, format="PNG")
-                            products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
-                        except Exception as e:
-                            skipped.append(f"{f.name}: ошибка обработки ({e})")
-                            continue
-                        matched += 1
-                    save_products(products_now)
-                    st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
-                    if skipped:
-                        st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
-                    st.rerun()
+                    def _match_photos():
+                        products_now = load_products()
+                        matched = 0
+                        skipped = []
+                        articles = {str(p.get("article","")).strip().lower(): i for i,p in enumerate(products_now) if str(p.get("article","")).strip()}
+                        for f in photo_files:
+                            stem = Path(f.name).stem.strip().lower()
+                            idx = articles.get(stem)
+                            if idx is None:
+                                for i,p in enumerate(products_now):
+                                    key = product_key(p, i).lower()
+                                    if stem == key or stem in key:
+                                        idx = i
+                                        break
+                            if idx is None:
+                                skipped.append(f.name)
+                                continue
+                            try:
+                                source_img = Image.open(io.BytesIO(f.getvalue())).convert("RGB")
+                                path = save_uploaded_photo(f, products_now[idx], idx)
+                                products_now[idx]["original_image"] = path
+                                p_now = products_now[idx]
+                                card_img = generate_card(
+                                    source_img,
+                                    p_now.get("name",""), p_now.get("brand",""), p_now.get("article",""),
+                                    p_now.get("sizes",""), p_now.get("color",""), p_now.get("description",""),
+                                    p_now.get("specs",""), p_now.get("category","Другое"), "Dark Premium", get_logo(),
+                                )
+                                card_buf = io.BytesIO()
+                                card_img.save(card_buf, format="PNG")
+                                products_now[idx]["card_image"] = base64.b64encode(card_buf.getvalue()).decode("ascii")
+                            except Exception as e:
+                                skipped.append(f"{f.name}: ошибка обработки ({e})")
+                                continue
+                            matched += 1
+                        save_products(products_now)
+                        return matched, skipped
+                    result = execute_write("auto_match_photos", True, _match_photos)
+                    if result["ok"]:
+                        matched, skipped = result["result"]
+                        st.success(f"Готово: привязано {matched}, не найдено {len(skipped)}.")
+                        if skipped:
+                            st.caption("Не сопоставлены: " + ", ".join(skipped[:20]))
+                        st.rerun()
+
 
         with auto_tab2:
             st.markdown("### Массовый контент")
@@ -763,9 +787,10 @@ def render_max():
                     if key not in existing_keys:
                         existing.append(item)
                         added += 1
-                save_plan(existing)
-                st.success(f"Добавлено {added} публикаций без дублей.")
-                st.rerun()
+                result = execute_write("auto_30_day_plan", True, lambda: save_plan(existing), details={"added": added})
+                if result["ok"]:
+                    st.success(f"Добавлено {added} публикаций без дублей.")
+                    st.rerun()
 
         with auto_tab3:
             st.markdown("### Массовое редактирование")
@@ -791,9 +816,13 @@ def render_max():
                             current_index = _current_product_index(products_now, record_id, fallback_index)
                             if current_index is not None:
                                 indexes.append(current_index)
-                        changed = bulk_update(products_now, indexes, field, value.strip())
-                        save_products(products_now)
-                        st.success(f"Изменено товаров: {changed}.")
+                        def _bulk_apply():
+                            changed = bulk_update(products_now, indexes, field, value.strip())
+                            save_products(products_now)
+                            return changed
+                        result = execute_write("auto_bulk_apply", True, _bulk_apply, details={"field": field})
+                        if result["ok"]:
+                            st.success(f"Изменено товаров: {result['result']}.")
                         st.rerun()
             else:
                 st.info("Каталог пуст.")
@@ -828,8 +857,9 @@ def render_max():
                         st.stop()
                     products_now[current_stock_idx]["stock_by_size"] = stock
                     products_now[current_stock_idx]["total_stock"] = sum(stock.values())
-                    save_products(products_now)
-                    st.success("Остатки сохранены.")
+                    result = execute_write("auto_stock_save", True, lambda: save_products(products_now), details={"product_id": stock_record_id})
+                    if result["ok"]:
+                        st.success("Остатки сохранены.")
                     st.rerun()
 
         with auto_tab4:
@@ -880,7 +910,9 @@ def render_max():
                     key = (item["date"], item["product"], item["platform"], item["type"])
                     if key not in existing_keys:
                         existing.append(item)
-                save_plan(existing)
+                result = execute_write("auto_run_all", True, lambda: save_plan(existing), details={"generated": len(generated)})
+                if not result["ok"]:
+                    st.stop()
                 st.session_state["auto_content_bundles"] = {
                     str(i): {"product": max_product_title(p), "content": content_for_product(p)}
                     for i,p in enumerate(products)
@@ -915,15 +947,29 @@ def render_max():
             for channel, text_value in bundle.items():
                 st.markdown(f"**{channel}**")
                 st.text_area(channel, text_value, height=110, key=f"max_bundle_{channel}")
+            plan_approve = st.checkbox(
+                "Подтвердить добавление в контент-план",
+                key="max_plan_suggest_approve",
+                disabled=not can("write_data"),
+            )
             if can("write_data") and st.button("✨ Создать 7 идей и добавить в план", type="primary", key="max_plan_suggest"):
-                suggestions = seven_day_plan(products)
-                existing = load_plan()
-                for item in suggestions:
-                    if not any(x.get("date") == item["date"] and x.get("product") == item["product"] for x in existing):
-                        existing.append(item)
-                save_plan(existing)
-                st.success("План на 7 дней добавлен без дублей.")
-                st.rerun()
+                if not plan_approve:
+                    st.warning("Сначала подтвердите изменение данных.")
+                else:
+                    suggestions = seven_day_plan(products)
+                    existing = load_plan()
+                    for item in suggestions:
+                        if not any(x.get("date") == item["date"] and x.get("product") == item["product"] for x in existing):
+                            existing.append(item)
+                    result = execute_write(
+                        "max_content_suggest",
+                        plan_approve,
+                        lambda: save_plan(existing),
+                        details={"source": "content_section"},
+                    )
+                    if result["ok"]:
+                        st.success("План на 7 дней добавлен без дублей.")
+                        st.rerun()
 
     else:
         st.subheader("Контент → продажи → AI")

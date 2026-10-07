@@ -1,9 +1,12 @@
 name: production-observability
+
 on:
   push:
-    branches: [audit/production-readiness-10of10-20261005]
+    branches: [main, 'work/**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
