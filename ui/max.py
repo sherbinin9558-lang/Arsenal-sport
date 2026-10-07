@@ -45,6 +45,7 @@ from growth_engine import ai_summary, recommendations as growth_recommendations
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
 from max_operator import audit_event, build_business_snapshot, can_execute, plan_action
+from ai_usage import usage_summary
 from saas_core import (
     activate_paid_subscription,
     can,
@@ -206,7 +207,29 @@ def render_max():
                 else:
                     approve = False
 
-                if operator_plan.action == "create_7_day_plan":
+                if operator_plan.action == "prepare_today":
+                    if can_execute(operator_plan, approve):
+                        if st.button("Выполнить безопасно", type="primary", key="max_operator_prepare_today"):
+                            with st.spinner("MAX готовит контент на сегодня…"):
+                                generated = seven_day_plan(products)
+                                existing = load_plan()
+                                existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
+                                added = 0
+                                for item in generated[:3]:
+                                    key = (item.get("date"), item.get("product"), item.get("platform"), item.get("type"))
+                                    if key not in existing_keys:
+                                        existing.append(item)
+                                        added += 1
+                                save_plan(existing)
+                                event = audit_event("prepare_today", "completed", details={"added": added})
+                                _max_audit(event)
+                                st.success(f"Готово. Подготовлено материалов: {added}.")
+                                st.session_state["max_operator_approve"] = False
+                                st.session_state["max_data_snapshot"] = None
+                                st.rerun()
+                    elif operator_plan.requires_confirmation:
+                        st.warning("Для изменения данных сначала установите подтверждение.")
+                elif operator_plan.action == "create_7_day_plan":
                     if can_execute(operator_plan, approve):
                         if st.button("Выполнить безопасно", type="primary", key="max_operator_execute"):
                             with st.spinner("MAX формирует план…"):
@@ -254,6 +277,14 @@ def render_max():
             with st.expander("Журнал действий MAX"):
                 for event in audit_log[:10]:
                     st.caption(f"{event['timestamp']} · {event['action']} · {event['status']}")
+        try:
+            usage = usage_summary(30)
+            st.caption(
+                f"Экономика MAX за 30 дней: {usage['requests']} операций · "
+                f"оценочная AI-себестоимость {usage['cost_rub']:.4f} ₽"
+            )
+        except Exception:
+            pass
 
     try:
         max_recs = growth_recommendations(products, leads, orders, plan)
