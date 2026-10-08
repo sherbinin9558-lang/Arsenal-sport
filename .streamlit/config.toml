@@ -1,9 +1,6 @@
 [client]
 showSidebarNavigation = false
-toolbarMode = "viewer"
-
-[ui]
-hideTopBar = true
+toolbarMode = "minimal"
 
 [server]
 enableXsrfProtection = true
