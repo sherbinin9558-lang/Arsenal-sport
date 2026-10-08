@@ -124,6 +124,17 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - name: Run billing webhook smoke
+        env:
+          BILLING_WEBHOOK_URL: ${{ secrets.BILLING_WEBHOOK_URL }}
+        run: python scripts/production_webhook_smoke.py
+
+      - name: Run read-only recovery preflight
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/recovery_preflight.py
+
       - name: Run read-only provider health checks
         run: |
           python - <<'PY'
