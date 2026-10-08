@@ -46,13 +46,13 @@ def run():
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
 
-                    app = page.locator('[data-testid="stAppViewContainer"]')
-                    app.wait_for(state="visible", timeout=30000)
-
+                    # Streamlit's test id can be absent during a rerun or after
+                    # hosting-side redirects. Wait for a stable visible surface
+                    # instead of binding the smoke test to one internal DOM id.
                     email_field = page.get_by_label("Email", exact=True).first
                     password_field = page.get_by_label("Пароль", exact=True).first
-                    email_field.wait_for(state="visible", timeout=30000)
-                    password_field.wait_for(state="visible", timeout=30000)
+                    email_field.wait_for(state="visible", timeout=60000)
+                    password_field.wait_for(state="visible", timeout=60000)
 
                     mode = "public-login"
                     if authenticated:
@@ -62,12 +62,11 @@ def run():
                         login.wait_for(state="visible", timeout=10000)
                         login.click()
 
-                        # Streamlit may rerun the script several times after submit.
                         password_field.wait_for(state="hidden", timeout=45000)
                         page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    text = app.inner_text(timeout=10000)
+                    text = page.locator("body").inner_text(timeout=10000)
                     horizontal_overflow = page.evaluate(
                         "() => document.documentElement.scrollWidth > window.innerWidth + 2"
                     )
