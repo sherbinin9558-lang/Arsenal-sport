@@ -38,10 +38,15 @@ def health_check():
         "body": body[:500],
         "latency_ms": latency_ms,
     }
-    (OUT / "health.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    if response.status_code != 200 or body != "ok":
+    (OUT / "health.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    if response.status_code != 200:
         raise RuntimeError(f"Production health check failed: {result}")
-
+    if body != "ok":
+        result["health_body_unexpected"] = True
+        # Community Cloud can return an auth HTML shell instead of the plain
+        # Streamlit health token when access is gated. Browser smoke classifies it.
 
 
 def startup_http_probe():
@@ -50,20 +55,50 @@ def startup_http_probe():
     started = time.perf_counter()
     result = {"url": url}
     try:
-        response = requests.get(url, timeout=60, headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"})
+        response = requests.get(
+            url,
+            timeout=60,
+            headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"},
+        )
         body = response.text[:20000]
-        result.update({"status": response.status_code, "latency_ms": round((time.perf_counter() - started) * 1000), "content_type": response.headers.get("content-type", ""), "server": response.headers.get("server", ""), "body_prefix": body, "streamlit_markers": {"has_streamlit": "streamlit" in body.lower(), "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")), "has_app_shell": "Ваш магазин. Один рабочий центр." in body}})
+        result.update(
+            {
+                "status": response.status_code,
+                "latency_ms": round((time.perf_counter() - started) * 1000),
+                "content_type": response.headers.get("content-type", ""),
+                "server": response.headers.get("server", ""),
+                "body_prefix": body,
+                "streamlit_markers": {
+                    "has_streamlit": "streamlit" in body.lower(),
+                    "has_error": any(
+                        x in body.lower() for x in ("exception", "traceback", "error")
+                    ),
+                    "has_app_shell": "Ваш магазин. Один рабочий центр." in body,
+                },
+            }
+        )
     except Exception as exc:
-        result.update({"status": 0, "latency_ms": round((time.perf_counter() - started) * 1000), "error": f"{type(exc).__name__}: {exc}"})
-    (OUT / "startup-http.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        result.update(
+            {
+                "status": 0,
+                "latency_ms": round((time.perf_counter() - started) * 1000),
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+    (OUT / "startup-http.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     if result.get("status") != 200:
         raise RuntimeError(f"Production application HTTP probe failed: {result}")
+
 
 def browser_url():
     parts = urlsplit(BASE_URL)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
     query["pw_probe"] = str(int(time.time()))
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
 
 
 def run():
@@ -77,21 +112,47 @@ def run():
             console_errors = []
             page_errors = []
             request_failures = []
-            page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+            page.on(
+                "console",
+                lambda msg: console_errors.append(msg.text)
+                if msg.type == "error"
+                else None,
+            )
             page.on("pageerror", lambda exc: page_errors.append(str(exc)))
             page.on(
                 "requestfailed",
-                lambda req: request_failures.append(f"{req.method} {req.url}: {req.failure}"),
+                lambda req: request_failures.append(
+                    f"{req.method} {req.url}: {req.failure}"
+                ),
             )
             started = time.perf_counter()
-            item = {"name": name, "browser": browser_name, "viewport": [width, height]}
+            item = {
+                "name": name,
+                "browser": browser_name,
+                "viewport": [width, height],
+            }
             try:
                 page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
                 page.wait_for_timeout(3000)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
                 item["body_prefix"] = page.locator("body").inner_text(timeout=10000)[:20000]
-                item["content_markers"] = {"has_app_shell": "Ваш магазин. Один рабочий центр." in item["body_prefix"], "has_email": "Email" in item["body_prefix"], "has_password": "Пароль" in item["body_prefix"], "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error"))}
+                item["content_markers"] = {
+                    "has_app_shell": "Ваш магазин. Один рабочий центр."
+                    in item["body_prefix"],
+                    "has_email": "Email" in item["body_prefix"],
+                    "has_password": "Пароль" in item["body_prefix"],
+                    "has_exception": any(
+                        x in item["body_prefix"].lower()
+                        for x in ("exception", "traceback", "error")
+                    ),
+                }
+                if "share.streamlit.io/-/auth/" in page.url:
+                    raise RuntimeError(
+                        "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud requires "
+                        "authentication for this app. Make the app public or provide "
+                        "a dedicated E2E viewer session; application UI was not reached."
+                    )
                 page.get_by_text("Ваш магазин. Один рабочий центр.").first.wait_for(
                     state="visible", timeout=TIMEOUT_MS
                 )
@@ -114,7 +175,9 @@ def run():
                 browser.close()
 
     report = {"base_url": BASE_URL, "results": results}
-    (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / "report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     failures = [x for x in results if x["status"] != "PASS"]
     if failures:
         print(json.dumps(report, ensure_ascii=False, indent=2))
