@@ -45,7 +45,20 @@ def run():
                     else None,
                 )
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=90000)
+                    response = page.goto(url, wait_until="domcontentloaded", timeout=90000)
+                    # Community Cloud redirects private apps to its auth gateway.
+                    # Detect that deployment condition immediately instead of waiting
+                    # for a misleading UI-selector timeout.
+                    if "share.streamlit.io/-/auth/" in page.url:
+                        raise RuntimeError(
+                            "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud requires "
+                            "authentication for this app. Make the app public or provide "
+                            "a dedicated E2E viewer session; application UI was not reached."
+                        )
+                    if response is not None and response.status >= 400:
+                        raise RuntimeError(
+                            f"PRODUCTION_HTTP_ERROR: initial document returned HTTP {response.status}"
+                        )
                     page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
                         state="visible", timeout=60000
                     )

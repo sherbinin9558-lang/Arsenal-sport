@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pathlib import Path
 
 import requests
@@ -58,6 +59,13 @@ def startup_http_probe():
     if result.get("status") != 200:
         raise RuntimeError(f"Production application HTTP probe failed: {result}")
 
+def browser_url():
+    parts = urlsplit(BASE_URL)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["pw_probe"] = str(int(time.time()))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 def run():
     health_check()
     startup_http_probe()
@@ -78,7 +86,7 @@ def run():
             started = time.perf_counter()
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
-                page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+                page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
                 page.wait_for_timeout(3000)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
