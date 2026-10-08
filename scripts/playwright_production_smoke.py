@@ -44,9 +44,9 @@ def health_check():
     if response.status_code != 200:
         raise RuntimeError(f"Production health check failed: {result}")
     if body != "ok":
-        # Community Cloud can return the app/auth HTML shell instead of the
-        # plain Streamlit health token when access is gated. Let browser smoke
-        # classify that condition instead of masking it as a generic health error.
+        result["health_body_unexpected"] = True
+        # Community Cloud can return an auth HTML shell instead of the plain
+        # Streamlit health token when access is gated. Browser smoke classifies it.
 
 
 def startup_http_probe():
