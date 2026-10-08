@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from tbank_billing import get_state, _token
+from tbank_billing import get_state, _token, plan_price
 from billing import get_payment
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
@@ -205,12 +205,13 @@ def _process_billing_event(provider, event_key, payment_id, status, tenant_id, p
 
 
 def _verify_webhook_secret(request: Request, env_name):
-    """Validate an optional configured Bearer layer.
+    """Validate the configured Bearer secret when a provider supports it.
 
-    T-Bank notifications have their own signed Token. If a Bearer secret is
-    configured for the T-Bank webhook API, a supplied Bearer header is checked;
-    its absence is not rejected because the provider Token is independently
-    verified below.
+    The Bearer layer is an application-side defense-in-depth check. For T-Bank,
+    the provider's signed Token remains the primary notification authentication,
+    so a missing Bearer header is accepted when a valid T-Bank Token is present.
+    For providers that require the configured secret, callers must reject a
+    False return value explicitly.
     """
     expected = _env(env_name)
     if not expected:
@@ -266,6 +267,18 @@ async def payment_status(request: Request):
 
     if plan not in ("starter", "pro", "business") or not tenant:
         raise HTTPException(status_code=422, detail="Invalid checkout session")
+
+    # Defense in depth: the amount must match the server-side tariff price
+    # before a successful payment can activate a subscription.
+    if status in ("CONFIRMED", "AUTHORIZED"):
+        provider_amount = state.get("Amount")
+        try:
+            expected_amount = int(round(float(plan_price(plan)) * 100))
+            actual_amount = int(provider_amount)
+        except (TypeError, ValueError, OverflowError):
+            raise HTTPException(status_code=422, detail="Invalid payment amount")
+        if expected_amount <= 0 or actual_amount != expected_amount:
+            raise HTTPException(status_code=422, detail="Payment amount does not match plan price")
 
     event_key = f"tbank:{payment_id}:{status.lower()}"
     try:
