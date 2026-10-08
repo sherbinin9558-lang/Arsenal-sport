@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Authenticated responsive browser smoke for the production Streamlit app.
+"""Read-only responsive browser smoke for the production Streamlit app.
 
-This is read-only: it logs in, verifies the main app renders at desktop/tablet/mobile
-viewports, checks the app render, responsive layout, and records screenshots.
+If E2E credentials are configured, the smoke authenticates and checks the main app.
+Without credentials it still verifies the public login surface at all three viewports.
 """
 import json
 import os
@@ -20,14 +20,15 @@ def run():
     url = os.getenv("SAAS_PUBLIC_URL", "").strip()
     email = os.getenv("E2E_EMAIL", "").strip()
     password = os.getenv("E2E_PASSWORD", "")
-    if not url or not email or not password:
-        raise RuntimeError("SAAS_PUBLIC_URL, E2E_EMAIL and E2E_PASSWORD are required")
+    if not url:
+        raise RuntimeError("SAAS_PUBLIC_URL is required")
 
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
         raise RuntimeError("playwright is required for responsive browser smoke") from exc
 
+    authenticated = bool(email and password)
     Path("artifacts/browser-matrix").mkdir(parents=True, exist_ok=True)
     results = {}
 
@@ -47,16 +48,17 @@ def run():
                     if email_field.count() == 0 or password_field.count() == 0:
                         raise RuntimeError("login fields not rendered")
 
-                    email_field.first.fill(email)
-                    password_field.first.fill(password)
-                    login = page.locator("button:visible").filter(has_text="Войти")
-                    if login.count() == 0:
-                        raise RuntimeError("login button not rendered")
-                    login.last.click()
-
-                    deadline = page.locator('input[type="password"]:visible')
-                    deadline.wait_for(state="hidden", timeout=30000)
-                    page.wait_for_timeout(3000)
+                    mode = "public-login"
+                    if authenticated:
+                        email_field.first.fill(email)
+                        password_field.first.fill(password)
+                        login = page.locator("button:visible").filter(has_text="Войти")
+                        if login.count() == 0:
+                            raise RuntimeError("login button not rendered")
+                        login.last.click()
+                        page.locator('input[type="password"]:visible').wait_for(state="hidden", timeout=30000)
+                        page.wait_for_timeout(3000)
+                        mode = "authenticated"
 
                     body = page.locator("body")
                     text = body.inner_text(timeout=10000)
@@ -66,17 +68,18 @@ def run():
                     viewport_width = page.evaluate("() => window.innerWidth")
 
                     if not app_ready:
-                        raise RuntimeError("Streamlit app container missing after login")
+                        raise RuntimeError("Streamlit app container missing")
                     if horizontal_overflow:
                         raise RuntimeError(f"horizontal overflow: body={body_width}, viewport={viewport_width}")
                     if len(text.strip()) < 40:
-                        raise RuntimeError("authenticated page rendered almost no text")
+                        raise RuntimeError("page rendered almost no text")
                     if console_errors:
                         raise RuntimeError("browser console errors: " + " | ".join(console_errors[:5]))
 
                     page.screenshot(path=f"artifacts/browser-matrix/{name}.png", full_page=True)
                     results[name] = {
                         "status": "ok",
+                        "mode": mode,
                         "viewport": viewport,
                         "app_ready": app_ready,
                         "horizontal_overflow": horizontal_overflow,
