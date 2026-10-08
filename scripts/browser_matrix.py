@@ -46,11 +46,24 @@ def run():
                 )
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
-                    page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
+
+                    # Streamlit Cloud can expose the rendered app through a child frame.
+                    # Search all frames instead of assuming the app is in the top document.
+                    def app_frame():
+                        for frame in page.frames:
+                            try:
+                                if frame.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).count():
+                                    return frame
+                            except Exception:
+                                continue
+                        return page
+
+                    frame = app_frame()
+                    frame.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
                         state="visible", timeout=60000
                     )
-                    email_field = page.get_by_label("Email", exact=True).first
-                    password_field = page.get_by_label("Пароль", exact=True).first
+                    email_field = frame.get_by_label("Email", exact=True).first
+                    password_field = frame.get_by_label("Пароль", exact=True).first
                     email_field.wait_for(state="visible", timeout=30000)
                     password_field.wait_for(state="visible", timeout=30000)
 
@@ -58,14 +71,14 @@ def run():
                     if authenticated:
                         email_field.fill(email)
                         password_field.fill(password)
-                        login = page.locator("button:visible").filter(has_text="Войти").last
+                        login = frame.locator("button:visible").filter(has_text="Войти").last
                         login.wait_for(state="visible", timeout=10000)
                         login.click()
                         password_field.wait_for(state="hidden", timeout=45000)
                         page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    body_text = page.locator("body").inner_text(timeout=10000)
+                    body_text = frame.locator("body").inner_text(timeout=10000)
                     horizontal_overflow = page.evaluate(
                         "() => document.documentElement.scrollWidth > window.innerWidth + 2"
                     )
