@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only responsive browser smoke for the production Streamlit app.
-
-If E2E credentials are configured, the smoke authenticates and checks the main app.
-Without credentials it still verifies the public login surface at all three viewports.
-"""
+"""Read-only responsive browser smoke for the production Streamlit app."""
 import json
 import os
 import sys
@@ -33,55 +29,70 @@ def run():
     results = {}
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--disable-http2", "--disable-dev-shm-usage"])
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-http2", "--disable-dev-shm-usage"],
+        )
         try:
             for name, viewport in VIEWPORTS.items():
                 page = browser.new_page(viewport=viewport)
                 console_errors = []
-                page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+                page.on(
+                    "console",
+                    lambda msg: console_errors.append(msg.text)
+                    if msg.type == "error"
+                    else None,
+                )
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
-                    page.wait_for_timeout(5000)
 
-                    email_field = page.get_by_label("Email", exact=True)
-                    password_field = page.get_by_label("Пароль", exact=True)
-                    if email_field.count() == 0 or password_field.count() == 0:
-                        raise RuntimeError("login fields not rendered")
+                    app = page.locator('[data-testid="stAppViewContainer"]')
+                    app.wait_for(state="visible", timeout=30000)
+
+                    email_field = page.get_by_label("Email", exact=True).first
+                    password_field = page.get_by_label("Пароль", exact=True).first
+                    email_field.wait_for(state="visible", timeout=30000)
+                    password_field.wait_for(state="visible", timeout=30000)
 
                     mode = "public-login"
                     if authenticated:
-                        email_field.first.fill(email)
-                        password_field.first.fill(password)
-                        login = page.locator("button:visible").filter(has_text="Войти")
-                        if login.count() == 0:
-                            raise RuntimeError("login button not rendered")
-                        login.last.click()
-                        page.locator('input[type="password"]:visible').wait_for(state="hidden", timeout=30000)
-                        page.wait_for_timeout(3000)
+                        email_field.fill(email)
+                        password_field.fill(password)
+                        login = page.locator("button:visible").filter(has_text="Войти").last
+                        login.wait_for(state="visible", timeout=10000)
+                        login.click()
+
+                        # Streamlit may rerun the script several times after submit.
+                        password_field.wait_for(state="hidden", timeout=45000)
+                        page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    body = page.locator("body")
-                    text = body.inner_text(timeout=10000)
-                    app_ready = page.locator('[data-testid="stAppViewContainer"]').count() > 0
-                    horizontal_overflow = page.evaluate("() => document.documentElement.scrollWidth > window.innerWidth + 2")
+                    text = app.inner_text(timeout=10000)
+                    horizontal_overflow = page.evaluate(
+                        "() => document.documentElement.scrollWidth > window.innerWidth + 2"
+                    )
                     body_width = page.evaluate("() => document.body.scrollWidth")
                     viewport_width = page.evaluate("() => window.innerWidth")
 
-                    if not app_ready:
-                        raise RuntimeError("Streamlit app container missing")
                     if horizontal_overflow:
-                        raise RuntimeError(f"horizontal overflow: body={body_width}, viewport={viewport_width}")
+                        raise RuntimeError(
+                            f"horizontal overflow: body={body_width}, viewport={viewport_width}"
+                        )
                     if len(text.strip()) < 40:
                         raise RuntimeError("page rendered almost no text")
                     if console_errors:
-                        raise RuntimeError("browser console errors: " + " | ".join(console_errors[:5]))
+                        raise RuntimeError(
+                            "browser console errors: " + " | ".join(console_errors[:5])
+                        )
 
-                    page.screenshot(path=f"artifacts/browser-matrix/{name}.png", full_page=True)
+                    page.screenshot(
+                        path=f"artifacts/browser-matrix/{name}.png", full_page=True
+                    )
                     results[name] = {
                         "status": "ok",
                         "mode": mode,
                         "viewport": viewport,
-                        "app_ready": app_ready,
+                        "app_ready": True,
                         "horizontal_overflow": horizontal_overflow,
                         "text_length": len(text.strip()),
                     }
