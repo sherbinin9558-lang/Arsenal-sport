@@ -36,6 +36,7 @@ jobs:
         run: pip install pip-audit && pip-audit -r requirements.txt --strict
 
   required-secrets:
+    if: github.event_name != 'pull_request'
     environment: production
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +64,7 @@ jobs:
 
   browser-webmcp:
     needs: required-secrets
+    if: github.event_name != 'pull_request'
     environment: production
     runs-on: ubuntu-latest
     env:
@@ -105,6 +107,7 @@ jobs:
 
   provider-smoke:
     needs: required-secrets
+    if: github.event_name != 'pull_request'
     environment: production
     runs-on: ubuntu-latest
     env:
