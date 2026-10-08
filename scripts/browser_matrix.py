@@ -25,7 +25,8 @@ def run():
         raise RuntimeError("playwright is required for responsive browser smoke") from exc
 
     authenticated = bool(email and password)
-    Path("artifacts/browser-matrix").mkdir(parents=True, exist_ok=True)
+    artifact_dir = Path("artifacts/browser-matrix")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
     results = {}
 
     with sync_playwright() as p:
@@ -45,9 +46,6 @@ def run():
                 )
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
-
-                    # Wait for the customer-facing shell before probing widgets.
-                    # Streamlit widgets can appear asynchronously during reruns.
                     page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
                         state="visible", timeout=60000
                     )
@@ -63,12 +61,11 @@ def run():
                         login = page.locator("button:visible").filter(has_text="Войти").last
                         login.wait_for(state="visible", timeout=10000)
                         login.click()
-
                         password_field.wait_for(state="hidden", timeout=45000)
                         page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    text = page.locator("body").inner_text(timeout=10000)
+                    body_text = page.locator("body").inner_text(timeout=10000)
                     horizontal_overflow = page.evaluate(
                         "() => document.documentElement.scrollWidth > window.innerWidth + 2"
                     )
@@ -79,24 +76,43 @@ def run():
                         raise RuntimeError(
                             f"horizontal overflow: body={body_width}, viewport={viewport_width}"
                         )
-                    if len(text.strip()) < 40:
+                    if len(body_text.strip()) < 40:
                         raise RuntimeError("page rendered almost no text")
                     if console_errors:
                         raise RuntimeError(
                             "browser console errors: " + " | ".join(console_errors[:5])
                         )
 
-                    page.screenshot(
-                        path=f"artifacts/browser-matrix/{name}.png", full_page=True
-                    )
+                    page.screenshot(path=str(artifact_dir / f"{name}.png"), full_page=True)
                     results[name] = {
                         "status": "ok",
                         "mode": mode,
                         "viewport": viewport,
                         "app_ready": True,
                         "horizontal_overflow": horizontal_overflow,
-                        "text_length": len(text.strip()),
+                        "text_length": len(body_text.strip()),
                     }
+                except Exception as exc:
+                    diagnostic = {
+                        "status": "failed",
+                        "viewport": viewport,
+                        "url": page.url,
+                        "title": page.title(),
+                        "error": str(exc),
+                        "console_errors": console_errors[:20],
+                    }
+                    try:
+                        diagnostic["body_text"] = page.locator("body").inner_text(timeout=5000)[:12000]
+                    except Exception as body_exc:
+                        diagnostic["body_text_error"] = str(body_exc)
+                    try:
+                        page.screenshot(path=str(artifact_dir / f"{name}-failure.png"), full_page=True)
+                        diagnostic["screenshot"] = f"{name}-failure.png"
+                    except Exception as screenshot_exc:
+                        diagnostic["screenshot_error"] = str(screenshot_exc)
+                    with open(artifact_dir / f"{name}-failure.json", "w", encoding="utf-8") as fh:
+                        json.dump(diagnostic, fh, ensure_ascii=False, indent=2)
+                    raise
                 finally:
                     page.close()
         finally:

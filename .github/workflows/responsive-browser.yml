@@ -2,7 +2,7 @@ name: Responsive browser matrix
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "work/**"]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +35,24 @@ jobs:
           print("Browser smoke target:", u.scheme + "://" + u.netloc)
           PY
           echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Verify Streamlit health endpoint
+        env:
+          SAAS_PUBLIC_URL: ${{ steps.target.outputs.url }}
+        run: |
+          python - <<'PY'
+          import os, urllib.request, time
+          base=os.environ["SAAS_PUBLIC_URL"].rstrip("/")
+          url=base+"/_stcore/health"
+          started=time.perf_counter()
+          req=urllib.request.Request(url,headers={"User-Agent":"AI-Agent-Content-Manager-Health/1.0"})
+          with urllib.request.urlopen(req,timeout=60) as response:
+              body=response.read().decode(errors="replace").strip().lower()
+              print("health_status=", response.status)
+              print("health_body=", body[:200])
+              print("health_latency_ms=", round((time.perf_counter()-started)*1000,1))
+              if response.status != 200 or body != "ok":
+                  raise SystemExit("Streamlit health endpoint is not healthy")
+          PY
       - name: Run desktop/tablet/mobile smoke
         env:
           SAAS_PUBLIC_URL: ${{ steps.target.outputs.url }}
