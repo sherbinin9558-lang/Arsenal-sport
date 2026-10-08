@@ -1,5 +1,5 @@
 """T-Bank (formerly Tinkoff) Internet Acquiring checkout."""
-import hashlib, os, uuid, requests
+import hashlib, os, time, uuid, requests
 import streamlit as st
 
 def _cfg(name, default=""):
@@ -108,7 +108,25 @@ def create_checkout(plan, tenant_id):
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
         raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
-    _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan)
+    # The provider payment is already created at this point. Persist the
+    # checkout record with bounded retries so a transient Supabase outage does
+    # not strand a real payment without a durable application reference.
+    save_error = None
+    for attempt in range(3):
+        try:
+            _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan)
+            save_error = None
+            break
+        except Exception as exc:
+            save_error = exc
+            if attempt < 2:
+                time.sleep(0.5 * (2 ** attempt))
+    if save_error is not None:
+        raise RuntimeError(
+            "Платёж в Т-Банке создан, но не удалось сохранить checkout-сессию. "
+            f"Идентификатор заказа: {order_id}; payment: {data.get('PaymentId')}. "
+            "Повторите синхронизацию checkout после восстановления Supabase."
+        ) from save_error
     return data
 
 def get_state(payment_id):
