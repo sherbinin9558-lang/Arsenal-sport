@@ -46,12 +46,10 @@ def run():
                 )
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
-                    page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
-                        state="visible", timeout=60000
-                    )
+                    page.wait_for_timeout(3000)
                     email_field = page.get_by_label("Email", exact=True).first
                     password_field = page.get_by_label("Пароль", exact=True).first
-                    email_field.wait_for(state="visible", timeout=30000)
+                    email_field.wait_for(state="visible", timeout=60000)
                     password_field.wait_for(state="visible", timeout=30000)
 
                     mode = "public-login"
