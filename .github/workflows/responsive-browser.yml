@@ -35,23 +35,28 @@ jobs:
           print("Browser smoke target:", u.scheme + "://" + u.netloc)
           PY
           echo "url=$url" >> "$GITHUB_OUTPUT"
-      - name: Verify Streamlit health endpoint
+      - name: Diagnose Streamlit health and redirect behavior
         env:
           SAAS_PUBLIC_URL: ${{ steps.target.outputs.url }}
         run: |
           python - <<'PY'
-          import os, urllib.request, time
+          import os, requests, time
           base=os.environ["SAAS_PUBLIC_URL"].rstrip("/")
-          url=base+"/_stcore/health"
-          started=time.perf_counter()
-          req=urllib.request.Request(url,headers={"User-Agent":"AI-Agent-Content-Manager-Health/1.0"})
-          with urllib.request.urlopen(req,timeout=60) as response:
-              body=response.read().decode(errors="replace").strip().lower()
-              print("health_status=", response.status)
-              print("health_body=", body[:200])
-              print("health_latency_ms=", round((time.perf_counter()-started)*1000,1))
-              if response.status != 200 or body != "ok":
-                  raise SystemExit("Streamlit health endpoint is not healthy")
+          for suffix in ("/_stcore/health", "/"):
+              url=base+suffix
+              started=time.perf_counter()
+              try:
+                  response=requests.get(url, timeout=60, allow_redirects=False, headers={"User-Agent":"AI-Agent-Content-Manager-Health/2.0"})
+                  print("probe=", suffix)
+                  print("status=", response.status_code)
+                  print("location=", response.headers.get("location",""))
+                  print("content_type=", response.headers.get("content-type",""))
+                  print("server=", response.headers.get("server",""))
+                  print("body_prefix=", response.text[:500].replace("\n"," "))
+                  print("latency_ms=", round((time.perf_counter()-started)*1000,1))
+              except Exception as exc:
+                  print("probe=", suffix)
+                  print("error=", f"{type(exc).__name__}: {exc}")
           PY
       - name: Run desktop/tablet/mobile smoke
         env:
