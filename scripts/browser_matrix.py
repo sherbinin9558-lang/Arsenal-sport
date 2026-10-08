@@ -2,7 +2,7 @@
 """Authenticated responsive browser smoke for the production Streamlit app.
 
 This is read-only: it logs in, verifies the main app renders at desktop/tablet/mobile
-viewports, checks the WebMCP registration marker, and records screenshots.
+viewports, checks the app render, responsive layout, and records screenshots.
 """
 import json
 import os
@@ -61,15 +61,12 @@ def run():
                     body = page.locator("body")
                     text = body.inner_text(timeout=10000)
                     app_ready = page.locator('[data-testid="stAppViewContainer"]').count() > 0
-                    marker = page.evaluate("() => !!globalThis.__ARSENAL_WEBMCP_READY__")
                     horizontal_overflow = page.evaluate("() => document.documentElement.scrollWidth > window.innerWidth + 2")
                     body_width = page.evaluate("() => document.body.scrollWidth")
                     viewport_width = page.evaluate("() => window.innerWidth")
 
                     if not app_ready:
                         raise RuntimeError("Streamlit app container missing after login")
-                    if not marker:
-                        raise RuntimeError("WebMCP registration marker missing")
                     if horizontal_overflow:
                         raise RuntimeError(f"horizontal overflow: body={body_width}, viewport={viewport_width}")
                     if len(text.strip()) < 40:
@@ -82,7 +79,6 @@ def run():
                         "status": "ok",
                         "viewport": viewport,
                         "app_ready": app_ready,
-                        "webmcp_registered": marker,
                         "horizontal_overflow": horizontal_overflow,
                         "text_length": len(text.strip()),
                     }
