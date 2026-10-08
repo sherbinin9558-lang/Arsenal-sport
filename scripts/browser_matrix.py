@@ -46,10 +46,16 @@ def run():
                 )
                 try:
                     response = page.goto(url, wait_until="domcontentloaded", timeout=90000)
-                    # Community Cloud redirects private apps to its auth gateway.
-                    # Detect that deployment condition immediately instead of waiting
-                    # for a misleading UI-selector timeout.
-                    if "share.streamlit.io/-/auth/" in page.url:
+                    # Community Cloud can answer the app URL with a redirect to its
+                    # authentication gateway. Inspect both the response and final URL
+                    # before waiting for application selectors so access gating is
+                    # reported deterministically instead of as a 60s selector timeout.
+                    location = response.headers.get("location", "") if response is not None else ""
+                    response_url = response.url if response is not None else ""
+                    auth_gateway = "share.streamlit.io/-/auth/" in " ".join(
+                        (location, response_url, page.url)
+                    )
+                    if auth_gateway:
                         raise RuntimeError(
                             "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud requires "
                             "authentication for this app. Make the app public or provide "
