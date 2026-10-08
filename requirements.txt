@@ -3,6 +3,7 @@ imageio-ffmpeg
 openpyxl
 Pillow
 requests>=2.32.0
+sentry-sdk>=2.0.0
 
 streamlit-cookies-controller==0.0.4
 

@@ -18,3 +18,20 @@ class ObservabilityTests(unittest.TestCase):
         self.assertTrue(all('SECRET' not in x for x in logs.output))
 
 if __name__=='__main__': unittest.main()
+
+def test_observability_loads_without_sentry_dsn(monkeypatch):
+    monkeypatch.delenv("SENTRY_DSN", raising=False)
+    import observability
+    observability._CONFIGURED = False
+    observability._SENTRY = None
+    observability.configure_observability()
+    assert observability._SENTRY is None
+
+
+def test_observability_supports_sentry_dsn(monkeypatch):
+    monkeypatch.setenv("SENTRY_DSN", "https://examplePublicKey@o0.ingest.sentry.io/0")
+    import observability
+    observability._CONFIGURED = False
+    observability._SENTRY = None
+    observability.configure_observability()
+    assert observability._CONFIGURED is True
