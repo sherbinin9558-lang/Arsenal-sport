@@ -24,11 +24,7 @@ jobs:
           INPUT_URL: ${{ inputs.target_url }}
           SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
         run: |
-          url="${INPUT_URL:-$SAAS_PUBLIC_URL}"
-          if [ -z "$url" ]; then
-            echo "::error::SAAS_PUBLIC_URL secret or workflow target_url is required"
-            exit 1
-          fi
+          url="${INPUT_URL:-${SAAS_PUBLIC_URL:-https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app}}"
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Run ZAP baseline scan
         uses: zaproxy/action-baseline@v0.15.0
