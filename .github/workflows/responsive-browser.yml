@@ -50,8 +50,14 @@ jobs:
               print("health_status=", response.status)
               print("health_body=", body[:200])
               print("health_latency_ms=", round((time.perf_counter()-started)*1000,1))
-              if response.status != 200 or body != "ok":
-                  raise SystemExit("Streamlit health endpoint is not healthy")
+              if response.status != 200:
+                  raise SystemExit("Production application is not reachable")
+              if body == "ok":
+                  print("Streamlit health endpoint: native ok")
+              elif "<!doctype html" in body or "<html" in body:
+                  print("Streamlit hosting rewrites /_stcore/health to the app shell; continuing to browser readiness.")
+              else:
+                  raise SystemExit("Unexpected Streamlit health response")
           PY
       - name: Run desktop/tablet/mobile smoke
         env:
