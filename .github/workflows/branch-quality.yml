@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - name: Compile changed Python modules
-        run: python -m py_compile max_operator.py ui/max.py webmcp_tools.py ai_gateway.py
+        run: python -m py_compile max_operator.py ui/max.py webmcp_tools.py ai_gateway.py scripts/browser_matrix.py
       - name: Run focused quality tests
         run: |
           python -m pip install --disable-pip-version-check -r requirements.txt pytest

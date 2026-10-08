@@ -1,0 +1,49 @@
+name: Responsive browser matrix
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require browser smoke secrets
+        env:
+          SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          for name in SAAS_PUBLIC_URL E2E_EMAIL E2E_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required secret: $name"
+              exit 1
+            fi
+          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt playwright
+      - name: Install Chromium
+        run: timeout 180s playwright install chromium
+      - name: Run desktop/tablet/mobile smoke
+        env:
+          SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: python scripts/browser_matrix.py
+      - name: Upload browser matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-browser-${{ github.run_id }}
+          path: |
+            browser-matrix-report.json
+            artifacts/browser-matrix/**
+          if-no-files-found: warn
