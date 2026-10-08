@@ -1,0 +1,82 @@
+name: Playwright Production Acceptance
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-playwright:
+    name: Production browser matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SAAS_PUBLIC_URL: ${{ vars.SAAS_PUBLIC_URL || 'https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium firefox webkit
+
+      - name: Production Playwright smoke
+        run: python scripts/playwright_production_smoke.py
+
+      - name: Upload Playwright artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-production-report
+          path: artifacts/playwright-production/
+          retention-days: 14
+
+  browserstack:
+    name: BrowserStack production smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ vars.BROWSERSTACK_ENABLED == 'true' }}
+    env:
+      SAAS_PUBLIC_URL: ${{ vars.SAAS_PUBLIC_URL || 'https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app' }}
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: BrowserStack credentials check
+        run: |
+          test -n "$BROWSERSTACK_USERNAME"
+          test -n "$BROWSERSTACK_ACCESS_KEY"
+
+      - name: Install Playwright
+        run: playwright install chromium
+
+      - name: BrowserStack smoke
+        run: python scripts/browserstack_production_smoke.py
+
+      - name: Upload BrowserStack artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: browserstack-production-report
+          path: artifacts/browserstack-production/
+          retention-days: 14
