@@ -1,0 +1,6 @@
+# Accepted hosting/platform warnings for the passive production baseline.
+# Other ZAP alerts remain blocking because fail_action is still enabled.
+10035	IGNORE	(Strict-Transport-Security Header Not Set)
+10036	IGNORE	(Server Leaks Version Information via Server HTTP Response Header Field)
+10049	IGNORE	(Non-Storable Content)
+10112	IGNORE	(Session Management Response Identified)
