@@ -46,13 +46,15 @@ def run():
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=90000)
 
-                    # Streamlit's test id can be absent during a rerun or after
-                    # hosting-side redirects. Wait for a stable visible surface
-                    # instead of binding the smoke test to one internal DOM id.
+                    # Wait for the customer-facing shell before probing widgets.
+                    # Streamlit widgets can appear asynchronously during reruns.
+                    page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
+                        state="visible", timeout=60000
+                    )
                     email_field = page.get_by_label("Email", exact=True).first
                     password_field = page.get_by_label("Пароль", exact=True).first
-                    email_field.wait_for(state="visible", timeout=60000)
-                    password_field.wait_for(state="visible", timeout=60000)
+                    email_field.wait_for(state="visible", timeout=30000)
+                    password_field.wait_for(state="visible", timeout=30000)
 
                     mode = "public-login"
                     if authenticated:
