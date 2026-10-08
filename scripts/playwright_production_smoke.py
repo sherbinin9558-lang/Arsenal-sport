@@ -26,20 +26,32 @@ TARGETS = [
 
 
 def health_check():
-    url = f"{BASE_URL}/_stcore/health"
+    """Validate liveness without assuming Streamlit Cloud exposes raw /_stcore/health."""
+    health_url = f"{BASE_URL}/_stcore/health"
     started = time.perf_counter()
-    response = requests.get(url, timeout=60)
+    health_response = requests.get(health_url, timeout=60, allow_redirects=True)
+    root_response = requests.get(BASE_URL, timeout=60, allow_redirects=True)
     latency_ms = round((time.perf_counter() - started) * 1000)
-    body = response.text.strip()
+    health_body = health_response.text.strip()
+    root_body = root_response.text[:2000]
     result = {
-        "url": url,
-        "status": response.status_code,
-        "body": body[:500],
+        "health_url": health_url,
+        "health_status": health_response.status_code,
+        "health_body": health_body[:500],
+        "root_status": root_response.status_code,
+        "root_content_type": root_response.headers.get("content-type", ""),
+        "root_has_html": "<html" in root_body.lower() or "<!doctype html" in root_body.lower(),
         "latency_ms": latency_ms,
     }
     (OUT / "health.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    if response.status_code != 200 or body != "ok":
-        raise RuntimeError(f"Production health check failed: {result}")
+    if root_response.status_code != 200:
+        raise RuntimeError(f"Production application liveness failed: {result}")
+    if health_response.status_code == 200 and health_body.lower() == "ok":
+        return
+    if health_response.status_code == 200 and result["root_has_html"]:
+        print("Streamlit health endpoint returned HTML instead of 'ok'; continuing with browser readiness checks.")
+        return
+    raise RuntimeError(f"Production health check failed: {result}")
 
 
 
