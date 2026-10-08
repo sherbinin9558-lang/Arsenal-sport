@@ -18,13 +18,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Resolve target URL
+      - name: Resolve and validate target URL
         id: target
         env:
           INPUT_URL: ${{ inputs.target_url }}
           SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
         run: |
           url="${INPUT_URL:-${SAAS_PUBLIC_URL:-https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app}}"
+          python - <<'PY' "$url"
+          import sys
+          from urllib.parse import urlparse
+          u = urlparse(sys.argv[1])
+          if u.scheme != "https" or not u.netloc:
+              raise SystemExit("Invalid HTTPS ZAP target URL")
+          print("ZAP target:", u.scheme + "://" + u.netloc)
+          PY
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Run ZAP baseline scan
         uses: zaproxy/action-baseline@v0.15.0

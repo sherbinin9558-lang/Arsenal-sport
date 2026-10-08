@@ -20,12 +20,20 @@ jobs:
       - run: pip install -r requirements.txt playwright
       - name: Install Chromium
         run: timeout 180s playwright install chromium
-      - name: Resolve browser smoke URL
+      - name: Resolve and validate browser smoke URL
         id: target
         env:
           SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
         run: |
           url="${SAAS_PUBLIC_URL:-https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app}"
+          python - <<'PY' "$url"
+          import sys
+          from urllib.parse import urlparse
+          u = urlparse(sys.argv[1])
+          if u.scheme != "https" or not u.netloc:
+              raise SystemExit("Invalid HTTPS production URL")
+          print("Browser smoke target:", u.scheme + "://" + u.netloc)
+          PY
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Run desktop/tablet/mobile smoke
         env:
