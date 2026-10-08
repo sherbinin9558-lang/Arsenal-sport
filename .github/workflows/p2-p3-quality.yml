@@ -36,11 +36,14 @@ jobs:
         run: pip install pip-audit && pip-audit -r requirements.txt --strict
 
   production-secrets:
+    outputs:
+      has_e2e: ${{ steps.capability.outputs.has_e2e }}
     if: github.event_name != 'pull_request'
     environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Report production smoke capability
+        id: capability
         env:
           SAAS_PUBLIC_URL: ${{ secrets.SAAS_PUBLIC_URL }}
           E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
@@ -52,8 +55,10 @@ jobs:
           test -n "${SAAS_PUBLIC_URL:-https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app}"
           test -n "${TELEGRAM_BOT_TOKEN}"
           if [ -n "${E2E_EMAIL}" ] && [ -n "${E2E_PASSWORD}" ]; then
+            echo "has_e2e=true" >> "$GITHUB_OUTPUT"
             echo "Authenticated browser smoke: enabled"
           else
+            echo "has_e2e=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Authenticated browser smoke: not configured; responsive public-login smoke remains active."
           fi
           if [ "${VK_REQUIRED}" = "1" ] && [ -z "${VK_TOKEN}" ]; then
@@ -63,7 +68,7 @@ jobs:
 
   browser-webmcp:
     needs: production-secrets
-    if: github.event_name != 'pull_request' && secrets.E2E_EMAIL != '' && secrets.E2E_PASSWORD != ''
+    if: github.event_name != 'pull_request' && needs.production-secrets.outputs.has_e2e == 'true'
     environment: production
     runs-on: ubuntu-latest
     env:
