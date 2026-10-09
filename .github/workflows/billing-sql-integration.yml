@@ -1,0 +1,141 @@
+name: Billing SQL integration
+
+on:
+  push:
+    branches: ['fix/**', 'work/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  billing-sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: billing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d billing_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: billing_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap isolated billing schema
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create extension if not exists pgcrypto;
+          create table public.billing_checkout_sessions (
+            id uuid primary key default gen_random_uuid(),
+            tenant_id uuid not null,
+            provider text not null,
+            provider_order_id text,
+            provider_payment_id text not null,
+            plan text not null,
+            status text not null default 'created',
+            updated_at timestamptz not null default now()
+          );
+          create unique index billing_checkout_provider_payment_uq
+            on public.billing_checkout_sessions(provider, provider_payment_id);
+          create table public.billing_webhook_events (
+            id uuid primary key default gen_random_uuid(),
+            provider text not null,
+            event_key text not null,
+            provider_payment_id text not null,
+            status text not null,
+            payload_hash text,
+            processed_at timestamptz,
+            unique(provider, event_key)
+          );
+          create table public.test_subscription_activations (
+            tenant_id uuid not null,
+            plan text not null,
+            provider text not null,
+            provider_payment_id text not null
+          );
+          create table public.test_subscription_deactivations (
+            tenant_id uuid not null,
+            provider text not null,
+            provider_payment_id text not null,
+            reason text not null
+          );
+          create function public.activate_paid_subscription(
+            uuid, text, text, text, text
+          ) returns void language sql as $$
+            insert into public.test_subscription_activations
+            values ($1, $2, $3, $4);
+          $$;
+          create function public.deactivate_paid_subscription(
+            uuid, text, text, text
+          ) returns boolean language plpgsql as $$
+          begin
+            insert into public.test_subscription_deactivations
+            values ($1, $2, $3, $4);
+            return true;
+          end;
+          $$;
+          SQL
+      - name: Apply billing state machine migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009170000_require_captured_payment_for_activation.sql
+      - name: Apply checkout amount migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009190000_billing_checkout_amount_validation.sql
+      - name: Verify captured-payment and idempotency behavior
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            tenant uuid := '11111111-1111-4111-8111-111111111111';
+            activated integer;
+            result jsonb;
+          begin
+            insert into public.billing_checkout_sessions
+              (tenant_id, provider, provider_payment_id, plan, expected_amount, expected_currency)
+            values (tenant, 'tbank', 'auth-only', 'pro', 990.00, 'RUB');
+            result := public.process_billing_payment_event(
+              'tbank', 'auth-event', 'auth-only', 'AUTHORIZED', tenant, 'pro', null, null
+            );
+            select count(*) into activated from public.test_subscription_activations;
+            if activated <> 0 then raise exception 'AUTHORIZED unexpectedly activated a subscription'; end if;
+
+            insert into public.billing_checkout_sessions
+              (tenant_id, provider, provider_payment_id, plan, expected_amount, expected_currency)
+            values (tenant, 'yookassa', 'captured', 'starter', 490.00, 'RUB');
+            result := public.process_billing_payment_event(
+              'yookassa', 'captured-event', 'captured', 'succeeded', tenant, 'starter', null, null
+            );
+            select count(*) into activated from public.test_subscription_activations;
+            if activated <> 1 then raise exception 'Captured payment did not activate subscription'; end if;
+
+            result := public.process_billing_payment_event(
+              'yookassa', 'captured-event', 'captured', 'succeeded', tenant, 'starter', null, null
+            );
+            if coalesce((result->>'duplicate')::boolean, false) is not true then
+              raise exception 'Repeated processed webhook was not treated as duplicate';
+            end if;
+            select count(*) into activated from public.test_subscription_activations;
+            if activated <> 1 then raise exception 'Duplicate webhook activated subscription twice'; end if;
+
+            begin
+              perform public.process_billing_payment_event(
+                'yookassa', 'wrong-plan-event', 'captured', 'succeeded', tenant, 'business', null, null
+              );
+              raise exception 'Plan mismatch was unexpectedly accepted';
+            exception when others then
+              if sqlerrm = 'Plan mismatch was unexpectedly accepted' then raise; end if;
+              if sqlerrm not in ('PLAN_MISMATCH') then raise; end if;
+            end;
+          end $$;
+          SQL
