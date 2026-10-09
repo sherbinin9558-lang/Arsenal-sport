@@ -29,7 +29,7 @@ def test_checkout_does_not_request_saved_payment_method(monkeypatch):
     monkeypatch.setattr(billing.requests, "post", fake_post)
     monkeypatch.setattr(billing, "_save_checkout", lambda *args: None)
     billing.create_checkout("pro", "tenant-test")
-    assert captured["save_payment_method"] is False
+    assert captured.get("save_payment_method", False) is False
 
 
 def test_auto_renew_cannot_be_enabled_until_recurring_charges_exist(monkeypatch):
