@@ -48,3 +48,21 @@ def test_yookassa_webhook_fails_closed_when_expected_amount_or_currency_missing(
     assert "Checkout amount verification failed" in verifier
     assert "Checkout currency verification failed" in verifier
     assert "status_code=422" in verifier
+
+def test_duplicate_processed_webhook_event_is_idempotent():
+    migration = Path(
+        "supabase/migrations/20261009170000_require_captured_payment_for_activation.sql"
+    ).read_text(encoding="utf-8")
+    assert "on conflict (provider, event_key) do nothing" in migration
+    assert "if event_status = 'processed' then" in migration
+    assert "jsonb_build_object('ok', true, 'duplicate', true, 'status', 'processed')" in migration
+
+
+def test_billing_state_transition_checks_tenant_and_plan_before_activation():
+    migration = Path(
+        "supabase/migrations/20261009170000_require_captured_payment_for_activation.sql"
+    ).read_text(encoding="utf-8")
+    assert "and tenant_id = p_tenant_id" in migration
+    assert "if checkout.plan <> p_plan then" in migration
+    assert "raise exception 'CHECKOUT_NOT_FOUND'" in migration
+    assert "raise exception 'PLAN_MISMATCH'" in migration

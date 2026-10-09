@@ -12,7 +12,7 @@ PASSWORD=_cfg("TBANK_PASSWORD")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 API_URL="https://securepay.tinkoff.ru/v2"
 
-def _save_checkout(tenant_id, order_id, payment_id, plan):
+def _save_checkout(tenant_id, order_id, payment_id, plan, expected_amount, expected_currency="RUB"):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -22,11 +22,12 @@ def _save_checkout(tenant_id, order_id, payment_id, plan):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=h,
         json={"tenant_id":str(tenant_id),"provider":"tbank","provider_order_id":str(order_id),
-              "provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created"},
+              "provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created",
+              "expected_amount":f"{float(expected_amount):.2f}","expected_currency":str(expected_currency).upper()},
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в платёжной базе.")
 
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
@@ -107,14 +108,14 @@ def create_checkout(plan, tenant_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Платёжный провайдер не смог обработать запрос. Проверьте настройки и журнал операции.")
     # The provider payment is already created at this point. Persist the
     # checkout record with bounded retries so a transient Supabase outage does
     # not strand a real payment without a durable application reference.
     save_error = None
     for attempt in range(3):
         try:
-            _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan)
+            _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan, price, "RUB")
             save_error = None
             break
         except Exception as exc:
@@ -137,7 +138,7 @@ def get_state(payment_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Платёжный провайдер не смог обработать запрос. Проверьте настройки и журнал операции.")
     return data
 
 
@@ -152,6 +153,6 @@ def get_checkout_by_order(order_id, tenant_id):
         params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.tbank",
                 "provider_order_id":f"eq.{order_id}","tenant_id":f"eq.{tenant_id}","limit":"1"}, timeout=15)
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из платёжной базы.")
     rows=r.json()
     return rows[0] if rows else None
