@@ -96,3 +96,17 @@ Keep all candidates unmerged until final checks and diff review. The live RLS ma
 - PR #134 is stacked on #133; PR #135 is stacked on #134. Review the chain in dependency order. Do not merge a child before its base has been accepted and revalidated.
 - None of these changes is merged into `main`; the production deployment remains unchanged. The latest `main` SHA recorded for this audit is `2fb836a34d7b0b18bc333dc4e282276559f582d4`.
 - Remaining hard sale gates: real provider test-mode payment/refund/callback verification; real `process_billing_payment_event` RPC test against a disposable Supabase database; backup-and-restore rehearsal; full authenticated CRUD/tenant-authorization matrix; load/performance validation; ownership-transfer and secret-rotation rehearsal. These require isolated test infrastructure or buyer-owned credentials and must not be simulated as completed.
+
+
+## Audit delta — 2026-10-09 18:30 UTC
+
+Latest GitHub metadata check (exact candidate heads):
+
+- PR #131 head `34dec9fcf4cc5a6ac09da1b460cbb062500958f5`: Unit and contract tests passed; optional public-app E2E skipped. The PR remains open and targets `audit/pre-sale-billing-readiness`.
+- PR #133 head `1235243ff7d7d4cec7753e37951aa80dae2b1fa2`: Unit/contract tests, Python quality, syntax, regression, webhook contract, dependency audit, security/SAST/dependency checks, RLS integration, commercial gate, observability, and Production browser matrix passed in the observed run. Optional public-app E2E, provider smoke, BrowserStack, production-secret, and browser-WebMCP checks were skipped. The latest run's unit/contract tests also passed. No real YooKassa payment, notification delivery, or refund was performed.
+- PR #134 head `55fc2518a39c1b404a7f426288a6286370ab9786`: Python quality passed. One unit/contract run was cancelled; an earlier run on the same head passed. Optional public-app E2E was skipped. PR #135 is stacked on this head and its tests passed, but this does not replace rechecking #134's own current required checks before any merge.
+- PR #135 head `e9fd44659b281bea155979c5b49ed94b856d6db9`: Unit/contract tests and Python quality passed; optional public-app E2E skipped.
+- PR #131 is documentation-only; its latest unit/contract check passed. These statuses describe GitHub Actions results, not live provider/database acceptance.
+- Dependency order remains #133 → #134 → #135. All three remain open and unmerged. Do not merge them automatically.
+
+Outstanding acceptance gates remain: real YooKassa test-account checkout/callback/refund; execution of `process_billing_payment_event` against a disposable PostgreSQL/Supabase database; broader tenant CRUD/role tests; backup/restore rehearsal; performance/load testing; and complete owner-transfer/infrastructure inventory. Do not add personal bank details or production payment secrets to the repository.
