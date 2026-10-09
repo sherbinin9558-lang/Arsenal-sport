@@ -159,6 +159,15 @@ def run():
                         source_url = str((item.get("location") or {}).get("url", ""))
                         if source_url.startswith("https://sdk.us.heap-api.com/"):
                             return True
+                        # Streamlit Community Cloud can reject its anonymous app-open
+                        # telemetry POST while still serving the actual app UI. Keep the
+                        # 403 in failed_responses for diagnosis, but do not fail a UI
+                        # smoke solely on this non-product telemetry endpoint.
+                        if (
+                            not auth_attempted
+                            and source_url.startswith(url.rstrip("/") + "/api/v1/app/event/open")
+                        ):
+                            return True
                         if (
                             not auth_attempted
                             and "/api/v2/user/details" in source_url
