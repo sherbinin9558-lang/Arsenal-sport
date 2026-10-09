@@ -61,7 +61,7 @@ class TestP2Hardening(unittest.TestCase):
         post_mock.return_value.text = "db unavailable"
         import tbank_billing
         with self.assertRaises(RuntimeError):
-            tbank_billing._save_checkout("tenant", "order", "payment", "pro")
+            tbank_billing._save_checkout("tenant", "order", "payment", "pro", 990.00)
 
     @patch("webmcp_tools.data_load")
     def test_webmcp_content_plan_is_allowlisted(self, load_mock):
