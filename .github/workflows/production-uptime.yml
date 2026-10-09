@@ -30,21 +30,38 @@ jobs:
       - name: Check Streamlit health
         run: |
           python - <<'PY'
-          import os, time, urllib.request
+          import os, time, urllib.error, urllib.request
           base=os.environ["SAAS_PUBLIC_URL"].rstrip("/")
           url=base+"/_stcore/health"
           last=None
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          opener=urllib.request.build_opener(NoRedirect)
           for attempt in range(3):
               try:
                   started=time.perf_counter()
                   req=urllib.request.Request(url,headers={"User-Agent":"AI-Agent-Content-Manager-Uptime/1.0"})
-                  with urllib.request.urlopen(req, timeout=30) as response:
-                      body=response.read().decode(errors="replace").strip().lower()
-                      latency=round((time.perf_counter()-started)*1000)
-                      print(f"attempt={attempt+1} status={response.status} body={body[:100]} latency_ms={latency}")
-                      if response.status == 200 and body == "ok":
-                          raise SystemExit(0)
-                      last=RuntimeError(f"unexpected health response: {response.status} {body[:100]}")
+                  try:
+                      response=opener.open(req, timeout=30)
+                  except urllib.error.HTTPError as exc:
+                      response=exc
+                  body=response.read().decode(errors="replace").strip().lower()
+                  status=response.code
+                  location=response.headers.get("Location","")
+                  latency=round((time.perf_counter()-started)*1000)
+                  print(f"attempt={attempt+1} status={status} body={body[:100]} location={location[:300]} latency_ms={latency}")
+                  if status in (301,302,303,307,308) and "share.streamlit.io/-/auth/" in location:
+                      raise SystemExit(
+                          "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud redirected "
+                          "the health endpoint to its authentication gateway. Check app visibility "
+                          "or configure a dedicated authenticated E2E probe."
+                      )
+                  if status == 200 and body == "ok":
+                      raise SystemExit(0)
+                  last=RuntimeError(f"unexpected health response: HTTP {status} {body[:100]}")
+              except SystemExit:
+                  raise
               except Exception as exc:
                   last=exc
                   print(f"attempt={attempt+1} error={exc}")
