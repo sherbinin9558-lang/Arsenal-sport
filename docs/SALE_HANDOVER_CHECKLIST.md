@@ -110,3 +110,10 @@ Latest GitHub metadata check (exact candidate heads):
 - Dependency order remains #133 → #134 → #135. All three remain open and unmerged. Do not merge them automatically.
 
 Outstanding acceptance gates remain: real YooKassa test-account checkout/callback/refund; execution of `process_billing_payment_event` against a disposable PostgreSQL/Supabase database; broader tenant CRUD/role tests; backup/restore rehearsal; performance/load testing; and complete owner-transfer/infrastructure inventory. Do not add personal bank details or production payment secrets to the repository.
+
+
+### Cross-PR dependency warning
+
+PR #124 is a separate open candidate based on `main` at `f8c4328c1b3a2e7563fb8b5ec89560b9f6b811c5`. It contains additional safeguards not present in the current #133 → #134 → #135 stack, including finite/positive tariff-price validation and T-Bank/other billing error handling and auto-renew safety. The stack currently targets #133 on `main`, #134 on #133, and #135 on #134; none includes PR #124 merely because it exists separately.
+
+Before release, reconcile the overlap explicitly: preserve the #124 safeguards while integrating #133–#135, then rerun CI on the final release-candidate heads. Do not assume merging #133–#135 alone delivers all protections described in #124. Main currently still has `save_payment_method=True`, permits non-finite float tariff values through `plan_price`, and can include raw YooKassa/Supabase response text in billing exceptions. These issues are not fixed in Production by the open PRs.
