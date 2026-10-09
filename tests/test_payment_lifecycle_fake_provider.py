@@ -27,7 +27,7 @@ class FakeYooKassa:
         self.sequence = 0
 
     def post(self, url, **kwargs):
-        if url == self.base_url:
+        if str(url).rstrip("/") == self.base_url.rstrip("/"):
             self.sequence += 1
             payment_id = f"fake-payment-{self.sequence}"
             checkout_id = kwargs["headers"]["Idempotence-Key"]
