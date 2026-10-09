@@ -102,7 +102,7 @@ def visible_page_text(page):
                 chunks.append(text)
         except Exception:
             continue
-    return "\\n".join(chunks)[:20000]
+    return "\n".join(chunks)[:20000]
 
 
 def run():
