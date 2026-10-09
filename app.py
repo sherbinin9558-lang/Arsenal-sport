@@ -1,5 +1,6 @@
 
 import streamlit as st
+from html import escape as html_escape
 from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re, tempfile, os
 from pathlib import Path
@@ -464,7 +465,22 @@ def render_platform_admin():
         unsafe_allow_html=True,
     )
     with st.container(key="desktop_tenant_table"):
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        tenant_columns = ["Магазин", "Владелец", "Тариф", "Статус", "Подписка", "Создан"]
+    tenant_rows_html = []
+    for row in rows:
+        cells = "".join(
+            f'<td data-label="{html_escape(column, quote=True)}">{html_escape(str(row.get(column, "—")))}</td>'
+            for column in tenant_columns
+        )
+        tenant_rows_html.append(f"<tr>{cells}</tr>")
+    tenant_table_html = (
+        '<div class="tenant-responsive-table"><table><thead><tr>'
+        + "".join(f"<th>{html_escape(column)}</th>" for column in tenant_columns)
+        + "</tr></thead><tbody>"
+        + "".join(tenant_rows_html)
+        + "</tbody></table></div>"
+    )
+    st.markdown(tenant_table_html, unsafe_allow_html=True)
     with st.container(key="mobile_tenant_cards"):
         for row in rows:
             with st.container(border=True):
@@ -739,7 +755,13 @@ button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!imp
 /* Main layout. */
 .block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
 .main-title{font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
-.mobile-nav-hint{display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}html,body{overflow-x:hidden!important;}
+.mobile-nav-hint{display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}
+.tenant-responsive-table{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid rgba(120,130,150,.25);border-radius:12px;}
+.tenant-responsive-table table{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--sidebar-bg,#fff);color:var(--chrome-fg,#171a21);}
+.tenant-responsive-table th,.tenant-responsive-table td{padding:10px 12px;border-bottom:1px solid rgba(120,130,150,.22);text-align:left;overflow-wrap:anywhere;vertical-align:top;}
+.tenant-responsive-table th{font-weight:800;background:rgba(120,130,150,.08);}
+.tenant-responsive-table tr:last-child td{border-bottom:0;}
+@media(max-width:768px){.tenant-responsive-table{border:0;overflow:visible;}.tenant-responsive-table table,.tenant-responsive-table tbody{display:block;width:100%;}.tenant-responsive-table thead{display:none;}.tenant-responsive-table tr{display:block;width:100%;box-sizing:border-box;margin:0 0 12px;padding:4px 12px;border:1px solid rgba(120,130,150,.32);border-radius:12px;background:var(--sidebar-bg,#fff);box-shadow:0 3px 12px rgba(20,30,50,.06);}.tenant-responsive-table td{display:grid;grid-template-columns:minmax(88px,38%) minmax(0,1fr);gap:10px;width:100%;box-sizing:border-box;padding:9px 0;border-bottom:1px solid rgba(120,130,150,.18);}.tenant-responsive-table td:last-child{border-bottom:0;}.tenant-responsive-table td::before{content:attr(data-label);font-weight:750;color:var(--chrome-fg,#171a21);opacity:.72;}}html,body{overflow-x:hidden!important;}
 /* MAX dialog: let Streamlit own the backdrop and centering. Do not stretch the dialog wrapper over the viewport. */
 div[data-testid="stDialog"]{visibility:visible!important;opacity:1!important;z-index:1000!important;pointer-events:auto!important;}
 div[data-testid="stDialog"]>div{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
