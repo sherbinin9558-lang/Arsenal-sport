@@ -44,7 +44,8 @@ def test_supabase_http_error_is_converted_to_typed_error(monkeypatch):
         saas_core._request("GET", "/rest/v1/app_data", token="user-token")
     except saas_core.SupabaseRequestError as exc:
         assert exc.status_code == 403
-        assert "Forbidden" in str(exc)
+        assert "Forbidden" not in str(exc)
+        assert "Недостаточно прав" in str(exc)
     else:
         raise AssertionError("Expected SupabaseRequestError")
 
