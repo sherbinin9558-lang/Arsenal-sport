@@ -141,7 +141,7 @@ class WebhookSecurityTests(unittest.TestCase):
             "object": {"id": "refund-1", "payment_id": "payment-1"},
         }
         with patch.object(tbank_webhook, "_read_body", return_value=body), \
-             patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}),
+             patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
              patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-1", "plan": "starter"
