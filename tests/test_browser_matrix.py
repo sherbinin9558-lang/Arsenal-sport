@@ -12,10 +12,6 @@ class BrowserMatrixTests(unittest.TestCase):
     def test_viewport_names_are_stable(self):
         self.assertEqual(list(VIEWPORTS), ["desktop", "tablet", "mobile"])
 
-
-if __name__ == "__main__":
-    unittest.main()
-
     def test_production_smoke_rejects_streamlit_status_embed_without_app_marker(self):
         from scripts.playwright_production_smoke import validate_application_content
 
@@ -36,3 +32,7 @@ if __name__ == "__main__":
         from scripts.playwright_production_smoke import validate_application_content
 
         validate_application_content("Please sign in. Ваш магазин. Один рабочий центр. Email Пароль")
+
+
+if __name__ == "__main__":
+    unittest.main()
