@@ -62,7 +62,7 @@ class WebhookSecurityTests(unittest.TestCase):
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_rejects_invalid_optional_bearer(self):
-        request = self._request(headers={})
+        request = self._request(headers={"authorization": "Bearer wrong"})
         with self.assertRaises(Exception) as ctx:
             tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
         self.assertIn("Unauthorized", str(ctx.exception))
