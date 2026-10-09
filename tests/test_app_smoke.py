@@ -61,6 +61,13 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn('[data-baseweb="select"] svg {fill:#4b5565!important;color:#4b5565!important;', source)
         self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"] {background:transparent!important;', source)
 
+    def test_max_dialog_css_is_mobile_bounded(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("max-height:calc(100dvh - 24px", source)
+        self.assertIn("width:calc(100vw - 24px)", source)
+        self.assertNotIn("position:fixed!important;inset:0!important;z-index:2147483647", source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:#f6f7fb!important;', source)
+
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
