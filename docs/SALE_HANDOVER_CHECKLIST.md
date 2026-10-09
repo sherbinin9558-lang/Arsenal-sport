@@ -55,11 +55,11 @@ All five still require review against their exact diff and current base before m
 - No independent proof in this audit of production tenant-isolation behavior across every CRUD/admin path.
 - No verified backup/restore and ownership-transfer rehearsal.
 - No verified complete inventory of external accounts, deploy targets, domains, secrets, and third-party costs.
-- PR #124 is the consolidated billing candidate; all enabled checks on its combined head passed, while live-provider, BrowserStack, and optional public-app checks were skipped. PR #128 is closed as superseded by #124. PR #121 consolidates the overlapping webhook-test changes from #118 and #120; its production browser matrix is still running at this snapshot. PR #118 and #120 remain open until that combined candidate finishes.
+- PR #124 is the consolidated billing candidate; all enabled checks on its combined head passed, while live-provider, BrowserStack, and optional public-app checks were skipped. PR #128 is closed as superseded by #124. PR #121 consolidates the overlapping webhook-test changes from #118 and #120; all enabled checks on its combined head passed. PRs #118 and #120 are closed as superseded.
 
 ## Release policy
 
-Do not merge candidates automatically. PR #124 has passed its enabled CI checks and consolidates #128; PR #121 consolidates #118 and #120 and still needs its browser matrix to finish. PR #129 is closed as superseded. Review final diffs and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
+Do not merge candidates automatically. PR #124 has passed its enabled CI checks and consolidates #128; PR #121 consolidates #118 and #120 and all enabled checks on its combined head passed. PR #129 is closed as superseded. Review final diffs and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
 
 
 ## Follow-up audit findings — 2026-10-09
@@ -75,4 +75,4 @@ Do not merge candidates automatically. PR #124 has passed its enabled CI checks 
 
 ## Current release decision
 
-Keep all open PRs unmerged until their latest CI completes and the diffs are reviewed together. PR #121 still needs its production browser matrix to complete. Even after CI passes, the product is not yet certified as fully sale-ready: authenticated CRUD across all roles, production payment-provider verification, recurring billing (if marketed), and a real backup/restore and ownership-transfer rehearsal still require evidence.
+Keep all open PRs unmerged until their latest CI completes and the diffs are reviewed together. PR #121's production browser matrix and all other enabled checks passed. Even after CI passes, the product is not yet certified as fully sale-ready: authenticated CRUD across all roles, production payment-provider verification, recurring billing (if marketed), and a real backup/restore and ownership-transfer rehearsal still require evidence.
