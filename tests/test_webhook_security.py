@@ -142,9 +142,9 @@ class WebhookSecurityTests(unittest.TestCase):
         }
         with patch.object(tbank_webhook, "_read_body", return_value=body), \
              patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "990.00", "currency": "RUB"}}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
-                 "tenant_id": "tenant-1", "plan": "starter"
+                 "tenant_id": "tenant-1", "plan": "starter", "expected_amount": "990.00", "expected_currency": "RUB"
              }), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
             response = asyncio.run(tbank_webhook.yookassa_payment_status(request))
