@@ -650,7 +650,19 @@ else:
     .stApp, .stApp * {color:#17151c;}
     .stApp [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stMarkdownContainer"] li, .stApp [data-testid="stMarkdownContainer"] span, .stApp label, .stApp [data-testid="stCaptionContainer"] {color:#17151c !important;}
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color:#17151c !important;}
-    .stApp input, .stApp textarea, .stApp [data-baseweb="select"] * {color:#17151c !important;}
+    .stApp input, .stApp textarea {color:#17151c !important;}
+    /* Keep native select controls light in light mode; avoid dark surfaces with black text. */
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stApp [data-baseweb="select"] > div {background:#ffffff!important;color:#17151c!important;border-color:#cfd4dd!important;}
+    .stApp [data-baseweb="select"] [role="combobox"],
+    .stApp [data-baseweb="select"] [role="combobox"] *,
+    .stApp [data-baseweb="select"] input {color:#17151c!important;background:transparent!important;}
+    .stApp [data-baseweb="select"] svg {fill:#4b5565!important;color:#4b5565!important;stroke:#4b5565!important;opacity:1!important;}
+    .stApp [data-baseweb="popover"],.stApp [data-baseweb="menu"],.stApp [role="listbox"] {background:#ffffff!important;color:#17151c!important;}
+    .stApp [role="option"],.stApp [role="option"] * {background:#ffffff!important;color:#17151c!important;}
+    /* Explicitly keep Streamlit's top chrome neutral instead of a black strip. */
+    header[data-testid="stHeader"],[data-testid="stToolbar"] {background:transparent!important;color:#17151c!important;}
+    header[data-testid="stHeader"] button,header[data-testid="stHeader"] button * {color:#17151c!important;fill:#17151c!important;}
     .stApp input::placeholder, .stApp textarea::placeholder {color:#667080 !important;opacity:1 !important;}
     .stApp button:not([data-baseweb="tab"]) {color:#17151c !important;}
     .stApp button[kind="primary"] {color:#ffffff !important;}
