@@ -172,7 +172,7 @@ def _checkout_by_payment(payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": "eq.tbank",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
