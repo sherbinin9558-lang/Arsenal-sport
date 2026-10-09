@@ -13,7 +13,7 @@ BASE_URL = os.getenv(
     "SAAS_PUBLIC_URL",
     "https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app",
 ).rstrip("/")
-TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "90000"))
+TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "180000"))
 OUT = Path("artifacts/playwright-production")
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -61,7 +61,7 @@ def startup_http_probe():
     try:
         response = requests.get(url, timeout=60, headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"})
         body = response.text[:20000]
-        result.update({"status": response.status_code, "latency_ms": round((time.perf_counter() - started) * 1000), "content_type": response.headers.get("content-type", ""), "server": response.headers.get("server", ""), "body_prefix": body, "streamlit_markers": {"has_streamlit": "streamlit" in body.lower(), "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")), "has_app_shell": "Ваш магазин. Один рабочий центр." in body}})
+        result.update({"status": response.status_code, "latency_ms": round((time.perf_counter() - started) * 1000), "content_type": response.headers.get("content-type", ""), "server": response.headers.get("server", ""), "body_prefix": body, "streamlit_markers": {"has_streamlit": "streamlit" in body.lower(), "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")), "has_auth_email": "Email" in body, "has_auth_password": "Пароль" in body}})
     except Exception as exc:
         result.update({"status": 0, "latency_ms": round((time.perf_counter() - started) * 1000), "error": f"{type(exc).__name__}: {exc}"})
     (OUT / "startup-http.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -100,11 +100,16 @@ def run():
                 item["initial_url"] = page.url
                 item["title"] = page.title()
                 item["body_prefix"] = page.locator("body").inner_text(timeout=10000)[:20000]
-                item["content_markers"] = {"has_app_shell": "Ваш магазин. Один рабочий центр." in item["body_prefix"], "has_email": "Email" in item["body_prefix"], "has_password": "Пароль" in item["body_prefix"], "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error"))}
-                page.get_by_text("Ваш магазин. Один рабочий центр.").first.wait_for(
-                    state="visible", timeout=TIMEOUT_MS
-                )
-                page.get_by_label("Email").wait_for(state="visible", timeout=30000)
+                item["content_markers"] = {
+                    "has_email": "Email" in item["body_prefix"],
+                    "has_password": "Пароль" in item["body_prefix"],
+                    "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
+                    "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
+                }
+                # The login controls are the stable acceptance contract; do not
+                # depend on a marketing headline that can change with the UI.
+                # The longer timeout accommodates a cold Streamlit Cloud start.
+                page.get_by_label("Email").wait_for(state="visible", timeout=TIMEOUT_MS)
                 page.get_by_label("Пароль").wait_for(state="visible", timeout=30000)
                 item["status"] = "PASS"
             except Exception as exc:
