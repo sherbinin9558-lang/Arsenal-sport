@@ -89,7 +89,10 @@ def plan_price(plan):
         value=0.0
     return value
 
-def create_checkout(plan, tenant_id):
+def create_checkout(plan, tenant_id, payment_method="all"):
+    """Create a hosted checkout, optionally forcing the SBP payment method."""
+    if payment_method not in ("all", "sbp"):
+        raise ValueError("Недопустимый способ оплаты.")
     price=plan_price(plan)
     if price <= 0:
         raise RuntimeError("Цена тарифа не настроена в Secrets.")
@@ -101,11 +104,13 @@ def create_checkout(plan, tenant_id):
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
-        "save_payment_method":True,
+        "save_payment_method":False,
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
         "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
     }
+    if payment_method == "sbp":
+        payload["payment_method_data"] = {"type": "sbp"}
     r=requests.post(
         "https://api.yookassa.ru/v3/payments",
         auth=(SHOP_ID,SECRET_KEY),
