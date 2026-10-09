@@ -60,10 +60,50 @@ class BillingWebhookTests(unittest.TestCase):
                 "starter",
             )
 
-    def test_webhook_errors_do_not_expose_internal_exception_or_tenant(self):
-        source = open("tbank_webhook.py", encoding="utf-8").read()
-        self.assertNotIn('detail=f"Billing state transition failed: {exc}"', source)
-        self.assertNotIn('        "tenant_id": tenant,', source)
+    def test_tbank_webhook_errors_do_not_expose_exception_or_tenant(self):
+        from fastapi import HTTPException
+        from types import SimpleNamespace
+        request = SimpleNamespace(headers={})
+        payload = {"PaymentId": "payment-123", "Token": "valid-token"}
+
+        with patch.dict("os.environ", {"TBANK_WEBHOOK_SECRET": ""}, clear=False), \
+             patch.object(tbank_webhook, "_read_body", return_value=payload), \
+             patch.object(tbank_webhook, "_token", return_value="valid-token"), \
+             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
+                 "tenant_id": "tenant-sensitive-987", "plan": "pro"
+             }), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-DB-SECRET")):
+            with self.assertRaises(HTTPException) as ctx:
+                import asyncio
+                asyncio.run(tbank_webhook.payment_status(request))
+
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.detail, "Billing state transition failed")
+        self.assertNotIn("INTERNAL-DB-SECRET", str(ctx.exception.detail))
+        self.assertNotIn("tenant-sensitive-987", str(ctx.exception.detail))
+
+    def test_yookassa_webhook_errors_do_not_expose_exception_or_tenant(self):
+        from fastapi import HTTPException
+        from types import SimpleNamespace
+        import asyncio
+        request = SimpleNamespace(headers={"authorization": "Bearer unit-yoo-secret"})
+        payload = {"event": "payment.succeeded", "object": {"id": "payment-456"}}
+
+        with patch.dict("os.environ", {"YOOKASSA_WEBHOOK_SECRET": "unit-yoo-secret"}, clear=False), \
+             patch.object(tbank_webhook, "_read_body", return_value=payload), \
+             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
+                 "tenant_id": "tenant-sensitive-654", "plan": "starter"
+             }), \
+             patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(tbank_webhook.yookassa_payment_status(request))
+
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.detail, "Billing state transition failed")
+        self.assertNotIn("INTERNAL-YOO-SECRET", str(ctx.exception.detail))
+        self.assertNotIn("tenant-sensitive-654", str(ctx.exception.detail))
 
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}
