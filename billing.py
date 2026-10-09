@@ -151,8 +151,11 @@ def create_checkout(plan, tenant_id, payment_method="all"):
 def get_payment(payment_id):
     if not configured():
         raise RuntimeError("ЮKassa не настроена.")
+    safe_id = quote(str(payment_id or "").strip(), safe="")
+    if not safe_id:
+        raise ValueError("Идентификатор платежа обязателен.")
     r=requests.get(
-        f"https://api.yookassa.ru/v3/payments/{payment_id}",
+        f"https://api.yookassa.ru/v3/payments/{safe_id}",
         auth=(SHOP_ID,SECRET_KEY),
         timeout=20,
     )
