@@ -11,7 +11,7 @@ SAAS_BUSINESS_PRICE
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
 """
-import os, time, uuid, requests
+import math, os, time, uuid, requests
 import streamlit as st
 
 PLANS = {
@@ -83,9 +83,11 @@ def plan_price(plan):
         raise ValueError("Недопустимый тариф.")
     raw=_cfg(PLANS[plan]["secret"])
     try:
-        value=float(raw.replace(",", "."))
-    except Exception:
-        value=0.0
+        value = float(raw.replace(",", "."))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    if not math.isfinite(value) or value <= 0:
+        return 0.0
     return value
 
 def create_checkout(plan, tenant_id):
