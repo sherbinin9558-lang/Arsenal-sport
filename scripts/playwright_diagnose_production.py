@@ -71,14 +71,52 @@ def main():
             result["browser"]["navigation_error"] = f"{type(exc).__name__}: {exc}"
             log(f"NAVIGATION ERROR: {result['browser']['navigation_error']}")
 
+        # Streamlit Cloud may wrap the actual app in a same-origin iframe. Capture
+        # frame metadata and search the main page plus every attached frame.
+        result["browser"]["frames"] = []
+        for frame in page.frames:
+            frame_info = {"url": frame.url, "name": frame.name}
+            try:
+                frame_info["body_text"] = frame.locator("body").inner_text(timeout=3000)[:5000]
+            except Exception as exc:
+                frame_info["body_error"] = f"{type(exc).__name__}: {exc}"
+            try:
+                frame_info["html_length"] = len(frame.content())
+            except Exception as exc:
+                frame_info["html_error"] = f"{type(exc).__name__}: {exc}"
+            result["browser"]["frames"].append(frame_info)
         try:
-            page.get_by_label("Email").wait_for(state="visible", timeout=60000)
-            result["browser"]["email_visible"] = True
-            log("PASS: Email field became visible")
+            result["browser"]["iframe_elements"] = page.locator("iframe").evaluate_all(
+                "(els) => els.map((el) => ({src: el.src, title: el.title, name: el.name, sandbox: el.getAttribute('sandbox')}))"
+            )
         except Exception as exc:
-            result["browser"]["email_visible"] = False
-            result["browser"]["locator_error"] = f"{type(exc).__name__}: {exc}"
-            log(f"EMAIL FIELD NOT VISIBLE: {result['browser']['locator_error']}")
+            result["browser"]["iframe_inspection_error"] = f"{type(exc).__name__}: {exc}"
+
+        email_locator = page.get_by_label("Email")
+        email_context = "main_page"
+        try:
+            email_locator.wait_for(state="visible", timeout=8000)
+        except Exception:
+            email_locator = None
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue
+                try:
+                    candidate = frame.get_by_label("Email")
+                    candidate.wait_for(state="visible", timeout=8000)
+                    email_locator = candidate
+                    email_context = f"frame:{frame.url}"
+                    break
+                except Exception:
+                    continue
+
+        result["browser"]["email_visible"] = email_locator is not None
+        result["browser"]["email_context"] = email_context if email_locator is not None else None
+        if email_locator is not None:
+            log(f"PASS: Email field became visible in {email_context}")
+        else:
+            result["browser"]["locator_error"] = "Email label not visible in main document or any attached frame"
+            log("EMAIL FIELD NOT VISIBLE in main document or attached frames")
 
         try:
             result["browser"]["title"] = page.title()
