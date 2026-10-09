@@ -23,8 +23,13 @@ class WebMCPDataRegressionTests(unittest.TestCase):
                 "size": "42",
                 "stock": 3,
                 "price": 99999,
-            }],
-            "content_plan": [{"title": "Test post"}],
+                "supplier_api_key": "must-not-leak",
+            }, "malformed-row"],
+            "content_plan": [{
+                "title": "Test post",
+                "secret": "must-not-leak",
+                "access_token": "must-not-leak",
+            }, "malformed-plan-row"],
         }
 
         def fake_data_load(entity, default):
@@ -37,7 +42,20 @@ class WebMCPDataRegressionTests(unittest.TestCase):
         self.assertNotIn("secret", data["settings"])
         self.assertEqual(data["products"][0]["_saas_record_id"], "p1")
         self.assertNotIn("price", data["products"][0])
-        self.assertEqual(data["content_plan"], fixtures["content_plan"])
+        self.assertNotIn("supplier_api_key", data["products"][0])
+        self.assertEqual(len(data["products"]), 1)
+        self.assertEqual(data["content_plan"], [{"title": "Test post"}])
+        self.assertNotIn("secret", data["content_plan"][0])
+        self.assertNotIn("access_token", data["content_plan"][0])
+
+    def test_webmcp_data_fails_closed_when_data_load_raises(self):
+        def broken_data_load(entity, default):
+            raise RuntimeError("backend details must not be exposed")
+
+        with patch.object(webmcp_tools, "data_load", side_effect=broken_data_load):
+            data = webmcp_tools._webmcp_data()
+
+        self.assertEqual(data, {"settings": {}, "products": [], "content_plan": []})
 
 
 if __name__ == "__main__":
