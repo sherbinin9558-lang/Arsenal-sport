@@ -286,6 +286,21 @@ async def payment_status(request: Request):
     if plan not in ("starter", "pro", "business") or not tenant:
         raise HTTPException(status_code=422, detail="Invalid checkout session")
 
+    # T-Bank's GetState Amount is expressed in kopecks. Only validate final
+    # captured states; authorization/other intermediate states never activate.
+    if status in ("CONFIRMED", "AUTHORIZED"):
+        try:
+            expected_amount = Decimal(str(checkout.get("expected_amount")))
+            received_kopecks = Decimal(str(state.get("Amount")))
+            received_amount = received_kopecks / Decimal("100")
+        except (InvalidOperation, TypeError, ValueError, ArithmeticError):
+            raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+        expected_currency = str(checkout.get("expected_currency") or "").upper()
+        if (not expected_amount.is_finite() or not received_amount.is_finite()
+                or expected_amount <= 0 or received_amount != expected_amount
+                or expected_currency != "RUB"):
+            raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+
     event_key = f"tbank:{payment_id}:{status.lower()}"
     try:
         result = _process_billing_event(
