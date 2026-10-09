@@ -54,6 +54,13 @@ class AppSmokeTests(unittest.TestCase):
         at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
 
+
+    def test_mobile_and_light_theme_css_keeps_controls_readable(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('[data-baseweb="select"] > div {background:#ffffff!important;color:#17151c!important;', source)
+        self.assertIn('[data-baseweb="select"] svg {fill:#4b5565!important;color:#4b5565!important;', source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"] {background:transparent!important;', source)
+
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
