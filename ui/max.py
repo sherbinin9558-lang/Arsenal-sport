@@ -42,6 +42,7 @@ from free_automation import (
     update_order,
 )
 from growth_engine import ai_summary, recommendations as growth_recommendations
+from app_data import _growth_snapshot
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
 from max_operator import audit_event, build_business_snapshot, can_execute, execute_write, plan_action
@@ -973,7 +974,7 @@ def render_max():
 
     else:
         st.subheader("Контент → продажи → AI")
-        growth = ai_summary(products, leads, orders, plan)
+        growth = _growth_snapshot(products, plan, leads, orders)
         f = growth["funnel"]
 
         x, y, z, q = st.columns(4)
