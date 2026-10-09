@@ -815,7 +815,7 @@ with tab1:
         if not name or not brand:
             st.error("Заполните: Название и Бренд")
         else:
-            with st.spinner("Генерация..."):
+            with st.spinner("Создаём карточку и сохраняем данные товара…"):
                 img = Image.open(up).convert("RGB") if up else None
                 card = generate_card(img, name, brand, article, sizes, color, description, specs, category, template, get_logo())
                 card_buf = io.BytesIO()
@@ -1511,7 +1511,7 @@ with tab6:
     plan = load_plan()
     leads = load_leads()
     orders = load_orders()
-    growth = ai_summary(products, leads, orders, plan)
+    growth = _growth_snapshot(products, plan, leads, orders)
     f = growth["funnel"]
 
     c1, c2, c3, c4, c5 = st.columns(5)
