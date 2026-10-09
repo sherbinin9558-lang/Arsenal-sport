@@ -43,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: playwright-production-report
-          path: artifacts/playwright-production/
+          path: |
+            artifacts/playwright-production/
+            artifacts/browser-matrix/
           retention-days: 14
 
   browserstack:
