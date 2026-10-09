@@ -30,8 +30,9 @@ class BillingProviderSafetyTests(unittest.TestCase):
 
     @patch.object(billing, "_save_checkout")
     @patch.object(billing.requests, "post")
+    @patch.object(billing, "configured", return_value=True)
     @patch.object(billing, "_cfg")
-    def test_saving_payment_method_is_disabled_by_default(self, cfg, post, save):
+    def test_saving_payment_method_is_disabled_by_default(self, cfg, post, save, _configured):
         values = {
             "SAAS_STARTER_PRICE": "100.00",
             "YOO_KASSA_SHOP_ID": "shop-test",
@@ -53,8 +54,9 @@ class BillingProviderSafetyTests(unittest.TestCase):
         save.assert_called_once()
 
     @patch.object(billing.requests, "post")
+    @patch.object(billing, "configured", return_value=True)
     @patch.object(billing, "_cfg")
-    def test_provider_error_does_not_leak_response_body(self, cfg, post):
+    def test_provider_error_does_not_leak_response_body(self, cfg, post, _configured):
         values = {
             "SAAS_STARTER_PRICE": "100.00",
             "YOO_KASSA_SHOP_ID": "shop-test",
