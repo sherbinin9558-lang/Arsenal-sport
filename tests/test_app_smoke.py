@@ -75,6 +75,11 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn("background:var(--app-bg)!important", source)
         self.assertIn("background:var(--sidebar-bg,#ffffff)!important", source)
 
+    def test_tbank_return_does_not_activate_on_authorized_status(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:', source)
+        self.assertNotIn('if status in ("CONFIRMED","AUTHORIZED")', source)
+
     def test_mobile_tables_stay_within_viewport_and_can_scroll(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('[data-testid="stDataFrame"],[data-testid="stTable"]{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important;', source)
