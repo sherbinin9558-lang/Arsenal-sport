@@ -75,10 +75,15 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn("background:var(--app-bg)!important", source)
         self.assertIn("background:var(--sidebar-bg,#ffffff)!important", source)
 
-    def test_tbank_return_does_not_activate_on_authorized_status(self):
+    def test_browser_payment_return_never_activates_subscription_directly(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn('if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:', source)
-        self.assertNotIn('if status in ("CONFIRMED","AUTHORIZED")', source)
+        start = source.index("# Проверка результата оплаты после возврата с ЮKassa.")
+        end = source.index("with st.sidebar:", start)
+        payment_return_code = source[start:end]
+        self.assertNotIn("activate_paid_subscription(", payment_return_code)
+        self.assertIn('if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:', payment_return_code)
+        self.assertNotIn('if status in ("CONFIRMED","AUTHORIZED")', payment_return_code)
+        self.assertIn('st.button("Проверить статус оплаты ещё раз", key="billing_return_refresh")', source)
 
     def test_mobile_tables_stay_within_viewport_and_can_scroll(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
