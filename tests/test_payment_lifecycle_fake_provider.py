@@ -48,7 +48,7 @@ class FakeYooKassa:
         raise AssertionError(f"Unexpected outbound POST in fake-provider test: {url}")
 
     def get(self, url, **kwargs):
-        if url.startswith(self.base_url + "/"):
+        if kwargs.get("auth") == ("test-shop", "test-secret"):
             payment_id = url.rsplit("/", 1)[-1]
             if payment_id not in self.payments:
                 return FakeResponse({"error": "not found"}, ok=False)
