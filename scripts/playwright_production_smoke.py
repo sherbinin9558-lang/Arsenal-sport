@@ -76,19 +76,24 @@ def browser_url():
 
 
 def visible_label_locator(page, label, timeout_ms):
-    """Find a visible labelled control in the main document or any attached iframe."""
-    contexts = [page.main_frame] + [frame for frame in page.frames if frame != page.main_frame]
+    """Wait for a visible labelled control, rescanning frames as Streamlit attaches them."""
+    deadline = time.monotonic() + timeout_ms / 1000
     last_error = None
-    for frame in contexts:
-        try:
-            locator = frame.get_by_label(label)
-            locator.wait_for(state="visible", timeout=min(timeout_ms, 8000))
-            return locator, frame.url
-        except Exception as exc:
-            last_error = exc
+    while time.monotonic() < deadline:
+        # Streamlit Cloud may attach/navigate the app iframe after the outer shell loads.
+        # Rebuild the frame list on every poll so newly attached frames are included.
+        contexts = [page.main_frame] + [frame for frame in page.frames if frame != page.main_frame]
+        for frame in contexts:
+            try:
+                locator = frame.get_by_label(label)
+                if locator.count() and locator.first.is_visible():
+                    return locator.first, frame.url
+            except Exception as exc:
+                last_error = exc
+        page.wait_for_timeout(250)
     raise RuntimeError(
-        f"Could not find visible label {label!r} in the page or any attached iframe. "
-        f"Last error: {last_error}"
+        f"Could not find visible label {label!r} in the page or any attached iframe "
+        f"within {timeout_ms} ms. Last error: {last_error}"
     )
 
 
@@ -126,7 +131,6 @@ def run():
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
                 page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
-                page.wait_for_timeout(3000)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
                 item["body_prefix"] = visible_page_text(page)
