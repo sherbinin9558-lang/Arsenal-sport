@@ -557,9 +557,10 @@ try:
         status=payment.get("Status")
         plan=str((checkout or {}).get("plan") or "").lower()
         if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:
-            activate_paid_subscription(plan,pid,None,provider="tbank",tenant=tenant_id)
+            # Browser return is informational only. The trusted webhook verifies
+            # payment state and checkout invariants before changing subscription access.
             st.session_state["tbank_verified"]=True
-            st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
+            st.info("Платёж подтверждён банком. Доступ будет активирован серверным обработчиком после проверки уведомления.")
         elif status:
             st.info(f"Статус платежа Т‑Банк: {status}.")
     elif (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
@@ -574,10 +575,11 @@ try:
             plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
             tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
             if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
-                method_id=(payment.get("payment_method") or {}).get("id")
-                activate_paid_subscription(plan,payment_id,method_id,provider="yookassa",tenant=tenant)
+                # Never grant subscription access from a browser redirect. The
+                # signed-in client does not own the server-side settlement gate;
+                # activation is handled by the verified provider webhook.
                 st.session_state["billing_verified"]=True
-                st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
+                st.info("Платёж подтверждён ЮKassa. Доступ будет активирован серверным обработчиком после проверки суммы, валюты и уведомления.")
         elif payment.get("status") == "canceled":
             st.warning("Платёж отменён.")
 except Exception as e:
