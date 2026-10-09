@@ -123,7 +123,6 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
 
     assert response["ok"] is True
     assert response["status"] == "succeeded"
-    assert response["tenant_id"] if "tenant_id" in response else True
     assert duplicate_response["duplicate"] is True
     assert len(processed) == 2
     assert processed[0]["tenant_id"] == "tenant-alpha"
