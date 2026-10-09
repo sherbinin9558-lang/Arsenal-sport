@@ -86,3 +86,13 @@ Do not merge candidates automatically. PRs #119, #121, #122, #124, #125, #126 an
 ## Current release decision
 
 Keep all candidates unmerged until final checks and diff review. The live RLS matrix passed for two tenants/five test users; browser smoke passed on the completed candidates. Optional provider/BrowserStack/public-E2E checks remain skipped. The product is not yet certified as fully sale-ready: real provider settlement/refund, disposable-database billing RPC validation, complete authenticated CRUD/admin coverage, and backup/restore plus ownership-transfer rehearsal still require evidence.
+
+
+## Payment follow-up — 2026-10-09 (latest candidate checks)
+
+- PR #133 (`fix/yookassa-webhook-verification`) has passing enabled checks on head `1235243ff7d7d4cec7753e37951aa80dae2b1fa2`, including the production Playwright browser smoke. BrowserStack was skipped. This confirms the automated browser smoke and mocked/contract coverage, not real payment settlement, provider callback delivery, or real refunds.
+- PR #134 (`feat/sbp-qr-checkout`) adds an explicit YooKassa SBP checkout path and disables payment-method saving. Its unit/contract workflow passed; optional public-app E2E was skipped because the optional URL/flag is not configured. Merchant-side SBP enablement and test-mode payment verification remain open.
+- PR #135 (`fix/billing-provider-error-sanitization`) sanitizes provider/database error responses and adds a regression test. Branch-quality and QA automation checks passed; optional public-app E2E was skipped.
+- PR #134 is stacked on #133; PR #135 is stacked on #134. Review the chain in dependency order. Do not merge a child before its base has been accepted and revalidated.
+- None of these changes is merged into `main`; the production deployment remains unchanged. The latest `main` SHA recorded for this audit is `2fb836a34d7b0b18bc333dc4e282276559f582d4`.
+- Remaining hard sale gates: real provider test-mode payment/refund/callback verification; real `process_billing_payment_event` RPC test against a disposable Supabase database; backup-and-restore rehearsal; full authenticated CRUD/tenant-authorization matrix; load/performance validation; ownership-transfer and secret-rotation rehearsal. These require isolated test infrastructure or buyer-owned credentials and must not be simulated as completed.
