@@ -10,7 +10,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
-from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_load_keyset, data_count, dashboard_snapshot, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
+from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_load_keyset, data_count, dashboard_snapshot, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
 from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation, crm_insights, update_instagram_draft)
