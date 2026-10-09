@@ -71,25 +71,38 @@ def main():
             result["browser"]["navigation_error"] = f"{type(exc).__name__}: {exc}"
             log(f"NAVIGATION ERROR: {result['browser']['navigation_error']}")
 
-        # Streamlit renders the app after the initial document response. Wait on
-        # observable app content (not a fixed sleep) before attributing missing controls.
-        try:
-            page.wait_for_function(
-                """() => {
-                    const text = document.body ? document.body.innerText : "";
-                    const hasControl = !!document.querySelector("input, textarea, select, [contenteditable='true']");
-                    const hasAppContent = /Войти|Создать магазин|Восстановить пароль|AI Agent Content Manager/i.test(text);
-                    return hasControl || hasAppContent;
-                }""",
-                timeout=30000,
-            )
-            result["browser"]["app_render_wait"] = "content_or_control_detected"
-        except Exception as exc:
-            result["browser"]["app_render_wait"] = "timed_out"
-            result["browser"]["app_render_wait_error"] = f"{type(exc).__name__}: {exc}"
+        # Streamlit Cloud serves the actual app in a nested iframe (often /~/+/).
+        # Waiting only in the outer document misses the real UI. Poll attached frames
+        # with a bounded deadline and condition-based checks; do not use fixed sleeps.
+        render_deadline = time.monotonic() + 30
+        app_frame = None
+        frame_wait_errors = []
+        while time.monotonic() < render_deadline and app_frame is None:
+            for candidate_frame in list(page.frames):
+                try:
+                    is_app_frame = "/~/" in candidate_frame.url and candidate_frame.locator(
+                        "input[aria-label='Email']"
+                    ).count() > 0
+                    if is_app_frame:
+                        app_frame = candidate_frame
+                        break
+                except Exception as exc:
+                    frame_wait_errors.append(f"{candidate_frame.url}: {type(exc).__name__}: {exc}")
+            if app_frame is None:
+                try:
+                    page.wait_for_timeout(250)
+                except Exception:
+                    break
+        result["browser"]["app_render_wait"] = "app_frame_with_email_control_detected" if app_frame else "timed_out"
+        result["browser"]["app_frame_url"] = app_frame.url if app_frame else None
+        if frame_wait_errors:
+            result["browser"]["frame_wait_errors"] = frame_wait_errors[-20:]
         result["browser"]["post_wait_body_text"] = ""
         try:
-            result["browser"]["post_wait_body_text"] = page.locator("body").inner_text(timeout=5000)[:12000]
+            result["browser"]["post_wait_body_text"] = (
+                app_frame.locator("body").inner_text(timeout=5000)[:12000]
+                if app_frame else page.locator("body").inner_text(timeout=5000)[:12000]
+            )
         except Exception as exc:
             result["browser"]["post_wait_body_error"] = f"{type(exc).__name__}: {exc}"
 
@@ -234,9 +247,9 @@ def main():
     if result["browser"].get("navigation_error") and not result["browser"].get("html_length"):
         raise SystemExit("Diagnostic infrastructure failure: navigation and HTML capture both failed")
     if result["browser"].get("app_render_wait") == "timed_out":
-        log("DIAGNOSTIC RESULT: app content/control not detected within 30 seconds; inspect artifacts")
+        log("DIAGNOSTIC RESULT: Streamlit app iframe with Email control not detected within 30 seconds; inspect artifacts")
     elif not result["browser"].get("email_visible"):
-        log("DIAGNOSTIC RESULT: app content appeared but Email label locator was not found; inspect control report")
+        log("DIAGNOSTIC RESULT: app iframe appeared but Email label locator was not found; inspect control report")
     else:
         log("DIAGNOSTIC RESULT: Email label locator found")
 
