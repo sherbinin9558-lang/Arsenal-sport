@@ -480,7 +480,7 @@ def _clear_tenant_runtime_cache():
         if key.startswith("_saas_data_records_") or key in (
             "max_data_snapshot", "saas_onboarding_complete",
             "_saas_usage_snapshot_cache", "_saas_user_tenants_cache",
-            "_saas_role_cache", "_saas_invitations_cache",
+            "_saas_role_cache", "_saas_invitations_cache", "_saas_onboarding_cache",
         ):
             st.session_state.pop(key, None)
     st.session_state.pop("_saas_data_page_cache", None)
@@ -1530,6 +1530,7 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_app_growth_snapshot_key", None)
     st.session_state.pop("_saas_data_page_cache", None)
     st.session_state.pop("_saas_usage_snapshot_cache", None)
+    st.session_state.pop("_saas_onboarding_cache", None)
 
 
 def data_save(entity,rows):
