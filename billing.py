@@ -7,6 +7,7 @@ SAAS_PUBLIC_URL
 SAAS_STARTER_PRICE
 SAAS_PRO_PRICE
 SAAS_BUSINESS_PRICE
+YOO_KASSA_SAVE_PAYMENT_METHOD (optional; defaults to false)
 
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
