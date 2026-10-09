@@ -94,6 +94,12 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn(".st-key-mobile_tenant_cards {display:none!important;}", source)
         self.assertIn('[data-testid="stTable"] table{min-width:560px!important;}', source)
 
+    def test_tenant_directory_uses_safe_responsive_mobile_cards(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("tenant-responsive-table", source)
+        self.assertIn('html_escape(str(row.get(column, "—")))', source)
+        self.assertIn("@media(max-width:768px){.tenant-responsive-table", source)
+
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
