@@ -99,6 +99,8 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
 
     # Simulate the provider's server-side state changing before it sends an event.
     fake.payments["fake-payment-1"]["status"] = "succeeded"
+    monkeypatch.setenv("SUPABASE_URL", "https://fake-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-key")
     monkeypatch.setattr(tbank_webhook, "_checkout_by_provider_payment",
                         lambda provider, payment_id: {
                             "tenant_id": session["tenant_id"],
