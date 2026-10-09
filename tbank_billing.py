@@ -12,7 +12,7 @@ PASSWORD=_cfg("TBANK_PASSWORD")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 API_URL="https://securepay.tinkoff.ru/v2"
 
-def _save_checkout(tenant_id, order_id, payment_id, plan):
+def _save_checkout(tenant_id, order_id, payment_id, plan, expected_amount, expected_currency="RUB"):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -22,11 +22,12 @@ def _save_checkout(tenant_id, order_id, payment_id, plan):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=h,
         json={"tenant_id":str(tenant_id),"provider":"tbank","provider_order_id":str(order_id),
-              "provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created"},
+              "provider_payment_id":str(payment_id or ""),"plan":plan,"status":"created",
+              "expected_amount":f"{float(expected_amount):.2f}","expected_currency":str(expected_currency).upper()},
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в платёжной базе.")
 
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
@@ -114,7 +115,7 @@ def create_checkout(plan, tenant_id):
     save_error = None
     for attempt in range(3):
         try:
-            _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan)
+            _save_checkout(tenant_id, order_id, data.get("PaymentId"), plan, price, "RUB")
             save_error = None
             break
         except Exception as exc:
