@@ -73,6 +73,11 @@ def set_auto_renew(
         return True
     if current_role() not in ("owner", "admin"):
         raise PermissionError("Только владелец или администратор может менять автопродление.")
+    if enabled:
+        raise RuntimeError(
+            "Автопродление пока недоступно: автоматические повторные списания не реализованы. "
+            "Продление подписки требует ручной оплаты."
+        )
     if not service_key:
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
     headers = {
