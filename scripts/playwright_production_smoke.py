@@ -133,17 +133,11 @@ def run():
                 page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
-                item["body_prefix"] = visible_page_text(page)
-                item["frames"] = [
+                item["initial_body_prefix"] = visible_page_text(page)
+                item["initial_frames"] = [
                     {"url": frame.url, "name": frame.name}
                     for frame in page.frames
                 ]
-                item["content_markers"] = {
-                    "has_email": "Email" in item["body_prefix"],
-                    "has_password": "Пароль" in item["body_prefix"],
-                    "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
-                    "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
-                }
                 # Streamlit Cloud can embed the rendered app in an iframe.
                 # Search the page and attached frames instead of assuming that
                 # the login controls belong to the top-level document.
@@ -152,7 +146,26 @@ def run():
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
                     "password_frame_url": password_frame_url,
+                    "email_control_visible": True,
+                    "password_control_visible": True,
                 }
+                # Streamlit may attach/navigate its app iframe after the initial
+                # shell/status iframe. Capture again after controls are visible.
+                item["body_prefix_after_login"] = visible_page_text(page)
+                item["frames_after_login"] = [
+                    {"url": frame.url, "name": frame.name}
+                    for frame in page.frames
+                ]
+                item["content_markers"] = {
+                    "has_email": "Email" in item["body_prefix_after_login"],
+                    "has_password": "Пароль" in item["body_prefix_after_login"],
+                    "has_exception": any(x in item["body_prefix_after_login"].lower() for x in ("exception", "traceback", "error")),
+                    "has_streamlit_shell": "hosted with streamlit" in item["body_prefix_after_login"].lower(),
+                }
+                item["slow_startup_warning"] = (
+                    "Browser startup took more than 10 seconds; review cold-start/network conditions."
+                    if (time.perf_counter() - started) > 10 else None
+                )
                 item["status"] = "PASS"
             except Exception as exc:
                 item["status"] = "FAIL"
