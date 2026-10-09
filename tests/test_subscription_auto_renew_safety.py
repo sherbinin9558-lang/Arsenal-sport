@@ -45,3 +45,15 @@ def test_auto_renew_cannot_be_enabled_until_recurring_charges_exist(monkeypatch)
             supabase_url="https://example.supabase.co",
         )
     assert called == []
+
+
+def test_auto_renew_cannot_be_enabled_in_demo_mode():
+    with pytest.raises(RuntimeError, match="автоматические повторные списания не реализованы"):
+        saas_billing.set_auto_renew(
+            True,
+            tenant_id=lambda: "demo-tenant",
+            saas_is_enabled=False,
+            current_role=lambda: "owner",
+            service_key="",
+            supabase_url="",
+        )
