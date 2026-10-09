@@ -48,7 +48,7 @@ class WebhookSecurityTests(unittest.TestCase):
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_accepts_provider_token_without_optional_bearer(self):
-        request = self._request(headers={"authorization": "Bearer wrong-secret"})
+        request = self._request(headers={})
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
              patch.object(tbank_webhook, "_token", return_value="signed"), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
@@ -62,7 +62,7 @@ class WebhookSecurityTests(unittest.TestCase):
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_rejects_invalid_optional_bearer(self):
-        request = self._request(headers={"authorization": "Bearer wrong"})
+        request = self._request(headers={})
         with self.assertRaises(Exception) as ctx:
             tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
         self.assertIn("Unauthorized", str(ctx.exception))
@@ -103,7 +103,7 @@ class WebhookSecurityTests(unittest.TestCase):
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
     def test_yookassa_rejects_wrong_optional_bearer(self):
-        request = self._request(headers={})
+        request = self._request(headers={"authorization": "Bearer wrong-secret"})
         with self.assertRaises(Exception) as ctx:
             asyncio.run(tbank_webhook.yookassa_payment_status(request))
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
