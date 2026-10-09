@@ -55,11 +55,11 @@ All five still require review against their exact diff and current base before m
 - No independent proof in this audit of production tenant-isolation behavior across every CRUD/admin path.
 - No verified backup/restore and ownership-transfer rehearsal.
 - No verified complete inventory of external accounts, deploy targets, domains, secrets, and third-party costs.
-- PRs #118–#129 remain open and unmerged; all observed checks on the latest inspected heads passed, but overlapping changes across #124, #128 and #129 must be consolidated and reviewed before merge.
+- PRs #118–#128 remain open and unmerged. PR #129 is closed as superseded by #124. All observed checks on the latest inspected heads passed except the latest PR #124 production browser matrix, still running at this snapshot; overlapping billing changes in #124 and #128 must be reviewed together before merge.
 
 ## Release policy
 
-Do not merge this branch or PRs #118–#129 automatically. Review diffs, consolidate overlapping billing changes, rerun checks on the final combined candidate, and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
+Do not merge this branch or PRs #118–#128 automatically. PR #129 is closed as superseded. Review diffs, consolidate overlapping billing changes, rerun checks on the final combined candidate, and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
 
 
 ## Follow-up audit findings — 2026-10-09
@@ -69,7 +69,7 @@ Do not merge this branch or PRs #118–#129 automatically. Review diffs, consoli
 - PR #126 improves production smoke artifacts by capturing the app after Streamlit attaches its iframe and recording slow-start warnings. Its observed checks passed; it remains unmerged.
 - PR #127 adds a test-only in-memory provider harness. The latest dedicated workflow passed 17 payment/webhook tests, and all observed workflows on its current head completed successfully. This is a test harness, not a production sandbox; it does not validate the real provider or the production Supabase RPC against a disposable database.
 - PR #128 addresses a separate commercial gap: repository inspection found an `auto_renew` flag and UI, but no recurring-charge worker/scheduler in the repository tree. It stops requesting saved payment methods, blocks enabling auto-renewal in both SaaS and demo modes, and explains manual renewal. Its latest observed CI suite completed successfully, including the subscription safety tests and production browser smoke.
-- PR #129 adds non-finite/negative price validation and sanitizes provider/storage errors for T-Bank and YooKassa, with network-free tests. Its latest observed CI suite passed all listed checks, including five production browser configurations. It overlaps with PRs #124 and #128 in `billing.py`; review/consolidate those changes rather than merging independently without checking the combined diff.
+- PR #129 was closed as a duplicate after its unique T-Bank price/error-safety changes and tests were moved into PR #124. PR #124 now contains the consolidated YooKassa/Supabase/T-Bank error-safety and invalid-price tests; its current CI is green except the production browser matrix, which is still running at this snapshot. PR #128 remains the source of truth for disabling saved payment methods and blocking unsupported auto-renewal.
 - PR #126's latest production browser run passed across five browser/viewport configurations. Time to visible login controls was approximately 5.0–7.2 seconds in that run, with no >10-second warning. A previous run had a 17.4-second first desktop load. These are small single-run smoke measurements, not a load test or a guarantee of consistently fast performance; PR #126 improves measurement visibility but does not itself make the app faster.
 - `secrets.example.toml` now includes previously missing plan price, YooKassa webhook, T-Bank notification and receipt placeholders. It still contains no real credentials.
 
