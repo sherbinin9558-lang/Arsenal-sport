@@ -60,3 +60,17 @@ All five still require review against their exact diff and current base before m
 ## Release policy
 
 Do not merge this branch or PRs #118–#122 automatically. Review diffs, run required tests, and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
+
+
+## Follow-up audit findings — 2026-10-09
+
+- PR #124 adds user-facing error sanitization for YooKassa/Supabase billing failures and regression tests. Its observed CI suite completed successfully, including the public login/browser smoke; it remains unmerged.
+- PR #125 adds mocked tests for tenant-scoped writes and role restrictions. Its tenant-isolation workflow and other observed checks passed; it remains unmerged.
+- PR #126 improves production smoke artifacts by capturing the app after Streamlit attaches its iframe and recording slow-start warnings. Its observed checks passed; it remains unmerged.
+- PR #127 adds a test-only in-memory provider harness. Its first CI run failed due to fake endpoint matching; a follow-up fix is being tested. This is not a production sandbox and must not be described as one until CI passes.
+- PR #128 addresses a separate commercial gap: repository inspection found an `auto_renew` flag and UI, but no recurring-charge worker/scheduler in the repository tree. Until recurring billing is implemented and tested, the safer behavior is to stop saving payment methods, block enabling auto-renewal, and clearly explain manual renewal. Its CI is still running.
+- The public browser smoke recorded an initial desktop startup/first-visible-login duration of about 17.4 seconds, with later browser checks around 5.1–6.7 seconds. These are single-run measurements, not a load test or a guarantee of consistently fast performance. PR #126 improves measurement visibility; it does not itself make the app faster.
+
+## Current release decision
+
+Keep all open PRs unmerged until their latest CI completes and the diffs are reviewed together. Even after these PRs pass, the product is not yet certified as fully sale-ready: authenticated CRUD across all roles, production payment-provider verification, recurring billing (if marketed), and a real backup/restore and ownership-transfer rehearsal still require evidence.
