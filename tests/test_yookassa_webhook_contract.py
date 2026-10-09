@@ -150,6 +150,18 @@ def test_refund_for_another_payment_is_rejected(monkeypatch):
     process.assert_not_called()
 
 
+def test_get_payment_encodes_provider_id_as_one_path_segment(monkeypatch):
+    monkeypatch.setattr(billing, 'configured', lambda: True)
+    monkeypatch.setattr(billing, 'SHOP_ID', 'test-shop')
+    monkeypatch.setattr(billing, 'SECRET_KEY', 'test-secret')
+    response = SimpleNamespace(ok=True, json=lambda: {'id': 'payment-1', 'status': 'pending'})
+    call = Mock(return_value=response)
+    monkeypatch.setattr(billing.requests, 'get', call)
+    result = billing.get_payment('payment/with?unsafe=query')
+    assert result['status'] == 'pending'
+    assert '/v3/payments/payment%2Fwith%3Funsafe%3Dquery' in call.call_args.args[0]
+
+
 def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
     monkeypatch.setattr(billing, 'configured', lambda: True)
     monkeypatch.setattr(billing, 'SHOP_ID', 'test-shop')
