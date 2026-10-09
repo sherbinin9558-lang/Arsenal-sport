@@ -25,7 +25,7 @@ class BrowserMatrixTests(unittest.TestCase):
     def test_production_smoke_requires_actual_app_marker(self):
         from scripts.playwright_production_smoke import validate_application_content
 
-        with self.assertRaisesRegex(RuntimeError, "expected application marker"):
+        with self.assertRaisesRegex(RuntimeError, "Expected application marker"):
             validate_application_content("Streamlit is starting…")
 
     def test_production_smoke_accepts_expected_login_page_marker(self):
