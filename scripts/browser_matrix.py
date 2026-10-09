@@ -39,6 +39,7 @@ def run():
             for name, viewport in VIEWPORTS.items():
                 page = browser.new_page(viewport=viewport)
                 console_errors = []
+                auth_attempted = False
                 failed_responses = []
                 request_failures = []
                 page.on(
@@ -109,6 +110,7 @@ def run():
 
                     mode = "public-login"
                     if authenticated:
+                        auth_attempted = True
                         email_field.fill(email)
                         password_field.fill(password)
                         login = page.locator("button:visible").filter(has_text="Войти").last
@@ -139,12 +141,30 @@ def run():
                         )
                     if len(body_text.strip()) < 40:
                         raise RuntimeError("page rendered almost no text")
-                    # Keep the complete resource/console diagnostics in the report.
-                    # Do not whitelist 404s until their URLs and ownership are inspected.
-                    if console_errors:
+                    # Ignore only known non-product noise. Keep all responses in the
+                    # diagnostic report; the app-owned user-details 404 is ignored only
+                    # before an authenticated login attempt.
+                    def is_ignorable_console_error(item):
+                        source_url = str((item.get("location") or {}).get("url", ""))
+                        if source_url.startswith("https://sdk.us.heap-api.com/"):
+                            return True
+                        if (
+                            not auth_attempted
+                            and "/api/v2/user/details" in source_url
+                            and source_url.startswith(url.rstrip("/") + "/")
+                        ):
+                            return True
+                        return False
+
+                    critical_console_errors = [
+                        item for item in console_errors
+                        if not is_ignorable_console_error(item)
+                    ]
+                    if critical_console_errors:
                         raise RuntimeError(
                             "browser console errors: " + " | ".join(
-                                str(item.get("text", item)) for item in console_errors[:5]
+                                str(item.get("text", item))
+                                for item in critical_console_errors[:5]
                             )
                         )
 
@@ -182,9 +202,19 @@ def run():
                         except Exception as frame_exc:
                             frame_info["html_error"] = str(frame_exc)
                         diagnostic["frames"].append(frame_info)
+                    def field_visible(label):
+                        for frame in page.frames:
+                            try:
+                                locator = frame.get_by_label(label, exact=True)
+                                if locator.count() and locator.first.is_visible():
+                                    return True
+                            except Exception:
+                                continue
+                        return False
+
                     diagnostic["app_readiness"] = {
-                        "email_visible": False,
-                        "password_visible": False,
+                        "email_visible": field_visible("Email"),
+                        "password_visible": field_visible("Пароль"),
                         "streamlit_statuspage_text_detected": any(
                             "status embed installed" in str(frame.get("body_text", "")).lower()
                             for frame in diagnostic["frames"]
