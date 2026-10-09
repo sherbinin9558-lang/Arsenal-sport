@@ -25,6 +25,8 @@ class FakeYooKassa:
         self.payments = {}
         self.checkouts = []
         self.sequence = 0
+        self.rpc_events = []
+        self.seen_event_keys = set()
 
     def post(self, url, **kwargs):
         if kwargs.get("auth") == ("test-shop", "test-secret"):
@@ -45,6 +47,13 @@ class FakeYooKassa:
         if url.endswith("/rest/v1/billing_checkout_sessions"):
             self.checkouts.append(dict(kwargs["json"]))
             return FakeResponse([])
+        if url.endswith("/rest/v1/rpc/process_billing_payment_event"):
+            rpc_payload = dict(kwargs["json"])
+            event_key = rpc_payload["p_event_key"]
+            duplicate = event_key in self.seen_event_keys
+            self.seen_event_keys.add(event_key)
+            self.rpc_events.append(rpc_payload)
+            return FakeResponse({"ok": True, "duplicate": duplicate})
         raise AssertionError(f"Unexpected outbound POST in fake-provider test: {url}")
 
     def get(self, url, **kwargs):
@@ -90,25 +99,14 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
 
     # Simulate the provider's server-side state changing before it sends an event.
     fake.payments["fake-payment-1"]["status"] = "succeeded"
-    processed = []
-    seen_event_keys = set()
-
-    def process(provider, event_key, payment_id, status, tenant_id, plan,
-                payment_method_id=None, payload=None):
-        duplicate = event_key in seen_event_keys
-        seen_event_keys.add(event_key)
-        processed.append({
-            "provider": provider, "event_key": event_key, "payment_id": payment_id,
-            "status": status, "tenant_id": tenant_id, "plan": plan,
-        })
-        return {"ok": True, "duplicate": duplicate}
-
     monkeypatch.setattr(tbank_webhook, "_checkout_by_provider_payment",
                         lambda provider, payment_id: {
                             "tenant_id": session["tenant_id"],
                             "plan": session["plan"],
                         })
-    monkeypatch.setattr(tbank_webhook, "_process_billing_event", process)
+    # Keep the production _process_billing_event implementation active. The
+    # fake intercepts its Supabase RPC request and models duplicate-key behavior;
+    # this is not a substitute for real database/RPC tests.
     monkeypatch.setenv("YOOKASSA_WEBHOOK_SECRET", "fake-webhook-secret")
 
     class Request:
@@ -124,11 +122,14 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
     assert response["ok"] is True
     assert response["status"] == "succeeded"
     assert duplicate_response["duplicate"] is True
-    assert len(processed) == 2
-    assert processed[0]["tenant_id"] == "tenant-alpha"
-    assert processed[0]["plan"] == "pro"
-    assert processed[0]["status"] == "succeeded"
-    assert processed[0]["event_key"] == processed[1]["event_key"]
+    assert len(fake.rpc_events) == 2
+    first, second = fake.rpc_events
+    assert first["p_provider"] == "yookassa"
+    assert first["p_provider_payment_id"] == "fake-payment-1"
+    assert first["p_tenant_id"] == "tenant-alpha"
+    assert first["p_plan"] == "pro"
+    assert first["p_status"] == "succeeded"
+    assert first["p_event_key"] == second["p_event_key"]
 
 
 def test_invalid_plan_never_contacts_fake_or_live_provider(monkeypatch):
