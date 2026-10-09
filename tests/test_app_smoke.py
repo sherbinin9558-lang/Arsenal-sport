@@ -66,7 +66,14 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn("max-height:calc(100dvh - 24px", source)
         self.assertIn("width:calc(100vw - 24px)", source)
         self.assertNotIn("position:fixed!important;inset:0!important;z-index:2147483647", source)
-        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:#f6f7fb!important;', source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:var(--chrome-bg,#f6f7fb)!important;', source)
+
+
+    def test_dark_theme_is_not_overridden_by_global_light_background(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("--app-bg:#0b0e13;--sidebar-bg:#10131a;--chrome-bg:#0b0e13;", source)
+        self.assertIn("background:var(--app-bg)!important", source)
+        self.assertIn("background:var(--sidebar-bg,#ffffff)!important", source)
 
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
