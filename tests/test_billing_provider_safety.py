@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import billing
+import tbank_billing
 
 
 class FakeResponse:
@@ -102,6 +103,38 @@ class BillingProviderSafetyTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             billing._save_checkout("tenant-test", "checkout-test", "payment-test", "starter")
         self.assertNotIn("SECRET-STORAGE-DETAIL", str(ctx.exception))
+
+
+    def test_tbank_rejects_non_finite_and_unknown_plan_prices(self):
+        with patch.object(tbank_billing, "_cfg", return_value="nan"):
+            self.assertEqual(tbank_billing.plan_price("starter"), 0.0)
+        with self.assertRaisesRegex(ValueError, "Недопустимый тариф"):
+            tbank_billing.plan_price("unknown")
+
+    @patch.object(tbank_billing.requests, "post")
+    @patch.object(tbank_billing, "configured", return_value=True)
+    @patch.object(tbank_billing, "plan_price", return_value=100.0)
+    def test_tbank_checkout_error_does_not_leak_provider_body(self, _price, _configured, post):
+        post.return_value = FakeResponse(
+            {"Success": False, "Message": "SECRET-TBANK-PROVIDER-DETAIL"},
+            ok=True,
+            text="SECRET-TBANK-PROVIDER-DETAIL",
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            tbank_billing.create_checkout("starter", "tenant-test")
+        self.assertNotIn("SECRET-TBANK-PROVIDER-DETAIL", str(ctx.exception))
+
+    @patch.object(tbank_billing.requests, "post")
+    @patch.object(tbank_billing, "configured", return_value=True)
+    def test_tbank_payment_state_error_does_not_leak_provider_body(self, _configured, post):
+        post.return_value = FakeResponse(
+            {"Success": False, "Message": "SECRET-TBANK-STATE-DETAIL"},
+            ok=True,
+            text="SECRET-TBANK-STATE-DETAIL",
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            tbank_billing.get_state("payment-test")
+        self.assertNotIn("SECRET-TBANK-STATE-DETAIL", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()
