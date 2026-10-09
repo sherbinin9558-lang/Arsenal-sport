@@ -57,7 +57,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в платёжной базе.")
 
 def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
@@ -72,7 +72,7 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из платёжной базы.")
     rows=r.json()
     return rows[0] if rows else None
 
@@ -121,7 +121,7 @@ def create_checkout(plan, tenant_id, payment_method="all"):
     try: data=r.json()
     except Exception: data={"description":r.text}
     if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+        raise RuntimeError("ЮKassa не смогла создать платёж. Проверьте настройки и доступность сервиса.")
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
@@ -157,7 +157,7 @@ def get_payment(payment_id):
     try: data=r.json()
     except Exception: data={"description":r.text}
     if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+        raise RuntimeError("Не удалось проверить платёж в ЮKassa. Повторите попытку позже.")
     return data
 
 
