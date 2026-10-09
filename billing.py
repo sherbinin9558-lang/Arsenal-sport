@@ -7,7 +7,6 @@ SAAS_PUBLIC_URL
 SAAS_STARTER_PRICE
 SAAS_PRO_PRICE
 SAAS_BUSINESS_PRICE
-YOO_KASSA_SAVE_PAYMENT_METHOD (optional; defaults to false)
 
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
@@ -105,9 +104,8 @@ def create_checkout(plan, tenant_id):
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
-        # Saving a payment method is opt-in. Keep it disabled unless recurring
-        # billing has been intentionally enabled and documented.
-        "save_payment_method": _cfg("YOO_KASSA_SAVE_PAYMENT_METHOD").lower() in ("1", "true", "yes"),
+        # Recurring charges are not implemented; never request saved payment methods.
+        "save_payment_method": False,
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
         "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
