@@ -204,6 +204,21 @@ class GrowthEnginePerformanceRegressionTests(unittest.TestCase):
         self.assertIn("O(products × leads/orders/content)", source)
 
 
+class LazyTabLoadingRegressionTests(unittest.TestCase):
+    def test_outer_workspace_tabs_rerun_on_selection(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn('st.tabs(tab_labels, on_change="rerun", key="main_workspace_tabs")', source)
+
+    def test_expensive_workspace_sections_are_guarded_by_selected_tab(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        for tab in ("tab_dashboard", "tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7", "tab8", "tab9"):
+            self.assertIn(f"if {tab}.open:", source, f"{tab} must render only when selected")
+
+    def test_platform_admin_tab_is_guarded_when_present(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        self.assertIn("if tab_admin is not None and tab_admin.open:", source)
+
+
 class ModularUiRegressionTests(unittest.TestCase):
     def test_ui_modules_exist_and_app_routes_dashboard_settings(self):
         root = Path(__file__).resolve().parents[1]
