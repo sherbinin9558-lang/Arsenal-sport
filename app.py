@@ -542,6 +542,13 @@ if not require_saas_access():
 
 mount_webmcp_tools()
 
+# Payment return is informational; allow a customer to re-check after the provider webhook arrives.
+if st.query_params.get("billing") in ("return", "tbank_return"):
+    if st.button("Проверить статус оплаты ещё раз", key="billing_return_refresh"):
+        st.session_state.pop("tbank_verified", None)
+        st.session_state.pop("billing_verified", None)
+        st.rerun()
+
 # Проверка результата оплаты после возврата с ЮKassa.
 try:
     payment_id=st.query_params.get("payment_id")
