@@ -92,6 +92,36 @@ class WebhookSecurityTests(unittest.TestCase):
         process.assert_called_once()
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
+    def test_tbank_rejects_confirmed_payment_with_non_rub_currency(self):
+        request = self._request(headers={"authorization": "Bearer unit-test-secret"})
+        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \\
+             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
+                 "tenant_id": "tenant-1", "plan": "starter",
+                 "expected_amount": "990.00", "expected_currency": "USD",
+             }), \\
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \\
+             patch.object(tbank_webhook, "_process_billing_event") as process:
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.payment_status(request))
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 422)
+        process.assert_not_called()
+
+    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
+    def test_tbank_rejects_malformed_confirmed_amount(self):
+        request = self._request(headers={"authorization": "Bearer unit-test-secret"})
+        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \\
+             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
+                 "tenant_id": "tenant-1", "plan": "starter",
+                 "expected_amount": "990.00", "expected_currency": "RUB",
+             }), \\
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": "not-a-number"}), \\
+             patch.object(tbank_webhook, "_process_billing_event") as process:
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.payment_status(request))
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 422)
+        process.assert_not_called()
+
+    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_accepts_provider_token_without_optional_bearer(self):
         request = self._request(headers={})
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
