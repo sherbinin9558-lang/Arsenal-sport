@@ -4,8 +4,8 @@ Audit snapshot: 2026-10-09. This document is an audit checklist, not a certifica
 
 ## Confirmed from GitHub metadata
 
-- The active release candidates are PRs #119, #121, #122, #123, #124, #125, #126, #127 and #130. None is merged. PRs #118 and #120 are closed as superseded; #128 and #129 are closed after their changes were consolidated into #124.
-- All enabled checks have passed on #119, #121, #122, #123, #124, #125, #126 and #127. PR #130's dedicated error-sanitization, security, quality and RLS checks passed; its production browser matrix was still running at the time of this update.
+- The active release candidates are PRs #119, #121, #122, #123, #124, #125, #126, #127, #130, #132 and #133. None is merged. PRs #118 and #120 are closed as superseded; #128 and #129 are closed after their changes were consolidated into #124.
+- All enabled checks have passed on #119, #121, #122, #123, #124, #125, #126 and #127. PR #130's dedicated error-sanitization, security, quality, RLS and production browser checks passed. PR #132's enabled checks passed. PR #133 addresses YooKassa callback/refund verification; its latest CI rerun is in progress after existing tests were updated to match the new contract.
 - Optional public-app E2E, live-provider smoke, BrowserStack and production-secret checks are skipped because the required optional credentials/flags are not configured.
 - This does not prove real payment-provider integration works; provider-dependent checks may be skipped when live credentials are absent.
 - Production `main` was read for this audit. No production credentials were requested or used.
@@ -20,6 +20,8 @@ Audit snapshot: 2026-10-09. This document is an audit checklist, not a certifica
 - #126: improves production Playwright smoke diagnostics and captures the app after the Streamlit iframe appears.
 - #127: adds a network-free fake-provider lifecycle test through the real webhook adapter. The Supabase RPC is simulated, so it does not prove database transaction/idempotency behavior.
 - #130: sanitizes raw Supabase REST/Auth error bodies in `saas_core.py` and adds regression tests. This addresses an additional raw-error path found during the follow-up audit.
+- #132: adds a forward-only migration so `AUTHORIZED` is not treated as a captured payment when activating subscriptions. CI passed; validate the exact T-Bank acquiring mode and run the transition against a disposable database before release.
+- #133: allows standard YooKassa callbacks without a custom Bearer header while checking current payment/refund state directly with YooKassa. It verifies refund-to-payment binding and gives distinct refund IDs distinct idempotency keys. CI must pass on the latest head; no real provider callback was run.
 
 Passing CI does not authorize an automatic merge. Recheck the exact candidate diff and all checks immediately before release.
 
@@ -54,7 +56,7 @@ Passing CI does not authorize an automatic merge. Recheck the exact candidate di
 
 ## Sale blockers — not yet proven closed by this repository review
 
-- No live-provider verification (intentionally not run; no personal or real payment credentials used).
+- No live-provider verification (intentionally not run; no personal or real payment credentials used). This includes end-to-end YooKassa notification delivery and refund confirmation.
 - The fake lifecycle harness does not validate the real billing RPC against a disposable database.
 - The live RLS matrix passed for two tenants/five test users, but does not independently prove every authenticated CRUD/admin path in the whole application.
 - No verified backup/restore and ownership-transfer rehearsal.
@@ -63,7 +65,7 @@ Passing CI does not authorize an automatic merge. Recheck the exact candidate di
 
 ## Release policy
 
-Do not merge candidates automatically. PRs #119, #121, #122, #124, #125, #126 and #127 have passed their enabled CI checks; PR #130 has passed all enabled checks except its production browser matrix, which was running at this snapshot. Review final diffs and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
+Do not merge candidates automatically. PRs #119, #121, #122, #124, #125, #126 and #127 have passed their enabled CI checks; PR #130 and #132 have passed their enabled checks. PR #133 remains under CI validation after the latest test correction. Review final diffs and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
 
 
 ## Follow-up audit findings — 2026-10-09
