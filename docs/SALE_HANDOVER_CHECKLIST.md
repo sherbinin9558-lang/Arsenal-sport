@@ -55,24 +55,24 @@ All five still require review against their exact diff and current base before m
 - No independent proof in this audit of production tenant-isolation behavior across every CRUD/admin path.
 - No verified backup/restore and ownership-transfer rehearsal.
 - No verified complete inventory of external accounts, deploy targets, domains, secrets, and third-party costs.
-- PRs #118–#128 remain open and unmerged. PR #129 is closed as superseded by #124. All observed checks on the latest inspected heads of PRs #118–#128 completed successfully; this is not equivalent to full commercial acceptance. Overlapping billing changes in #124 and #128 must be reviewed together before merge.
+- PR #124 is the consolidated billing candidate; all enabled checks on its combined head passed, while live-provider, BrowserStack, and optional public-app checks were skipped. PR #128 is closed as superseded by #124. PR #121 consolidates the overlapping webhook-test changes from #118 and #120; its production browser matrix is still running at this snapshot. PR #118 and #120 remain open until that combined candidate finishes.
 
 ## Release policy
 
-Do not merge this branch or PRs #118–#128 automatically. PR #129 is closed as superseded. Review diffs, consolidate overlapping billing changes, rerun checks on the final combined candidate, and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
+Do not merge candidates automatically. PR #124 has passed its enabled CI checks and consolidates #128; PR #121 consolidates #118 and #120 and still needs its browser matrix to finish. PR #129 is closed as superseded. Review final diffs and merge only after explicit release approval. Do not represent the product as fully production-ready or payment-ready until the outstanding gates above have evidence.
 
 
 ## Follow-up audit findings — 2026-10-09
 
-- PR #124 initially added user-facing error sanitization for YooKassa/Supabase/T-Bank billing failures and regression tests. It now also includes the safety changes from #128: no saved payment methods and no misleading auto-renew toggle until recurring billing exists. The combined head has no reported CI failures; production browser matrix is still running.
+- PR #124 initially added user-facing error sanitization for YooKassa/Supabase/T-Bank billing failures and regression tests. It now also includes the safety changes from #128: no saved payment methods and no misleading auto-renew toggle until recurring billing exists. All enabled checks on the combined head passed; optional public-app E2E, live provider smoke, BrowserStack, and production-secret checks were skipped.
 - PR #125 adds mocked tests for tenant-scoped writes and role restrictions. Its tenant-isolation workflow and other observed checks passed; it remains unmerged.
 - PR #126 improves production smoke artifacts by capturing the app after Streamlit attaches its iframe and recording slow-start warnings. Its observed checks passed; it remains unmerged.
 - PR #127 adds a test-only in-memory provider harness. The latest dedicated workflow passed 17 payment/webhook tests, and all observed workflows on its current head completed successfully. This is a test harness, not a production sandbox; it does not validate the real provider or the production Supabase RPC against a disposable database.
-- PR #128's changes have been copied into PR #124 and the dedicated renewal-safety workflow passes on the combined head. Keep #128 open only until #124's full combined checks pass, then close #128 as superseded.
-- PR #129 was closed as a duplicate after its unique T-Bank price/error-safety changes and tests were moved into PR #124. The latest #124 combined head includes the renewal safety changes from #128 as well. Most CI jobs are green; the browser matrix is still running, so this candidate is not yet fully accepted.
+- PR #128's changes have been copied into PR #124; the dedicated renewal-safety workflow and all other enabled checks passed on the combined head. PR #128 is now closed as superseded.
+- PR #129 was closed as a duplicate after its unique T-Bank price/error-safety changes and tests were moved into PR #124. The latest #124 combined head includes the renewal safety changes from #128 as well, and all enabled CI jobs have passed.
 - PR #126's latest production browser run passed across five browser/viewport configurations. Time to visible login controls was approximately 5.0–7.2 seconds in that run, with no >10-second warning. A previous run had a 17.4-second first desktop load. These are small single-run smoke measurements, not a load test or a guarantee of consistently fast performance; PR #126 improves measurement visibility but does not itself make the app faster.
 - `secrets.example.toml` now includes previously missing plan price, YooKassa webhook, T-Bank notification and receipt placeholders. It still contains no real credentials.
 
 ## Current release decision
 
-Keep all open PRs unmerged until their latest CI completes and the diffs are reviewed together. Even after these PRs pass, the product is not yet certified as fully sale-ready: authenticated CRUD across all roles, production payment-provider verification, recurring billing (if marketed), and a real backup/restore and ownership-transfer rehearsal still require evidence.
+Keep all open PRs unmerged until their latest CI completes and the diffs are reviewed together. PR #121 still needs its production browser matrix to complete. Even after CI passes, the product is not yet certified as fully sale-ready: authenticated CRUD across all roles, production payment-provider verification, recurring billing (if marketed), and a real backup/restore and ownership-transfer rehearsal still require evidence.
