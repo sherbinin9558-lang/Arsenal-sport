@@ -49,6 +49,7 @@ The repository contains RLS and tenant-isolation tests, but mocked request tests
 
 ## Required release gates
 
+- [x] Payment-return path no longer directly grants subscriptions; the browser only displays provider status and server webhook owns activation (integration still requires test-mode proof).
 - [ ] All PRs merged in dependency order only after review; no direct edits to `main`.
 - [ ] Full CI green on the final combined commit; no cancelled required checks.
 - [ ] Disposable-database migration run from an empty schema and from the latest supported schema.
