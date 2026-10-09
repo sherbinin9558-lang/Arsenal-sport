@@ -27,7 +27,7 @@ class FakeYooKassa:
         self.sequence = 0
 
     def post(self, url, **kwargs):
-        if "api.yookassa.com/v3/payments" in str(url):
+        if kwargs.get("auth") == ("test-shop", "test-secret"):
             self.sequence += 1
             payment_id = f"fake-payment-{self.sequence}"
             checkout_id = kwargs["headers"]["Idempotence-Key"]
