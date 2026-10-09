@@ -108,7 +108,7 @@ def create_checkout(plan, tenant_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Платёжный провайдер не смог обработать запрос. Проверьте настройки и журнал операции.")
     # The provider payment is already created at this point. Persist the
     # checkout record with bounded retries so a transient Supabase outage does
     # not strand a real payment without a durable application reference.
@@ -138,7 +138,7 @@ def get_state(payment_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Платёжный провайдер не смог обработать запрос. Проверьте настройки и журнал операции.")
     return data
 
 
