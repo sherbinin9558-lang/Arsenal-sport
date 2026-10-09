@@ -71,20 +71,47 @@ def main():
             result["browser"]["navigation_error"] = f"{type(exc).__name__}: {exc}"
             log(f"NAVIGATION ERROR: {result['browser']['navigation_error']}")
 
-        # Streamlit Cloud may wrap the actual app in a same-origin iframe. Capture
-        # frame metadata and search the main page plus every attached frame.
+        # Capture each attached document independently. The screenshot/body text
+        # alone cannot prove that an actual form control exists or is label-associated.
         result["browser"]["frames"] = []
-        for frame in page.frames:
-            frame_info = {"url": frame.url, "name": frame.name}
+        for index, frame in enumerate(page.frames):
+            frame_info = {"index": index, "url": frame.url, "name": frame.name}
             try:
-                frame_info["body_text"] = frame.locator("body").inner_text(timeout=3000)[:5000]
+                frame_info["body_text"] = frame.locator("body").inner_text(timeout=5000)[:8000]
             except Exception as exc:
                 frame_info["body_error"] = f"{type(exc).__name__}: {exc}"
             try:
-                frame_info["html_length"] = len(frame.content())
+                html = frame.content()
+                frame_info["html_length"] = len(html)
+                (OUT / f"frame-{index}.html").write_text(html, encoding="utf-8")
             except Exception as exc:
                 frame_info["html_error"] = f"{type(exc).__name__}: {exc}"
+            try:
+                frame_info["controls"] = frame.locator("input, textarea, select, [contenteditable='true']").evaluate_all(
+                    """els => els.map((el, index) => {
+                        const rect = el.getBoundingClientRect();
+                        const style = getComputedStyle(el);
+                        const labels = el.labels ? Array.from(el.labels).map(label => label.innerText) : [];
+                        return {
+                            index, tag: el.tagName.toLowerCase(),
+                            type: el.getAttribute('type'), id: el.id || null,
+                            name: el.getAttribute('name'), placeholder: el.getAttribute('placeholder'),
+                            ariaLabel: el.getAttribute('aria-label'),
+                            ariaLabelledby: el.getAttribute('aria-labelledby'),
+                            labels, role: el.getAttribute('role'),
+                            className: typeof el.className === 'string' ? el.className : null,
+                            valuePresent: Boolean(el.value),
+                            visible: rect.width > 0 && rect.height > 0 &&
+                                style.visibility !== 'hidden' && style.display !== 'none',
+                            rect: {x: Math.round(rect.x), y: Math.round(rect.y),
+                                   width: Math.round(rect.width), height: Math.round(rect.height)}
+                        };
+                    })"""
+                )
+            except Exception as exc:
+                frame_info["controls_error"] = f"{type(exc).__name__}: {exc}"
             result["browser"]["frames"].append(frame_info)
+
         try:
             result["browser"]["iframe_elements"] = page.locator("iframe").evaluate_all(
                 "(els) => els.map((el) => ({src: el.src, title: el.title, name: el.name, sandbox: el.getAttribute('sandbox')}))"
@@ -92,31 +119,62 @@ def main():
         except Exception as exc:
             result["browser"]["iframe_inspection_error"] = f"{type(exc).__name__}: {exc}"
 
-        email_locator = page.get_by_label("Email")
-        email_context = "main_page"
-        try:
-            email_locator.wait_for(state="visible", timeout=8000)
-        except Exception:
-            email_locator = None
-            for frame in page.frames:
-                if frame == page.main_frame:
-                    continue
+        # Compare semantic and structural locators in every document. Record
+        # counts/visibility only; do not enter or submit credentials.
+        locator_diagnostics = []
+        for frame_index, frame in enumerate(page.frames):
+            for selector_name, selector in [
+                ("label:Email", 'input[aria-label="Email"]'),
+                ("placeholder:Email", 'input[placeholder="Email"]'),
+                ("name:email", 'input[name="email"]'),
+                ("type:email", 'input[type="email"]'),
+                ("all-inputs", "input"),
+                ("label-text", "label"),
+            ]:
                 try:
-                    candidate = frame.get_by_label("Email")
-                    candidate.wait_for(state="visible", timeout=8000)
-                    email_locator = candidate
-                    email_context = f"frame:{frame.url}"
-                    break
-                except Exception:
-                    continue
-
+                    loc = frame.locator(selector)
+                    count = loc.count()
+                    visible_count = sum(1 for i in range(count) if loc.nth(i).is_visible())
+                    locator_diagnostics.append({
+                        "frame_index": frame_index, "frame_url": frame.url,
+                        "selector_name": selector_name, "selector": selector,
+                        "count": count, "visible_count": visible_count
+                    })
+                except Exception as exc:
+                    locator_diagnostics.append({
+                        "frame_index": frame_index, "frame_url": frame.url,
+                        "selector_name": selector_name, "selector": selector,
+                        "error": f"{type(exc).__name__}: {exc}"
+                    })
+        result["browser"]["locator_diagnostics"] = locator_diagnostics
+        email_locator = None
+        email_context = None
+        for frame in page.frames:
+            try:
+                candidate = frame.get_by_label("Email")
+                candidate.wait_for(state="visible", timeout=1500)
+                email_locator, email_context = candidate, frame.url
+                break
+            except Exception:
+                continue
         result["browser"]["email_visible"] = email_locator is not None
-        result["browser"]["email_context"] = email_context if email_locator is not None else None
-        if email_locator is not None:
-            log(f"PASS: Email field became visible in {email_context}")
-        else:
-            result["browser"]["locator_error"] = "Email label not visible in main document or any attached frame"
-            log("EMAIL FIELD NOT VISIBLE in main document or attached frames")
+        result["browser"]["email_context"] = email_context
+        result["browser"]["label_locator_failed_but_input_exists"] = (
+            email_locator is None and any(
+                control.get("tag") == "input" and control.get("visible")
+                for frame in result["browser"]["frames"]
+                for control in frame.get("controls", [])
+            )
+        )
+        log("CONTROL SUMMARY: " + json.dumps({
+            "frames": [{"index": f.get("index"), "url": f.get("url"),
+                        "controls": f.get("controls", []),
+                        "controls_error": f.get("controls_error")}
+                       for f in result["browser"]["frames"]],
+            "locator_diagnostics": locator_diagnostics,
+            "email_visible": result["browser"]["email_visible"],
+            "email_context": email_context
+        }, ensure_ascii=False))
 
         try:
             result["browser"]["title"] = page.title()
