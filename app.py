@@ -753,7 +753,7 @@ button[aria-label*="Прокрут"] {
 </style>
 """, unsafe_allow_html=True)
 
-_tabs = list(st.tabs(tab_labels))
+_tabs = list(st.tabs(tab_labels, on_change="rerun", key="main_workspace_tabs"))
 
 # Streamlit's AppTest has had tab-collection edge cases across releases.
 # Keep the page renderable even if the test/runtime adapter returns fewer
@@ -775,11 +775,10 @@ while len(_base_tabs) < _expected_base_tabs:
  tab6, tab7, tab8, tab9) = _base_tabs
 
 # ========== DASHBOARD ==========
-if tab_admin is not None:
-    with tab_admin:
-        render_platform_admin()
+if tab_admin is not None and tab_admin.open:
+    render_platform_admin()
 
-with tab_dashboard:
+if tab_dashboard.open:
     render_dashboard(
         load_products=load_products, load_plan=load_plan, load_leads=load_leads, load_orders=load_orders,
         dashboard_snapshot=dashboard_snapshot, crm_metrics=crm_metrics, order_metrics=order_metrics, conversion_metrics=conversion_metrics,
@@ -790,7 +789,7 @@ with tab_dashboard:
     )
 
 # ========== 1: СОЗДАТЬ КАРТОЧКУ ==========
-with tab1:
+if tab1.open:
     st.markdown('<div class="section-kicker">CONTENT STUDIO</div><div class="section-title">Создать товар</div><div class="section-subtitle">Загрузите фото, заполните данные и сразу получите готовую карточку.</div>', unsafe_allow_html=True)
     if not can("write_data"):
         st.info("Ваша роль доступна только для просмотра. Создание товаров доступно пользователям с правом записи.")
@@ -984,7 +983,7 @@ def bulk_import_products(uploaded_file, update_existing=False):
 
 
 # ========== 2: КАТАЛОГ ==========
-with tab2:
+if tab2.open:
     render_catalog(
         categories=CATEGORIES,
         category_emoji=CATEGORY_EMOJI,
@@ -997,7 +996,7 @@ with tab2:
     )
 
 # ========== 3: ТЕКСТЫ С ПУБЛИКАЦИЕЙ ==========
-with tab3:
+if tab3.open:
     st.header("Тексты для соцсетей")
     products = load_products()
     if not products:
@@ -1135,7 +1134,7 @@ with tab3:
             )
 
 # ========== 4: REELS & STORIES ==========
-with tab4:
+if tab4.open:
     st.markdown('<div class="section-kicker">SHORT VIDEO</div><div class="section-title">Reels & Stories</div><div class="section-subtitle">Идея → сценарий → видео → публикация.</div>', unsafe_allow_html=True)
     products = load_products()
     if not products:
@@ -1371,7 +1370,7 @@ with tab4:
 
 
 # ========== 5: КОНТЕНТ-ПЛАН ==========
-with tab5:
+if tab5.open:
     st.markdown('<div class="section-kicker">CONTENT WORKFLOW</div><div class="section-title">Контент-центр</div><div class="section-subtitle">Единый процесс: идея → работа → проверка → готово → публикация.</div>', unsafe_allow_html=True)
     products = load_products()
     plan = load_plan()
@@ -1505,7 +1504,7 @@ with tab5:
                            file_name=f"arsenal_content_history_{datetime.date.today()}.csv", mime="text/csv")
 
 # ========== 6: СТАТИСТИКА ==========
-with tab6:
+if tab6.open:
     st.markdown('<div class="section-kicker">GROWTH ENGINE</div><div class="section-title">Контент · Продажи · Аналитика · AI</div><div class="section-subtitle">Единый контур: товар → контент → публикация → заявка → заказ → выручка → следующая рекомендация.</div>', unsafe_allow_html=True)
     products = load_products()
     plan = load_plan()
@@ -1646,7 +1645,7 @@ def save_settings(data):
 
 
 # ========== 8: AI OPERATIONS CENTER ==========
-with tab8:
+if tab8.open:
     st.markdown('<div class="section-kicker">AI OPERATIONS</div><div class="section-title">Центр автоматизации</div><div class="section-subtitle">CRM-интеллект, задачи команды, уведомления, безопасные AI-действия и очередь Instagram.</div>', unsafe_allow_html=True)
     products = load_products(); plan = load_plan(); leads = load_leads(); orders = load_orders()
     metrics = advanced_analytics(products, leads, orders, plan)
@@ -1740,11 +1739,11 @@ with tab8:
     else: st.info("Очередь Instagram пока пуста.")
 
 # ========== 9: ПРАВОВАЯ ИНФОРМАЦИЯ ==========
-with tab9:
+if tab9.open:
     render_legal()
 
 # ========== 7: НАСТРОЙКИ ==========
-with tab7:
+if tab7.open:
     if can("settings"):
         render_settings(
             load_settings=load_settings, save_settings=save_settings, templates=TEMPLATES,
