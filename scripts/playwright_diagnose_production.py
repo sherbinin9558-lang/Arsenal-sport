@@ -71,6 +71,28 @@ def main():
             result["browser"]["navigation_error"] = f"{type(exc).__name__}: {exc}"
             log(f"NAVIGATION ERROR: {result['browser']['navigation_error']}")
 
+        # Streamlit renders the app after the initial document response. Wait on
+        # observable app content (not a fixed sleep) before attributing missing controls.
+        try:
+            page.wait_for_function(
+                """() => {
+                    const text = document.body ? document.body.innerText : "";
+                    const hasControl = !!document.querySelector("input, textarea, select, [contenteditable='true']");
+                    const hasAppContent = /Войти|Создать магазин|Восстановить пароль|AI Agent Content Manager/i.test(text);
+                    return hasControl || hasAppContent;
+                }""",
+                timeout=30000,
+            )
+            result["browser"]["app_render_wait"] = "content_or_control_detected"
+        except Exception as exc:
+            result["browser"]["app_render_wait"] = "timed_out"
+            result["browser"]["app_render_wait_error"] = f"{type(exc).__name__}: {exc}"
+        result["browser"]["post_wait_body_text"] = ""
+        try:
+            result["browser"]["post_wait_body_text"] = page.locator("body").inner_text(timeout=5000)[:12000]
+        except Exception as exc:
+            result["browser"]["post_wait_body_error"] = f"{type(exc).__name__}: {exc}"
+
         # Capture each attached document independently. The screenshot/body text
         # alone cannot prove that an actual form control exists or is label-associated.
         result["browser"]["frames"] = []
@@ -207,9 +229,17 @@ def main():
         browser.close()
 
     (OUT / "report.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    if not result["browser"].get("email_visible"):
-        raise SystemExit("Diagnostic failed: login UI did not render; inspect report and page.html artifact")
-    log("DIAGNOSTIC PASS: login UI rendered")
+    # A missing semantic locator is the observation under investigation, not a
+    # diagnostic infrastructure failure. Fail only when navigation/capture failed.
+    if result["browser"].get("navigation_error") and not result["browser"].get("html_length"):
+        raise SystemExit("Diagnostic infrastructure failure: navigation and HTML capture both failed")
+    if result["browser"].get("app_render_wait") == "timed_out":
+        log("DIAGNOSTIC RESULT: app content/control not detected within 30 seconds; inspect artifacts")
+    elif not result["browser"].get("email_visible"):
+        log("DIAGNOSTIC RESULT: app content appeared but Email label locator was not found; inspect control report")
+    else:
+        log("DIAGNOSTIC RESULT: Email label locator found")
+
 
 
 if __name__ == "__main__":
