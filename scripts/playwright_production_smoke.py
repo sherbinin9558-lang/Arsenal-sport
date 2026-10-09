@@ -128,7 +128,7 @@ def validate_application_content(body_text):
                 "but the expected application marker is missing."
             )
         raise RuntimeError(
-            f"Production app marker {APP_READY_MARKER!r} was not visible after login controls loaded."
+            f"Expected application marker {APP_READY_MARKER!r} was not visible after login controls loaded."
         )
 
 
