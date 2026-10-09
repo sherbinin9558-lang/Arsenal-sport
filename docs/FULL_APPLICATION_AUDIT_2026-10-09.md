@@ -18,6 +18,16 @@ Evidence: default `app.py` called `activate_paid_subscription` from the T-Bank r
 - Fix proposed in PR #138: browser redirects are now informational only; server-side activation remains on the verified webhook path, and the customer can re-check after the webhook arrives.
 - Acceptance: regression test asserts that the payment-return block contains no direct `activate_paid_subscription` call; webhook contract tests verify amount, currency, authoritative provider state and refund association.
 
+### P0 — Browser return path can activate a subscription outside the verified webhook state machine
+Evidence: the audited `app.py` flow handled `billing=return` by calling `activate_paid_subscription` directly when YooKassa reported a successful paid payment. The T-Bank return flow also called the activation function for both `CONFIRMED` and `AUTHORIZED`. That bypassed the webhook's checkout amount/currency validation and could grant access on an authorization-only state.
+- Fix proposed in PR #136: make browser returns informational only; actual access changes must come from provider-verified webhooks through the database state machine. Add a regression test that forbids direct activation in the return handler.
+- Acceptance: contract tests pass; verify that return URLs never alter subscription state and successful webhook processing activates access exactly once.
+
+### P1 — Production smoke report may capture the Streamlit shell before the application iframe attaches
+Evidence: the previous run recorded a status/maintenance iframe in its initial body snapshot but later found visible login controls by polling frames. The pass/fail logic required the controls, but diagnostics could show stale shell text and did not explicitly require the application-ready marker.
+- Fix proposed in this audit branch: refresh frame/text diagnostics after controls become visible and require the known app-ready marker; a standalone status/maintenance page must fail.
+- Acceptance: tests reject status-page-only and generic loading content, accept the expected login page marker, and the production browser matrix passes.
+
 ### P0 — Default branch does not bind successful checkout to expected amount/currency
 Evidence: default `billing.py` saves provider order/payment IDs, tenant and plan but no expected amount/currency. The webhook resolves the checkout and provider status, but amount/currency validation is not present in the reviewed main-branch path.
 - Required fix: save server-calculated amount/currency at checkout creation and compare with provider-authoritative payment before activation. Reject missing/mismatched values. Handle old rows with an explicit migration/reconciliation plan.
