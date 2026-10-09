@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import os
+from decimal import Decimal, InvalidOperation
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -136,7 +137,7 @@ def _checkout_by_provider_payment(provider, payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": f"eq.{provider}",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -146,6 +147,24 @@ def _checkout_by_provider_payment(provider, payment_id):
     response.raise_for_status()
     data = response.json()
     return data[0] if data else None
+
+def _verify_yookassa_payment_amount(payment, checkout):
+    """Require provider settlement amount/currency to match the server-created checkout."""
+    expected_amount = checkout.get("expected_amount")
+    expected_currency = str(checkout.get("expected_currency") or "").upper()
+    actual = payment.get("amount") if isinstance(payment, dict) else None
+    actual_amount = actual.get("value") if isinstance(actual, dict) else None
+    actual_currency = str(actual.get("currency") or "").upper() if isinstance(actual, dict) else ""
+    try:
+        expected = Decimal(str(expected_amount))
+        received = Decimal(str(actual_amount))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if not expected.is_finite() or not received.is_finite() or expected <= 0 or received != expected:
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if not expected_currency or actual_currency != expected_currency:
+        raise HTTPException(status_code=422, detail="Checkout currency verification failed")
+
 
 def _checkout_by_payment(payment_id):
     url, _ = _supabase()
@@ -332,6 +351,7 @@ async def yookassa_payment_status(request: Request):
     if not checkout:
         raise HTTPException(status_code=404, detail="Checkout session not found")
 
+    _verify_yookassa_payment_amount(payment, checkout)
     plan = str(checkout.get("plan") or "").lower()
     tenant = str(checkout.get("tenant_id") or "")
     if plan not in ("starter", "pro", "business") or not tenant:
