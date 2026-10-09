@@ -449,7 +449,30 @@ def render_platform_admin():
             "Подписка": sub.get("status","—"),
             "Создан": str(t.get("created_at",""))[:10],
         })
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.markdown(
+        """
+        <style>
+        .st-key-desktop_tenant_table {display:block!important;min-width:0!important;max-width:100%!important;}
+        .st-key-mobile_tenant_cards {display:none!important;}
+        @media (max-width:768px) {
+          .st-key-desktop_tenant_table {display:none!important;}
+          .st-key-mobile_tenant_cards {display:block!important;min-width:0!important;max-width:100%!important;}
+          .st-key-mobile_tenant_cards [data-testid="stVerticalBlockBorderWrapper"] {padding:.75rem!important;border-radius:12px!important;}
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.container(key="desktop_tenant_table"):
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+    with st.container(key="mobile_tenant_cards"):
+        for row in rows:
+            with st.container(border=True):
+                st.markdown(f"**{row['Магазин']}**")
+                st.caption(f"{row['Тариф']} · {row['Статус']}")
+                st.write("Владелец:", row["Владелец"])
+                st.write("Подписка:", row["Подписка"])
+                st.caption(f"Создано: {row['Создан']}")
 
     if not tenants:
         st.info("Пока нет зарегистрированных магазинов.")
