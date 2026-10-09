@@ -362,3 +362,33 @@ class DashboardAndConcurrencyRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
+    def test_mobile_css_keeps_native_sidebar_controls_available(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        mobile_rules = source[source.index("@media (max-width:1100px)"):source.index("@media (max-width:768px)", source.index("@media (max-width:1100px)"))]
+        self.assertNotIn('section[data-testid="stSidebar"]{display:none', mobile_rules)
+        self.assertNotIn('[data-testid="stSidebarCollapseButton"],[data-testid="stSidebarCollapsedControl"]{display:none', mobile_rules)
+        self.assertIn('st-key-mobile_max_launcher{display:block!important', source)
+
+    def test_mobile_max_launcher_is_rendered_outside_sidebar(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        launcher = source.index('with st.container(key="mobile_max_launcher"):')
+        sidebar = source.index("with st.sidebar:")
+        tabs = source.index('_tabs = list(st.tabs(tab_labels')
+        self.assertGreater(launcher, sidebar)
+        self.assertLess(launcher, tabs)
+        self.assertIn('key="main_mobile_max"', source)
+
+    def test_max_initial_data_load_and_recommendations_show_progress_and_cache(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn('st.spinner("MAX загружает данные магазина…")', source)
+        self.assertIn('_max_session_cached(', source)
+        self.assertIn('f"_max_recommendations:{tenant_key}:{revision_key}"', source)
+        self.assertIn('f"_max_usage_summary:{tenant_key}"', source)
+
+    def test_ai_seller_reuses_session_results_for_same_query_and_revision(self):
+        source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state.setdefault("_max_sales_reply_cache", {})', source)
+        self.assertIn('st.session_state.setdefault("_max_followup_cache", {})', source)
+        self.assertIn('with st.spinner("MAX ищет подходящие товары…")', source)
