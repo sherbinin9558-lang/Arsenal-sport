@@ -3,6 +3,7 @@
 import base64
 import datetime
 import io
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -164,16 +165,36 @@ def _max_audit(event):
     st.session_state["max_audit_log"] = st.session_state["max_audit_log"][:50]
 
 
+def _max_session_cached(cache_key, ttl_seconds, loader, spinner_text=None):
+    """Short-lived cache scoped to the current Streamlit session and tenant."""
+    now = time.monotonic()
+    entry = st.session_state.get(cache_key)
+    if isinstance(entry, dict) and entry.get("expires_at", 0) > now:
+        return entry.get("value")
+    if spinner_text:
+        with st.spinner(spinner_text):
+            value = loader()
+    else:
+        value = loader()
+    st.session_state[cache_key] = {"expires_at": now + ttl_seconds, "value": value}
+    return value
+
+
 @st.dialog("⚡ AI Agent Content Manager MAX", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
+    current_revision = int(st.session_state.get("_app_data_revision", 0) or 0)
+    if snap is not None and snap.get("_revision", current_revision) != current_revision:
+        snap = None
     if snap is None:
-        snap = {
-            "products": load_products(),
-            "plan": load_plan(),
-            "leads": load_leads(),
-            "orders": load_orders(),
-        }
+        with st.spinner("MAX загружает данные магазина…"):
+            snap = {
+                "products": load_products(),
+                "plan": load_plan(),
+                "leads": load_leads(),
+                "orders": load_orders(),
+                "_revision": current_revision,
+            }
         st.session_state["max_data_snapshot"] = snap
     products = snap.get("products", [])
     plan = snap.get("plan", [])
@@ -279,7 +300,12 @@ def render_max():
                 for event in audit_log[:10]:
                     st.caption(f"{event['timestamp']} · {event['action']} · {event['status']}")
         try:
-            usage = usage_summary(30)
+            tenant_key = str(st.session_state.get("saas_tenant_id") or "session")
+            usage = _max_session_cached(
+                f"_max_usage_summary:{tenant_key}", 30,
+                lambda: usage_summary(30),
+                "Загружаем сводку использования…",
+            )
             st.caption(
                 f"Экономика MAX за 30 дней: {usage['requests']} операций · "
                 f"оценочная AI-себестоимость {usage['cost_rub']:.4f} ₽"
@@ -288,7 +314,14 @@ def render_max():
             pass
 
     try:
-        max_recs = growth_recommendations(products, leads, orders, plan)
+        tenant_key = str(st.session_state.get("saas_tenant_id") or "session")
+        revision_key = int(st.session_state.get("_app_data_revision", 0) or 0)
+        max_recs = _max_session_cached(
+            f"_max_recommendations:{tenant_key}:{revision_key}",
+            20,
+            lambda: growth_recommendations(products, leads, orders, plan),
+            "MAX анализирует данные магазина…",
+        )
     except Exception:
         max_recs = []
     if max_recs:
@@ -584,7 +617,18 @@ def render_max():
             key="max_sales_query",
         )
         if st.button("🔎 Найти товар", type="primary", key="max_sales_search"):
-            ans, found = ai_sales_reply(products, q)
+            tenant_key = str(st.session_state.get("saas_tenant_id") or "session")
+            revision_key = int(st.session_state.get("_app_data_revision", 0) or 0)
+            cache = st.session_state.setdefault("_max_sales_reply_cache", {})
+            cache_key = f"{tenant_key}:{revision_key}:{q.strip().casefold()}"
+            if cache_key in cache:
+                ans, found = cache[cache_key]
+            else:
+                with st.spinner("MAX ищет подходящие товары…"):
+                    ans, found = ai_sales_reply(products, q)
+                cache[cache_key] = (ans, found)
+                if len(cache) > 20:
+                    cache.pop(next(iter(cache)))
             st.session_state["max_sales_answer"] = ans
             st.session_state["max_sales_found"] = found
         if st.session_state.get("max_sales_answer"):
@@ -593,7 +637,19 @@ def render_max():
         if found:
             follow = st.text_input("Уточнение клиента", placeholder="Например: покажи второй вариант", key="max_followup")
             if st.button("↩️ Ответить клиенту", key="max_followup_btn"):
-                ans, new_found = sales_followup(products, follow, found)
+                tenant_key = str(st.session_state.get("saas_tenant_id") or "session")
+                revision_key = int(st.session_state.get("_app_data_revision", 0) or 0)
+                found_key = ",".join(str(x.get("_saas_record_id") or x.get("id") or x.get("name") or "") for x in found)
+                cache = st.session_state.setdefault("_max_followup_cache", {})
+                cache_key = f"{tenant_key}:{revision_key}:{found_key}:{follow.strip().casefold()}"
+                if cache_key in cache:
+                    ans, new_found = cache[cache_key]
+                else:
+                    with st.spinner("MAX готовит ответ клиенту…"):
+                        ans, new_found = sales_followup(products, follow, found)
+                    cache[cache_key] = (ans, new_found)
+                    if len(cache) > 20:
+                        cache.pop(next(iter(cache)))
                 st.session_state["max_sales_answer"] = ans
                 st.session_state["max_sales_found"] = new_found
                 st.rerun()
