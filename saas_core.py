@@ -1039,8 +1039,11 @@ def create_team_invitation(email,role):
 
 def onboarding_complete():
     if not saas_enabled(): return True
-    settings=data_load("settings", [])
-    return bool(settings and isinstance(settings[0],dict) and settings[0].get("onboarding_complete"))
+    cache_key = str(tenant_id())
+    def load_onboarding():
+        settings = data_load("settings", [])
+        return bool(settings and isinstance(settings[0], dict) and settings[0].get("onboarding_complete"))
+    return bool(_session_cached_value("_saas_onboarding_cache", cache_key, 15, load_onboarding))
 
 def render_onboarding():
     st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">QUICK START</div><div class="dashboard-hero-title">Настроим магазин за 60 секунд</div><div class="dashboard-hero-text">Эти данные нужны MAX, чтобы писать контент, отвечать клиентам и подсказывать следующие действия. Их можно изменить позже.</div></div>',unsafe_allow_html=True)
@@ -1117,7 +1120,6 @@ def require_saas_access():
             st.session_state.pop("saas_tenant_id", None)
             st.session_state.pop("saas_tenant_name", None)
             st.session_state.pop("saas_tenant_status", None)
-            st.session_state.pop("saas_plan", None)
             st.session_state.pop("saas_plan", None)
             login_ui()
             return False
