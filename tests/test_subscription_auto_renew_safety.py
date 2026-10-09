@@ -21,7 +21,7 @@ def test_checkout_does_not_request_saved_payment_method(monkeypatch):
             return {"id": "payment-test", "confirmation": {"confirmation_url": "https://pay.example.invalid"}}
 
     def fake_post(url, **kwargs):
-        if "api.yookassa.com/v3/payments" in str(url):
+        if kwargs.get("auth") == ("test-shop", "test-secret"):
             captured.update(kwargs["json"])
             return Response()
         return Response()
