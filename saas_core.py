@@ -436,11 +436,31 @@ def _rest_post(path,token,payload,headers=None): return _request("POST",path,tok
 def _rest_patch(path,token,payload,params=None,headers=None): return _request("PATCH",path,token=token,headers=headers,params=params or {},json=payload)
 def _rest_delete(path,token,params=None,headers=None): return _request("DELETE",path,token=token,headers=headers,params=params or {})
 
+def _session_cached_value(cache_name, cache_key, ttl_seconds, loader):
+    """Small per-session cache for repeated UI reads; never shared across tenants/users."""
+    now = time.time()
+    entry = st.session_state.get(cache_name)
+    if isinstance(entry, dict) and entry.get("key") == cache_key and now - float(entry.get("at", 0)) < ttl_seconds:
+        return entry.get("value")
+    value = loader()
+    st.session_state[cache_name] = {"key": cache_key, "at": now, "value": value}
+    return value
+
+
 def user_tenants(token,user_id=None):
     uid=user_id or st.session_state.get("saas_user_id")
     if not uid: return []
-    rows=_rest_get("/rest/v1/memberships",token,params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}","order":"created_at.asc"})
-    return [row.get("tenants") for row in rows if row.get("tenants")]
+    # The membership list is queried by login and again by sidebar controls.
+    # Cache only inside this Streamlit session and key it by user ID.
+    return _session_cached_value(
+        "_saas_user_tenants_cache", str(uid), 20,
+        lambda: [
+            row.get("tenants") for row in _rest_get(
+                "/rest/v1/memberships", token,
+                params={"select":"tenant_id,role,tenants(id,name,slug,plan,status)","user_id":f"eq.{uid}","order":"created_at.asc"},
+            ) if row.get("tenants")
+        ],
+    )
 
 def current_tenant(token,user_id=None,selected_tenant_id=None):
     tenants=user_tenants(token,user_id)
@@ -457,7 +477,11 @@ def current_tenant(token,user_id=None,selected_tenant_id=None):
 
 def _clear_tenant_runtime_cache():
     for key in list(st.session_state):
-        if key.startswith("_saas_data_records_") or key in ("max_data_snapshot","saas_onboarding_complete"):
+        if key.startswith("_saas_data_records_") or key in (
+            "max_data_snapshot", "saas_onboarding_complete",
+            "_saas_usage_snapshot_cache", "_saas_user_tenants_cache",
+            "_saas_role_cache", "_saas_invitations_cache",
+        ):
             st.session_state.pop(key, None)
     st.session_state.pop("_saas_data_page_cache", None)
 
@@ -744,17 +768,26 @@ def login_ui():
                 st.error(f"Не удалось отправить письмо: {e}")
 
 def usage_snapshot():
+    # The sidebar renders on every rerun. Avoid four repeated COUNT requests
+    # while keeping the cache tenant-scoped and short-lived.
+    cache_key = f"{tenant_id()}:{st.session_state.get('_app_data_revision', 0)}"
+    cached = st.session_state.get("_saas_usage_snapshot_cache")
+    if isinstance(cached, dict) and cached.get("key") == cache_key and time.time() - float(cached.get("at", 0)) < 15:
+        return dict(cached.get("value") or {})
     if not saas_enabled():
-        return {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
-    try:
-        return {
-            "products": data_count("products"),
-            "leads": data_count("leads"),
-            "orders": data_count("orders"),
-            "content": data_count("content_plan"),
-        }
-    except Exception:
-        return {"products":0,"leads":0,"orders":0,"content":0}
+        value = {"products":len(data_load("products", [])),"leads":len(data_load("leads", [])),"orders":len(data_load("orders", [])),"content":len(data_load("content_plan", []))}
+    else:
+        try:
+            value = {
+                "products": data_count("products"),
+                "leads": data_count("leads"),
+                "orders": data_count("orders"),
+                "content": data_count("content_plan"),
+            }
+        except Exception:
+            value = {"products":0,"leads":0,"orders":0,"content":0}
+    st.session_state["_saas_usage_snapshot_cache"] = {"key": cache_key, "at": time.time(), "value": dict(value)}
+    return value
 
 
 def dashboard_snapshot():
@@ -947,8 +980,11 @@ def current_role(token=None):
     if not saas_enabled(): return "owner"
     token=token or st.session_state.get("saas_access_token"); uid=st.session_state.get("saas_user_id"); tid=tenant_id()
     if not token or not uid or not tid: return "viewer"
-    rows=_rest_get("/rest/v1/memberships",token,params={"select":"role","tenant_id":f"eq.{tid}","user_id":f"eq.{uid}","limit":"1"})
-    return rows[0].get("role","viewer") if rows else "viewer"
+    cache_key = f"{uid}:{tid}"
+    def load_role():
+        rows=_rest_get("/rest/v1/memberships",token,params={"select":"role","tenant_id":f"eq.{tid}","user_id":f"eq.{uid}","limit":"1"})
+        return rows[0].get("role","viewer") if rows else "viewer"
+    return _session_cached_value("_saas_role_cache", cache_key, 20, load_role)
 
 def team_members():
     token=st.session_state.get("saas_access_token")
@@ -957,8 +993,12 @@ def team_members():
 
 def my_invitations():
     token=st.session_state.get("saas_access_token")
-    if not saas_enabled() or not token or not st.session_state.get("saas_email"): return []
-    return _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,expires_at","email":f"eq.{st.session_state.get('saas_email').lower()}","status":"eq.pending","order":"created_at.desc"})
+    email=str(st.session_state.get("saas_email") or "").lower()
+    if not saas_enabled() or not token or not email: return []
+    return _session_cached_value(
+        "_saas_invitations_cache", email, 20,
+        lambda: _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,expires_at","email":f"eq.{email}","status":"eq.pending","order":"created_at.desc"}),
+    )
 
 def accept_invitation(invite_id):
     token=st.session_state.get("saas_access_token")
@@ -1024,26 +1064,28 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Restore an existing session without blocking the public startup path.
+    """Restore a cookie-backed session without flashing the login screen.
 
-    CookieController is client-side, so a hard reload can race its first
-    response. The previous implementation solved that by sleeping and forcing
-    repeated Streamlit reruns. That made startup depend on a timing loop and
-    could leave the app appearing to load indefinitely on some runtimes.
-
-    The startup path is now deliberately non-blocking: try the cookie once and
-    immediately fall back to the normal login UI when no valid session exists.
-    A real cookie is restored normally; anonymous users never need a bootstrap
-    wait. This function does not change Supabase data or credentials.
+    CookieController is client-side: on a hard reload its cookie value may
+    arrive one component cycle after the Python script starts. None means
+    "wait for that component cycle"; False means "show login".
     """
     if st.session_state.get("saas_access_token"):
         return True
-
     if st.session_state.get("_saas_cookie_restore_failed"):
         st.session_state.pop("saas_auth_error", None)
         return False
 
-    return bool(_restore_session_from_cookie())
+    restored = bool(_restore_session_from_cookie())
+    if restored:
+        return True
+
+    # Only defer once, and only when the browser cookie component exists.
+    # New users still reach login immediately when the component is unavailable.
+    probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
+    if CookieController is not None and probes <= 1 and not st.session_state.get("saas_auth_error"):
+        return None
+    return False
 
 
 def require_saas_access():
@@ -1059,7 +1101,11 @@ def require_saas_access():
         return False
 
     if not st.session_state.get("saas_access_token"):
-        if not _auth_bootstrap_gate():
+        bootstrap = _auth_bootstrap_gate()
+        if bootstrap is None:
+            st.info("Восстанавливаем сохранённую сессию…")
+            st.stop()
+        if not bootstrap:
             if st.session_state.get("saas_auth_error"):
                 auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
                 st.session_state["_saas_login_notice"] = (
@@ -1071,6 +1117,7 @@ def require_saas_access():
             st.session_state.pop("saas_tenant_id", None)
             st.session_state.pop("saas_tenant_name", None)
             st.session_state.pop("saas_tenant_status", None)
+            st.session_state.pop("saas_plan", None)
             st.session_state.pop("saas_plan", None)
             login_ui()
             return False
@@ -1480,6 +1527,7 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_app_growth_snapshot", None)
     st.session_state.pop("_app_growth_snapshot_key", None)
     st.session_state.pop("_saas_data_page_cache", None)
+    st.session_state.pop("_saas_usage_snapshot_cache", None)
 
 
 def data_save(entity,rows):
