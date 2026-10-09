@@ -59,7 +59,7 @@ class AppSmokeTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('[data-baseweb="select"] > div {background:#ffffff!important;color:#17151c!important;', source)
         self.assertIn('[data-baseweb="select"] svg {fill:#4b5565!important;color:#4b5565!important;', source)
-        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"] {background:transparent!important;', source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:var(--chrome-bg,#f6f7fb)!important;', source)
 
     def test_max_dialog_css_is_mobile_bounded(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
