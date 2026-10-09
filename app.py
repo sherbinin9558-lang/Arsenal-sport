@@ -10,7 +10,7 @@ from free_automation import load_orders, create_order, update_order, order_metri
 from automation_suite import low_stock_products, stock_info, content_for_product, make_30_day_plan, bulk_update, analytics as automation_analytics, save_uploaded_photo, product_key
 from content_manager import WORKFLOW_STATUSES, ensure_workflow, change_status, adapt_content, workflow_metrics, recommendations, report_lines
 from growth_engine import ai_summary, attribution_performance, recommendations as growth_recommendations
-from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_load_keyset, data_count, dashboard_snapshot, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, activate_paid_subscription, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
+from saas_core import require_saas_access, render_account_bar, render_sidebar_overview, data_load, data_save, data_load_page, data_load_keyset, data_count, dashboard_snapshot, data_update_record, data_delete_record, DataConflictError, saas_enabled, tenant_plan, feature_allowed, can, platform_admin_enabled, platform_admin_snapshot, platform_admin_set_tenant, platform_admin_set_subscription
 from webmcp_tools import mount_webmcp_tools
 from asset_store import load_logo_bytes, save_logo_bytes
 from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation, crm_insights, update_instagram_draft)
@@ -542,47 +542,48 @@ if not require_saas_access():
 
 mount_webmcp_tools()
 
-# Проверка результата оплаты после возврата с ЮKassa.
+# Browser return is informational only. Subscription activation must happen through the
+# provider-verified webhook and the database state machine, never from query parameters.
 try:
-    payment_id=st.query_params.get("payment_id")
-    checkout_id=st.query_params.get("checkout_id")
-    billing_return=st.query_params.get("billing")
-    if billing_return == "tbank_return" and not st.session_state.get("tbank_verified"):
-        from tbank_billing import get_state, get_checkout_by_order
-        order_id=st.query_params.get("order_id")
-        tenant_id=str(st.session_state.get("saas_tenant_id") or "")
-        checkout=get_checkout_by_order(str(order_id), tenant_id) if order_id and tenant_id else None
-        pid=str((checkout or {}).get("provider_payment_id") or "")
-        payment=get_state(pid) if pid else {}
-        status=payment.get("Status")
-        plan=str((checkout or {}).get("plan") or "").lower()
-        if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business") and pid:
-            activate_paid_subscription(plan,pid,None,provider="tbank",tenant=tenant_id)
-            st.session_state["tbank_verified"]=True
-            st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
-        elif status:
-            st.info(f"Статус платежа Т‑Банк: {status}.")
-    elif (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
-        from billing import get_checkout_by_order, get_payment
-        if checkout_id:
-            checkout=get_checkout_by_order(str(checkout_id))
-            if not checkout or not checkout.get("provider_payment_id"):
-                raise RuntimeError("Checkout-сессия не найдена или не содержит ID платежа.")
-            payment_id=str(checkout["provider_payment_id"])
-        payment=get_payment(payment_id)
-        if payment.get("status") == "succeeded" and payment.get("paid"):
-            plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
-            tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
-            if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
-                method_id=(payment.get("payment_method") or {}).get("id")
-                activate_paid_subscription(plan,payment_id,method_id,provider="yookassa",tenant=tenant)
-                st.session_state["billing_verified"]=True
-                st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
-        elif payment.get("status") == "canceled":
-            st.warning("Платёж отменён.")
-except Exception as e:
-    st.warning(f"Статус оплаты пока не подтверждён: {e}")
+    payment_id = st.query_params.get("payment_id")
+    checkout_id = st.query_params.get("checkout_id")
+    billing_return = st.query_params.get("billing")
 
+    if billing_return == "tbank_return":
+        from tbank_billing import get_state, get_checkout_by_order
+
+        order_id = st.query_params.get("order_id")
+        tenant_id = str(st.session_state.get("saas_tenant_id") or "")
+        checkout = get_checkout_by_order(str(order_id), tenant_id) if order_id and tenant_id else None
+        pid = str((checkout or {}).get("provider_payment_id") or "")
+        payment = get_state(pid) if pid else {}
+        status = str(payment.get("Status") or "").upper()
+
+        if status == "AUTHORIZED":
+            st.warning("Платёж авторизован, но ещё не подтверждён окончательно. Тариф пока не активирован.")
+        elif status == "CONFIRMED":
+            st.info("Платёж подтверждён провайдером. Ожидается серверная обработка уведомления; возврат в браузер сам по себе тариф не активирует.")
+        elif status:
+            st.info(f"Текущий статус платежа Т‑Банк: {status}. Тариф будет изменён после серверной проверки события.")
+    elif (payment_id or checkout_id) and billing_return == "return":
+        from billing import get_checkout_by_order, get_payment
+
+        if checkout_id:
+            checkout = get_checkout_by_order(str(checkout_id))
+            if not checkout or not checkout.get("provider_payment_id"):
+                raise RuntimeError("Checkout-сессия не найдена.")
+            payment_id = str(checkout["provider_payment_id"])
+
+        payment = get_payment(payment_id)
+        status = str(payment.get("status") or "").lower()
+        if status == "succeeded" and payment.get("paid") is True:
+            st.info("Платёж найден. Подписка активируется только после серверной проверки суммы, валюты и платёжного уведомления.")
+        elif status == "canceled":
+            st.warning("Платёж отменён.")
+        elif status:
+            st.info(f"Текущий статус платежа ЮKassa: {status}. Тариф не активируется по одному только возврату из браузера.")
+except Exception:
+    st.warning("Статус оплаты пока не подтверждён. Тариф не изменён; повторная проверка произойдёт через серверный платёжный контур.")
 
 with st.sidebar:
     # MAX is intentionally the first high-visibility action.

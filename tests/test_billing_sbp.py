@@ -28,7 +28,7 @@ class YooKassaSBPCheckoutTests(unittest.TestCase):
         self.assertFalse(payload["save_payment_method"])
         self.assertEqual(payload["metadata"]["tenant_id"], "tenant-1")
         self.assertEqual(result["id"], "payment-123")
-        save_checkout.assert_called_once_with("tenant-1", payload["metadata"]["checkout_id"], "payment-123", "pro")
+        save_checkout.assert_called_once_with("tenant-1", payload["metadata"]["checkout_id"], "payment-123", "pro", 990.0, "RUB")
 
     @patch.object(billing, "_save_checkout")
     @patch.object(billing.requests, "post")
