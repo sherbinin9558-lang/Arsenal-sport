@@ -141,6 +141,17 @@ def run():
                         )
                     if len(body_text.strip()) < 40:
                         raise RuntimeError("page rendered almost no text")
+                    normalized_body = " ".join(body_text.split()).casefold()
+                    if "ai agent content manager" not in normalized_body:
+                        raise RuntimeError(
+                            "APP_UI_NOT_CONFIRMED: login fields were found, but the expected "
+                            "AI Agent Content Manager branding was not present in rendered app text"
+                        )
+                    if "создать магазин" not in normalized_body or "восстановить пароль" not in normalized_body:
+                        raise RuntimeError(
+                            "APP_LOGIN_UI_INCOMPLETE: expected login, create-shop, and password-recovery "
+                            "navigation was not present in rendered app text"
+                        )
                     # Ignore only known non-product noise. Keep all responses in the
                     # diagnostic report; the app-owned user-details 404 is ignored only
                     # before an authenticated login attempt.
