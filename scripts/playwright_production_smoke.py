@@ -75,6 +75,36 @@ def browser_url():
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
+def visible_label_locator(page, label, timeout_ms):
+    """Find a visible labelled control in the main document or any attached iframe."""
+    contexts = [page.main_frame] + [frame for frame in page.frames if frame != page.main_frame]
+    last_error = None
+    for frame in contexts:
+        try:
+            locator = frame.get_by_label(label)
+            locator.wait_for(state="visible", timeout=min(timeout_ms, 8000))
+            return locator, frame.url
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(
+        f"Could not find visible label {label!r} in the page or any attached iframe. "
+        f"Last error: {last_error}"
+    )
+
+
+def visible_page_text(page):
+    """Collect visible text from the top-level page and embedded app frames."""
+    chunks = []
+    for frame in page.frames:
+        try:
+            text = frame.locator("body").inner_text(timeout=3000).strip()
+            if text:
+                chunks.append(text)
+        except Exception:
+            continue
+    return "\\n".join(chunks)[:20000]
+
+
 def run():
     health_check()
     startup_http_probe()
@@ -99,25 +129,33 @@ def run():
                 page.wait_for_timeout(3000)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
-                item["body_prefix"] = page.locator("body").inner_text(timeout=10000)[:20000]
+                item["body_prefix"] = visible_page_text(page)
+                item["frames"] = [
+                    {"url": frame.url, "name": frame.name}
+                    for frame in page.frames
+                ]
                 item["content_markers"] = {
                     "has_email": "Email" in item["body_prefix"],
                     "has_password": "Пароль" in item["body_prefix"],
                     "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
                     "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
                 }
-                # The login controls are the stable acceptance contract; do not
-                # depend on a marketing headline that can change with the UI.
-                # The longer timeout accommodates a cold Streamlit Cloud start.
-                page.get_by_label("Email").wait_for(state="visible", timeout=TIMEOUT_MS)
-                page.get_by_label("Пароль").wait_for(state="visible", timeout=30000)
+                # Streamlit Cloud can embed the rendered app in an iframe.
+                # Search the page and attached frames instead of assuming that
+                # the login controls belong to the top-level document.
+                _, email_frame_url = visible_label_locator(page, "Email", TIMEOUT_MS)
+                _, password_frame_url = visible_label_locator(page, "Пароль", 30000)
+                item["login_control_context"] = {
+                    "email_frame_url": email_frame_url,
+                    "password_frame_url": password_frame_url,
+                }
                 item["status"] = "PASS"
             except Exception as exc:
                 item["status"] = "FAIL"
                 item["error"] = str(exc)
                 item["url"] = page.url
                 item["title"] = page.title()
-                item["body"] = page.locator("body").inner_text(timeout=10000)[:12000]
+                item["body"] = visible_page_text(page)
                 item["console_errors"] = console_errors[-100:]
                 item["page_errors"] = page_errors[-100:]
                 item["request_failures"] = request_failures[-100:]
