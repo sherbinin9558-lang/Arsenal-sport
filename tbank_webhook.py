@@ -351,7 +351,8 @@ async def yookassa_payment_status(request: Request):
     if not checkout:
         raise HTTPException(status_code=404, detail="Checkout session not found")
 
-    _verify_yookassa_payment_amount(payment, checkout)
+    if not is_refund and provider_status in ("succeeded", "confirmed"):
+        _verify_yookassa_payment_amount(payment, checkout)
     plan = str(checkout.get("plan") or "").lower()
     tenant = str(checkout.get("tenant_id") or "")
     if plan not in ("starter", "pro", "business") or not tenant:
