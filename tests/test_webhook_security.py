@@ -38,20 +38,47 @@ class WebhookSecurityTests(unittest.TestCase):
 
         self.assertEqual(asyncio.run(tbank_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
 
-    def test_security_headers_are_present(self):
-        class Response:
-            headers = {}
-        response = Response()
-        response.headers.update({
+    def test_security_headers_are_applied_by_real_middleware(self):
+        async def run():
+            from starlette.requests import Request
+            from starlette.responses import PlainTextResponse
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "https",
+                "path": "/healthz",
+                "raw_path": b"/healthz",
+                "query_string": b"",
+                "headers": [],
+                "client": ("127.0.0.1", 12345),
+                "server": ("testserver", 443),
+            }
+            request = Request(scope, receive=receive)
+
+            async def call_next(_request):
+                return PlainTextResponse("ok")
+
+            middleware = tbank_webhook.SecurityHeadersMiddleware(tbank_webhook.app)
+            return await middleware.dispatch(request, call_next)
+
+        response = asyncio.run(run())
+        expected = {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "Referrer-Policy": "no-referrer",
             "Cache-Control": "no-store",
-        })
-        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
-        self.assertEqual(response.headers["X-Frame-Options"], "DENY")
-        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
-        self.assertEqual(response.headers["Cache-Control"], "no-store")
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        }
+        for header, value in expected.items():
+            with self.subTest(header=header):
+                self.assertEqual(response.headers.get(header), value)
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_accepts_configured_bearer_secret(self):
@@ -131,7 +158,64 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
 
     def test_oversized_request_is_rejected_before_handler(self):
-        self.assertGreater(tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES, 0)
+        async def run():
+            sent = []
+            downstream_called = False
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                sent.append(message)
+
+            async def downstream(scope, receive, send):
+                nonlocal downstream_called
+                downstream_called = True
+
+            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            await middleware(
+                {"type": "http", "headers": [
+                    (b"content-length", str(middleware.MAX_BODY_BYTES + 1).encode("ascii"))
+                ]},
+                receive,
+                send,
+            )
+            return sent, downstream_called
+
+        sent, downstream_called = asyncio.run(run())
+        self.assertFalse(downstream_called)
+        self.assertTrue(any(message.get("status") == 413 for message in sent))
+        body = b"".join(message.get("body", b"") for message in sent)
+        self.assertIn(b"Request too large", body)
+
+    def test_invalid_content_length_is_rejected_before_handler(self):
+        async def run():
+            sent = []
+            downstream_called = False
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                sent.append(message)
+
+            async def downstream(scope, receive, send):
+                nonlocal downstream_called
+                downstream_called = True
+
+            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            await middleware(
+                {"type": "http", "headers": [(b"content-length", b"not-a-number")]},
+                receive,
+                send,
+            )
+            return sent, downstream_called
+
+        sent, downstream_called = asyncio.run(run())
+        self.assertFalse(downstream_called)
+        self.assertTrue(any(message.get("status") == 400 for message in sent))
+        body = b"".join(message.get("body", b"") for message in sent)
+        self.assertIn(b"Invalid Content-Length", body)
 
     def test_chunked_oversized_request_is_rejected(self):
         async def run():
