@@ -59,13 +59,30 @@ def run():
                         raise RuntimeError(
                             f"PRODUCTION_HTTP_ERROR: initial document returned HTTP {response.status}"
                         )
-                    page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
-                        state="visible", timeout=60000
-                    )
-                    email_field = page.get_by_label("Email", exact=True).first
-                    password_field = page.get_by_label("Пароль", exact=True).first
-                    email_field.wait_for(state="visible", timeout=30000)
-                    password_field.wait_for(state="visible", timeout=30000)
+                    # Streamlit Cloud may render the app in a late-attached iframe.
+                    # Do not depend on marketing copy that can change independently of app readiness.
+                    def visible_label(label, timeout_ms=60000):
+                        deadline = time.monotonic() + timeout_ms / 1000
+                        last_error = None
+                        while time.monotonic() < deadline:
+                            frames = [page.main_frame] + [
+                                frame for frame in page.frames if frame != page.main_frame
+                            ]
+                            for frame in frames:
+                                try:
+                                    locator = frame.get_by_label(label, exact=True)
+                                    if locator.count() and locator.first.is_visible():
+                                        return locator.first
+                                except Exception as exc:
+                                    last_error = exc
+                            page.wait_for_timeout(250)
+                        raise RuntimeError(
+                            f"Could not find visible {label!r} field in page or attached frames; "
+                            f"last error: {last_error}"
+                        )
+
+                    email_field = visible_label("Email")
+                    password_field = visible_label("Пароль")
 
                     mode = "public-login"
                     if authenticated:
@@ -78,7 +95,15 @@ def run():
                         page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    body_text = page.locator("body").inner_text(timeout=10000)
+                    body_chunks = []
+                    for frame in page.frames:
+                        try:
+                            chunk = frame.locator("body").inner_text(timeout=3000).strip()
+                            if chunk:
+                                body_chunks.append(chunk)
+                        except Exception:
+                            continue
+                    body_text = "\\n".join(body_chunks)
                     horizontal_overflow = page.evaluate(
                         "() => document.documentElement.scrollWidth > window.innerWidth + 2"
                     )
