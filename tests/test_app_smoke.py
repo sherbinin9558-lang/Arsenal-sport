@@ -75,6 +75,12 @@ class AppSmokeTests(unittest.TestCase):
         self.assertIn("background:var(--app-bg)!important", source)
         self.assertIn("background:var(--sidebar-bg,#ffffff)!important", source)
 
+    def test_mobile_tables_stay_within_viewport_and_can_scroll(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('[data-testid="stDataFrame"],[data-testid="stTable"]{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important;', source)
+        self.assertIn("-webkit-overflow-scrolling:touch!important", source)
+        self.assertIn('[data-testid="stTable"] table{min-width:560px!important;}', source)
+
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
