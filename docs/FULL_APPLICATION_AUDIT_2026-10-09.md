@@ -13,6 +13,11 @@ Evidence: `supabase/migrations/20261006090000_billing_refund_lifecycle.sql` defi
 - Required fix: apply a forward-only migration after all billing lifecycle migrations; only final provider success states activate access.
 - Acceptance: SQL contract tests and disposable-database RPC tests prove `authorized` never activates, `succeeded/confirmed` activates once, and duplicates are idempotent.
 
+### P0 — Browser return could activate a subscription outside webhook validation
+Evidence: default `app.py` called `activate_paid_subscription` from the T-Bank return when status was `AUTHORIZED` or `CONFIRMED`, and from the YooKassa return when the payment was marked succeeded. That bypassed the verified webhook's amount/currency check and its idempotent billing state transition.
+- Fix proposed in PR #138: browser redirects are now informational only; server-side activation remains on the verified webhook path, and the customer can re-check after the webhook arrives.
+- Acceptance: regression test asserts that the payment-return block contains no direct `activate_paid_subscription` call; webhook contract tests verify amount, currency, authoritative provider state and refund association.
+
 ### P0 — Default branch does not bind successful checkout to expected amount/currency
 Evidence: default `billing.py` saves provider order/payment IDs, tenant and plan but no expected amount/currency. The webhook resolves the checkout and provider status, but amount/currency validation is not present in the reviewed main-branch path.
 - Required fix: save server-calculated amount/currency at checkout creation and compare with provider-authoritative payment before activation. Reject missing/mismatched values. Handle old rows with an explicit migration/reconciliation plan.
