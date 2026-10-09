@@ -16,6 +16,28 @@ class WebhookSecurityTests(unittest.TestCase):
                 return self._body
         return Request()
 
+    def test_read_body_rejects_non_object_json(self):
+        class JsonRequest:
+            def __init__(self, payload):
+                self.payload = payload
+
+            async def json(self):
+                return self.payload
+
+        for payload in ([], "string", 42, None):
+            with self.subTest(payload=payload):
+                with self.assertRaises(Exception) as ctx:
+                    asyncio.run(tbank_webhook._read_body(JsonRequest(payload)))
+                self.assertEqual(getattr(ctx.exception, "status_code", None), 400)
+                self.assertIn("JSON object required", str(ctx.exception))
+
+    def test_read_body_accepts_json_object(self):
+        class JsonRequest:
+            async def json(self):
+                return {"PaymentId": "123"}
+
+        self.assertEqual(asyncio.run(tbank_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
+
     def test_security_headers_are_present(self):
         class Response:
             headers = {}
