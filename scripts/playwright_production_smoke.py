@@ -110,6 +110,28 @@ def visible_page_text(page):
     return "\n".join(chunks)[:20000]
 
 
+APP_READY_MARKER = "Ваш магазин. Один рабочий центр."
+STATUS_PAGE_MARKERS = (
+    "status embed installed",
+    "this will be shown if an incident or maintenance is posted",
+    "view latest updates",
+)
+
+
+def validate_application_content(body_text):
+    """Require real app content; a Streamlit status/maintenance page is not a pass."""
+    normalized = str(body_text or "").casefold()
+    if APP_READY_MARKER.casefold() not in normalized:
+        if any(marker in normalized for marker in STATUS_PAGE_MARKERS):
+            raise RuntimeError(
+                "Production page contains Streamlit status/maintenance content, "
+                "but the expected application marker is missing."
+            )
+        raise RuntimeError(
+            f"Production app marker {APP_READY_MARKER!r} was not visible after login controls loaded."
+        )
+
+
 def run():
     health_check()
     startup_http_probe()
@@ -149,6 +171,19 @@ def run():
                 # the login controls belong to the top-level document.
                 _, email_frame_url = visible_label_locator(page, "Email", TIMEOUT_MS)
                 _, password_frame_url = visible_label_locator(page, "Пароль", 30000)
+
+                # Re-capture after waiting for labelled controls: Streamlit Cloud may
+                # attach the real app iframe after the initial shell/status iframe.
+                item["body_prefix"] = visible_page_text(page)
+                item["frames"] = [
+                    {"url": frame.url, "name": frame.name}
+                    for frame in page.frames
+                ]
+                validate_application_content(item["body_prefix"])
+                item["content_markers"]["app_ready_marker"] = APP_READY_MARKER.casefold() in item["body_prefix"].casefold()
+                item["content_markers"]["status_page_content"] = any(
+                    marker in item["body_prefix"].casefold() for marker in STATUS_PAGE_MARKERS
+                )
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
                     "password_frame_url": password_frame_url,
