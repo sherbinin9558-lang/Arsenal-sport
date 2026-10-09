@@ -109,7 +109,64 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
 
     def test_oversized_request_is_rejected_before_handler(self):
-        self.assertGreater(tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES, 0)
+        async def run():
+            sent = []
+            downstream_called = False
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                sent.append(message)
+
+            async def downstream(scope, receive, send):
+                nonlocal downstream_called
+                downstream_called = True
+
+            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            await middleware(
+                {"type": "http", "headers": [
+                    (b"content-length", str(middleware.MAX_BODY_BYTES + 1).encode("ascii"))
+                ]},
+                receive,
+                send,
+            )
+            return sent, downstream_called
+
+        sent, downstream_called = asyncio.run(run())
+        self.assertFalse(downstream_called)
+        self.assertTrue(any(message.get("status") == 413 for message in sent))
+        body = b"".join(message.get("body", b"") for message in sent)
+        self.assertIn(b"Request too large", body)
+
+    def test_invalid_content_length_is_rejected_before_handler(self):
+        async def run():
+            sent = []
+            downstream_called = False
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                sent.append(message)
+
+            async def downstream(scope, receive, send):
+                nonlocal downstream_called
+                downstream_called = True
+
+            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            await middleware(
+                {"type": "http", "headers": [(b"content-length", b"not-a-number")]},
+                receive,
+                send,
+            )
+            return sent, downstream_called
+
+        sent, downstream_called = asyncio.run(run())
+        self.assertFalse(downstream_called)
+        self.assertTrue(any(message.get("status") == 400 for message in sent))
+        body = b"".join(message.get("body", b"") for message in sent)
+        self.assertIn(b"Invalid Content-Length", body)
 
     def test_chunked_oversized_request_is_rejected(self):
         async def run():
