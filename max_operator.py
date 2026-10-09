@@ -45,9 +45,10 @@ ACTIONS = {
 
 _PATTERNS = (
     ("low_stock", r"(остат|заканч|дефицит|склад)"),
+    # Match explicit write intent before the broader "content today" read query.
+    ("prepare_today", r"(подготов|сделай).*(контент|пост).*(сегодня|на сегодня)"),
     ("content_today", r"(контент|пост).*(сегодня)"),
     ("sales_summary", r"(продаж|выручк|заказ|конверси)"),
-    ("prepare_today", r"(подготов|сделай).*(контент|пост).*(сегодня|на сегодня)"),
     ("create_7_day_plan", r"(создай|сделай).*(контент|план).*(7|недел)"),
     ("refresh_analysis", r"(обнови|анализ).*(магазин|данн)"),
 )

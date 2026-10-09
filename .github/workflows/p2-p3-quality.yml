@@ -29,6 +29,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - name: Install QA test dependencies
+        run: pip install -r requirements-qa.txt
       - run: python -m compileall -q .
       - run: pip check
       - run: python -m unittest discover -s tests -p "test_*.py" -v
