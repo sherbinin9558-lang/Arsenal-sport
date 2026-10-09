@@ -556,7 +556,7 @@ try:
         payment=get_state(pid) if pid else {}
         status=payment.get("Status")
         plan=str((checkout or {}).get("plan") or "").lower()
-        if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business") and pid:
+        if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:
             activate_paid_subscription(plan,pid,None,provider="tbank",tenant=tenant_id)
             st.session_state["tbank_verified"]=True
             st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
