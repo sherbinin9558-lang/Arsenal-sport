@@ -76,5 +76,32 @@ class BillingProviderSafetyTests(unittest.TestCase):
         self.assertIn("ЮKassa", str(ctx.exception))
 
 
+    @patch.object(billing.requests, "get")
+    @patch.object(billing, "configured", return_value=True)
+    def test_payment_lookup_error_does_not_leak_provider_body(self, _configured, get):
+        get.return_value = FakeResponse(
+            {"description": "SECRET-PAYMENT-LOOKUP-DETAIL"}, ok=False,
+            text="SECRET-PAYMENT-LOOKUP-DETAIL",
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            billing.get_payment("payment-test")
+        self.assertNotIn("SECRET-PAYMENT-LOOKUP-DETAIL", str(ctx.exception))
+
+    @patch.object(billing.requests, "post")
+    @patch.object(billing, "_cfg")
+    def test_checkout_storage_error_does_not_leak_response_body(self, cfg, post):
+        values = {
+            "SUPABASE_SERVICE_ROLE_KEY": "service-test",
+            "SUPABASE_URL": "https://example.supabase.co",
+        }
+        cfg.side_effect = lambda name, default="": values.get(name, default)
+        post.return_value = FakeResponse(
+            {"message": "SECRET-STORAGE-DETAIL"}, ok=False,
+            text="SECRET-STORAGE-DETAIL",
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            billing._save_checkout("tenant-test", "checkout-test", "payment-test", "starter")
+        self.assertNotIn("SECRET-STORAGE-DETAIL", str(ctx.exception))
+
 if __name__ == "__main__":
     unittest.main()
