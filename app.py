@@ -694,12 +694,39 @@ button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!imp
 .block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
 .main-title{font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
 .mobile-nav-hint{display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}html,body{overflow-x:hidden!important;}
-/* MAX dialog. */
-div[data-testid="stDialog"]{display:flex!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:auto!important;}
-div[data-testid="stDialog"]>div,div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
-div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:relative!important;z-index:2147483647!important;background:linear-gradient(180deg,#ffffff 0%,#f8f9fc 100%)!important;color:#17151c!important;border:1px solid #d9ddea!important;border-radius:22px!important;box-shadow:0 28px 90px rgba(12,16,28,.34),0 0 0 1px rgba(91,92,226,.06)!important;max-height:90vh!important;overflow:auto!important;} div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
-[data-testid="stDialog"] [data-testid="stExpander"] button,div[role="dialog"] [data-testid="stExpander"] button{color:#b8ff00!important;opacity:1!important;}
-[data-testid="stDialog"] [data-testid="stExpander"] button svg,[data-testid="stDialog"] [data-testid="stExpander"] button svg *,div[role="dialog"] [data-testid="stExpander"] button svg,div[role="dialog"] [data-testid="stExpander"] button svg *{color:#b8ff00!important;stroke:#b8ff00!important;fill:none!important;opacity:1!important;stroke-width:3px!important;filter:drop-shadow(0 0 6px rgba(184,255,0,.9))!important;}
+/* MAX dialog: let Streamlit own the backdrop and centering. Do not stretch the dialog wrapper over the viewport. */
+div[data-testid="stDialog"]{visibility:visible!important;opacity:1!important;z-index:1000!important;pointer-events:auto!important;}
+div[data-testid="stDialog"]>div{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
+div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{
+  box-sizing:border-box!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+  background:#ffffff!important;color:#171a21!important;border:1px solid #d9ddea!important;border-radius:22px!important;
+  box-shadow:0 20px 60px rgba(12,16,28,.28)!important;max-height:calc(100dvh - 32px)!important;overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+}
+div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
+div[data-testid="stDialog"] [role="dialog"] p,
+div[data-testid="stDialog"] [role="dialog"] label,
+div[data-testid="stDialog"] [role="dialog"] span,
+div[data-testid="stDialog"] [role="dialog"] h1,
+div[data-testid="stDialog"] [role="dialog"] h2,
+div[data-testid="stDialog"] [role="dialog"] h3,
+div[data-testid="stDialog"] [role="dialog"] li{color:#171a21!important;opacity:1!important;}
+div[data-testid="stDialog"] [role="dialog"] [data-testid="stCaptionContainer"],
+div[data-testid="stDialog"] [role="dialog"] [data-testid="stMarkdownContainer"] p{color:#4b5565!important;}
+div[data-testid="stDialog"] [role="dialog"] button{min-height:42px!important;touch-action:manipulation!important;}
+div[data-testid="stDialog"] [data-testid="stExpander"] button{color:#171a21!important;opacity:1!important;}
+div[data-testid="stDialog"] [data-testid="stExpander"] button svg,
+div[data-testid="stDialog"] [data-testid="stExpander"] button svg *{stroke:currentColor!important;fill:none!important;opacity:1!important;filter:none!important;}
+@media (max-width:768px){
+  div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{
+    width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;
+    min-width:0!important;margin:12px!important;border-radius:18px!important;
+    max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important;
+    padding:16px!important;
+  }
+  div[data-testid="stDialog"] [role="dialog"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:8px!important;}
+  div[data-testid="stDialog"] [role="dialog"] [data-testid="column"]{min-width:0!important;flex:1 1 100%!important;width:100%!important;}
+}
 .max-header{display:block!important;width:100%!important;padding:6px 52px 14px 0!important;border-bottom:1px solid #e8ebf1!important;margin-bottom:8px!important;}.max-header-title{font-size:clamp(1.25rem,2vw,1.55rem)!important;line-height:1.2!important;font-weight:950!important;letter-spacing:-.02em!important;color:#21164d!important;}.max-header-title span{color:#7cff00!important;text-shadow:0 0 8px rgba(184,255,0,.55)!important;}.max-header-subtitle{margin-top:4px!important;font-size:.82rem!important;color:#687182!important;}
 /* Existing visual styles retained. */
 :root{--accent:#5b5ce2;--accent2:#4f46c5;--bg:#f6f7fb;--surface:#fff;--border:#e4e7ec;--text:#171a21;--muted:#687182;}.stApp{background:#f6f7fb;}
