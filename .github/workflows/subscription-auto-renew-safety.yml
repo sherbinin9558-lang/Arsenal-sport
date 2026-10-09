@@ -1,0 +1,26 @@
+name: Subscription auto-renew safety tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subscription-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install application dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pytest
+      - name: Compile billing/UI modules
+        run: python -m py_compile billing.py saas_billing.py ui/max.py
+      - name: Run subscription safety tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_subscription_auto_renew_safety.py tests/test_saas_billing.py
