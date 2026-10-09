@@ -8,7 +8,7 @@ def test_authorized_payment_does_not_activate_subscription():
     ).read_text(encoding='utf-8')
     assert "if normalized_status in ('succeeded','confirmed') then" in migration
     assert "if normalized_status in ('succeeded','confirmed','authorized') then" not in migration
-    assert "AUTHENTICATED" not in migration
+    assert "perform public.activate_paid_subscription(" in migration
 
 
 def test_refund_and_reversal_lifecycle_remains_present():
