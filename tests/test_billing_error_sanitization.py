@@ -78,7 +78,7 @@ def test_auto_renew_does_not_expose_database_body(monkeypatch):
     )))
 
     assert_sanitized(lambda: saas_billing.set_auto_renew(
-        True, tenant_id=lambda: "tenant-test", saas_is_enabled=True,
+        False, tenant_id=lambda: "tenant-test", saas_is_enabled=True,
         current_role=lambda: "owner", service_key="private-secret-value",
         supabase_url="https://example.supabase.co",
     ))
