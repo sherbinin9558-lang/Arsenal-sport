@@ -228,9 +228,12 @@ def _verify_webhook_secret(request: Request, env_name):
 
 async def _read_body(request: Request):
     try:
-        return await request.json()
+        body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="JSON object required")
+    return body
 
 
 @app.post("/webhooks/tbank/payment-status")
