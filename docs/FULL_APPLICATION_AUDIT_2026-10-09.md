@@ -27,6 +27,11 @@ Evidence: default `saas_core.py` implements `tenant_id()` with a `demo-tenant` d
 Evidence: default `app.py` forced `div[data-testid="stDialog"]` to `position:fixed; inset:0`, applied an extreme z-index, and forced all descendants visible. This matches the screenshot symptoms (oversized white dialog, low contrast, controls pushed down).
 - Proposed fix is isolated in PR #137. Unit/contract tests passed for its current head; optional public-app E2E was skipped. iPhone Safari visual confirmation remains outstanding.
 
+### P1 — Global CSS overrode selected theme and mobile layout
+Evidence: a later unconditional `.stApp{background:#f6f7fb}` and white sidebar background overrode earlier dark-mode CSS. The mobile dialog override forced the dialog wrapper to `position:fixed; inset:0` with an extreme z-index, and the light-theme select controls had dark surfaces with dark text.
+- Fix proposed in PR #138: theme-aware CSS variables for app/sidebar/toolbar, explicit light select contrast, neutral toolbar colors, and viewport-bounded MAX dialog.
+- Regression tests cover CSS invariants. BrowserStack/live public E2E jobs are skipped in current CI; visual iPhone confirmation remains necessary.
+
 ### P1 — Billing changes are stacked and not deployed
 PRs #133–#136 are dependent. Reviewing a child branch alone is not sufficient: each base must be merged in order and the final combined head must pass the full suite. Real provider test-mode payment, notification delivery, refund, and SBP merchant enablement have not been verified.
 
