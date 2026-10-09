@@ -29,25 +29,33 @@ TARGETS = [
 def health_check():
     url = f"{BASE_URL}/_stcore/health"
     started = time.perf_counter()
-    response = requests.get(url, timeout=60)
+    # Do not follow redirects here: Streamlit Community Cloud can redirect a
+    # private app to its hosted authentication gateway, whose HTTP 200 login
+    # page can otherwise be mistaken for a healthy application.
+    response = requests.get(url, timeout=60, allow_redirects=False)
     latency_ms = round((time.perf_counter() - started) * 1000)
     body = response.text.strip()
     result = {
         "url": url,
         "status": response.status_code,
+        "location": response.headers.get("Location", ""),
         "body": body[:500],
         "latency_ms": latency_ms,
     }
     (OUT / "health.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    # Streamlit Cloud may serve the SPA shell for this internal endpoint.
-    # Do not abort browser acceptance solely because the endpoint returns HTML;
-    # the homepage probe and real browser matrix below determine app availability.
+    location = result["location"]
+    if response.status_code in (301, 302, 303, 307, 308) and "share.streamlit.io/-/auth/" in location:
+        raise RuntimeError(
+            "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud redirected the health "
+            "endpoint to its authentication gateway. The production app UI is not publicly "
+            f"reachable; configure app visibility or a dedicated E2E session. Details: {result}"
+        )
     if response.status_code != 200:
         raise RuntimeError(f"Production health endpoint returned HTTP {response.status_code}: {result}")
-    if body != "ok":
+    if body.lower() != "ok":
         result["warning"] = (
             "Health endpoint did not return the expected plain-text 'ok'; "
-            "continuing with homepage and browser checks."
+            "continuing only after confirming the homepage is not an auth-gateway redirect."
         )
         print(f"WARNING: {result['warning']}")
 
