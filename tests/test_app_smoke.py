@@ -54,6 +54,52 @@ class AppSmokeTests(unittest.TestCase):
         at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
 
+
+    def test_mobile_and_light_theme_css_keeps_controls_readable(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('[data-baseweb="select"] > div {background:#ffffff!important;color:#17151c!important;', source)
+        self.assertIn('[data-baseweb="select"] svg {fill:#4b5565!important;color:#4b5565!important;', source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:var(--chrome-bg,#f6f7fb)!important;', source)
+
+    def test_max_dialog_css_is_mobile_bounded(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("max-height:calc(100dvh - 24px", source)
+        self.assertIn("width:calc(100vw - 24px)", source)
+        self.assertNotIn("position:fixed!important;inset:0!important;z-index:2147483647", source)
+        self.assertIn('header[data-testid="stHeader"],[data-testid="stToolbar"]{background:var(--chrome-bg,#f6f7fb)!important;', source)
+
+
+    def test_dark_theme_is_not_overridden_by_global_light_background(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("--app-bg:#0b0e13;--sidebar-bg:#10131a;--chrome-bg:#0b0e13;", source)
+        self.assertIn("background:var(--app-bg)!important", source)
+        self.assertIn("background:var(--sidebar-bg,#ffffff)!important", source)
+
+    def test_browser_payment_return_never_activates_subscription_directly(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        start = source.index("# Проверка результата оплаты после возврата с ЮKassa.")
+        end = source.index("with st.sidebar:", start)
+        payment_return_code = source[start:end]
+        self.assertNotIn("activate_paid_subscription(", payment_return_code)
+        self.assertIn('if status == "CONFIRMED" and plan in ("starter","pro","business") and pid:', payment_return_code)
+        self.assertNotIn('if status in ("CONFIRMED","AUTHORIZED")', payment_return_code)
+        self.assertIn('st.button("Проверить статус оплаты ещё раз", key="billing_return_refresh")', source)
+
+    def test_mobile_tables_stay_within_viewport_and_can_scroll(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('[data-testid="stDataFrame"],[data-testid="stTable"]{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;overflow-x:auto!important;', source)
+        self.assertIn("-webkit-overflow-scrolling:touch!important", source)
+        self.assertIn('with st.container(key="desktop_tenant_table"):', source)
+        self.assertIn('with st.container(key="mobile_tenant_cards"):', source)
+        self.assertIn(".st-key-mobile_tenant_cards {display:none!important;}", source)
+        self.assertIn('[data-testid="stTable"] table{min-width:560px!important;}', source)
+
+    def test_tenant_directory_uses_safe_responsive_mobile_cards(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("tenant-responsive-table", source)
+        self.assertIn('html_escape(str(row.get(column, "—")))', source)
+        self.assertIn("@media(max-width:768px){.tenant-responsive-table", source)
+
     def test_every_max_section_renders(self):
         at = AppTest.from_function(_max_script, default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])

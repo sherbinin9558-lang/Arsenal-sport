@@ -1159,7 +1159,14 @@ def require_saas_access():
 
     return True
 
-def tenant_id(): return st.session_state.get("saas_tenant_id","demo-tenant")
+def tenant_id():
+    """Return the selected tenant; never silently fall back to a demo tenant in SaaS mode."""
+    selected = str(st.session_state.get("saas_tenant_id") or "").strip()
+    if selected:
+        return selected
+    if not saas_enabled() and demo_mode_enabled():
+        return "demo-tenant"
+    return ""
 def tenant_plan(): return st.session_state.get("saas_plan","trial")
 def limit(name): return PLAN_LIMITS.get(tenant_plan(),PLAN_LIMITS["trial"]).get(name,0)
 def feature_allowed(name,current_count=0):

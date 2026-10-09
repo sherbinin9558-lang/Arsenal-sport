@@ -49,3 +49,9 @@ def test_invalid_entity_name_is_rejected():
     import pytest
     with pytest.raises(ValueError):
         saas_core.data_load("../products", [])
+
+
+def test_tenant_id_fails_closed_when_saas_has_no_selected_tenant(monkeypatch, isolated_state):
+    monkeypatch.setattr(saas_core, "saas_enabled", lambda: True)
+    isolated_state.pop("saas_tenant_id", None)
+    assert saas_core.tenant_id() == ""
