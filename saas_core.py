@@ -984,7 +984,8 @@ def current_role(token=None):
     def load_role():
         rows=_rest_get("/rest/v1/memberships",token,params={"select":"role","tenant_id":f"eq.{tid}","user_id":f"eq.{uid}","limit":"1"})
         return rows[0].get("role","viewer") if rows else "viewer"
-    return _session_cached_value("_saas_role_cache", cache_key, 20, load_role)
+    # Permission cache is deliberately shorter than ordinary UI caches so role revocation takes effect quickly.
+    return _session_cached_value("_saas_role_cache", cache_key, 5, load_role)
 
 def team_members():
     token=st.session_state.get("saas_access_token")
