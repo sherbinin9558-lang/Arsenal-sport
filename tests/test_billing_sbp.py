@@ -56,6 +56,23 @@ class YooKassaSBPCheckoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             billing.create_checkout("pro", "tenant-1", payment_method="qr")
 
+    @patch.object(billing, "configured", return_value=True)
+    @patch.object(billing, "plan_price", return_value=990.0)
+    @patch.object(billing, "_cfg", return_value="configured")
+    @patch.object(billing.requests, "post")
+    def test_provider_error_details_are_not_exposed(self, post, _cfg, _price, _configured):
+        response = Mock()
+        response.ok = False
+        response.json.return_value = {"description": "private provider diagnostic"}
+        response.text = "private provider diagnostic"
+        post.return_value = response
+
+        with self.assertRaises(RuntimeError) as raised:
+            billing.create_checkout("pro", "tenant-1", payment_method="sbp")
+
+        self.assertNotIn("private provider diagnostic", str(raised.exception))
+        self.assertIn("ЮKassa", str(raised.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
