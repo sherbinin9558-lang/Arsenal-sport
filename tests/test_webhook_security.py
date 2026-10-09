@@ -16,20 +16,47 @@ class WebhookSecurityTests(unittest.TestCase):
                 return self._body
         return Request()
 
-    def test_security_headers_are_present(self):
-        class Response:
-            headers = {}
-        response = Response()
-        response.headers.update({
+    def test_security_headers_are_applied_by_real_middleware(self):
+        async def run():
+            from starlette.requests import Request
+            from starlette.responses import PlainTextResponse
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "https",
+                "path": "/healthz",
+                "raw_path": b"/healthz",
+                "query_string": b"",
+                "headers": [],
+                "client": ("127.0.0.1", 12345),
+                "server": ("testserver", 443),
+            }
+            request = Request(scope, receive=receive)
+
+            async def call_next(_request):
+                return PlainTextResponse("ok")
+
+            middleware = tbank_webhook.SecurityHeadersMiddleware(tbank_webhook.app)
+            return await middleware.dispatch(request, call_next)
+
+        response = asyncio.run(run())
+        expected = {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "Referrer-Policy": "no-referrer",
             "Cache-Control": "no-store",
-        })
-        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
-        self.assertEqual(response.headers["X-Frame-Options"], "DENY")
-        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
-        self.assertEqual(response.headers["Cache-Control"], "no-store")
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        }
+        for header, value in expected.items():
+            with self.subTest(header=header):
+                self.assertEqual(response.headers.get(header), value)
 
     @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
     def test_tbank_accepts_configured_bearer_secret(self):
