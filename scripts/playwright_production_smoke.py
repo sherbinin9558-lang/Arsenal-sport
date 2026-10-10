@@ -27,11 +27,9 @@ TARGETS = [
 
 
 def health_check():
+    """Record the non-browser health result without confusing Streamlit auth redirects with browser availability."""
     url = f"{BASE_URL}/_stcore/health"
     started = time.perf_counter()
-    # Do not follow redirects here: Streamlit Community Cloud can redirect a
-    # private app to its hosted authentication gateway, whose HTTP 200 login
-    # page can otherwise be mistaken for a healthy application.
     response = requests.get(url, timeout=60, allow_redirects=False)
     latency_ms = round((time.perf_counter() - started) * 1000)
     body = response.text.strip()
@@ -45,36 +43,63 @@ def health_check():
     (OUT / "health.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     location = result["location"]
     if response.status_code in (301, 302, 303, 307, 308) and "share.streamlit.io/-/auth/" in location:
-        raise RuntimeError(
-            "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud redirected the health "
-            "endpoint to its authentication gateway. The production app UI is not publicly "
-            f"reachable; configure app visibility or a dedicated E2E session. Details: {result}"
+        result["warning"] = (
+            "Non-browser health request was redirected to Streamlit's auth gateway. "
+            "This alone does not establish whether the app is public; continuing with real-browser checks."
         )
+        print(f"WARNING: {result['warning']}")
+        return
     if response.status_code != 200:
         raise RuntimeError(f"Production health endpoint returned HTTP {response.status_code}: {result}")
     if body.lower() != "ok":
         result["warning"] = (
             "Health endpoint did not return the expected plain-text 'ok'; "
-            "continuing only after confirming the homepage is not an auth-gateway redirect."
+            "continuing to the homepage and real-browser checks."
         )
         print(f"WARNING: {result['warning']}")
 
 
-
 def startup_http_probe():
-    """Capture raw production HTML before browser automation."""
+    """Capture a diagnostic homepage response; real-browser checks are authoritative for UI access."""
     url = BASE_URL
     started = time.perf_counter()
     result = {"url": url}
     try:
-        response = requests.get(url, timeout=60, headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"})
+        response = requests.get(
+            url,
+            timeout=60,
+            allow_redirects=False,
+            headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"},
+        )
         body = response.text[:20000]
-        result.update({"status": response.status_code, "latency_ms": round((time.perf_counter() - started) * 1000), "content_type": response.headers.get("content-type", ""), "server": response.headers.get("server", ""), "body_prefix": body, "streamlit_markers": {"has_streamlit": "streamlit" in body.lower(), "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")), "has_auth_email": "Email" in body, "has_auth_password": "Пароль" in body}})
+        result.update({
+            "status": response.status_code,
+            "location": response.headers.get("Location", ""),
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "content_type": response.headers.get("content-type", ""),
+            "server": response.headers.get("server", ""),
+            "body_prefix": body,
+            "streamlit_markers": {
+                "has_streamlit": "streamlit" in body.lower(),
+                "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")),
+                "has_auth_email": "Email" in body,
+                "has_auth_password": "Пароль" in body,
+            },
+        })
     except Exception as exc:
-        result.update({"status": 0, "latency_ms": round((time.perf_counter() - started) * 1000), "error": f"{type(exc).__name__}: {exc}"})
+        result.update({
+            "status": 0,
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "error": f"{type(exc).__name__}: {exc}",
+        })
     (OUT / "startup-http.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    location = result.get("location", "")
+    if result.get("status") in (301, 302, 303, 307, 308) and "share.streamlit.io/-/auth/" in location:
+        print("WARNING: Non-browser homepage request redirected to Streamlit auth gateway; browser matrix will determine UI access.")
+        return
     if result.get("status") != 200:
         raise RuntimeError(f"Production application HTTP probe failed: {result}")
+
 
 def browser_url():
     parts = urlsplit(BASE_URL)
