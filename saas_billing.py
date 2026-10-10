@@ -89,7 +89,7 @@ def set_auto_renew(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError(response.text)
+        raise RuntimeError("Не удалось изменить настройки автопродления в платёжной базе.")
     st.session_state["auto_renew"] = bool(enabled)
     return True
 
