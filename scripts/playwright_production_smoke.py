@@ -182,6 +182,21 @@ def run():
                 # the login controls belong to the top-level document.
                 _, email_frame_url = visible_label_locator(page, "Email", TIMEOUT_MS)
                 _, password_frame_url = visible_label_locator(page, "Пароль", 30000)
+                # Do not let an unrelated visible control or Streamlit's status-page
+                # embed produce a false positive. The rendered page must expose the
+                # actual app's login form in visible text as well as accessible controls.
+                rendered_text = visible_page_text(page)
+                if "Email" not in rendered_text or "Пароль" not in rendered_text:
+                    raise RuntimeError(
+                        "The browser found accessible login controls, but the rendered page "
+                        "does not contain the expected app login labels. This can indicate "
+                        "that only the Streamlit status-page embed loaded, not the application. "
+                        f"Rendered text prefix: {rendered_text[:1000]!r}"
+                    )
+                if "Status embed installed correctly" in rendered_text and "Email" not in rendered_text:
+                    raise RuntimeError(
+                        "Only the Streamlit status-page embed rendered; the app login UI is absent."
+                    )
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
                     "password_frame_url": password_frame_url,
