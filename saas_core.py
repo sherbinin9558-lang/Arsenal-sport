@@ -533,7 +533,35 @@ def login_ui():
     st.markdown(
         """
         <style>
-        /* Public SaaS shell: hide Streamlit/developer chrome from customers. */
+        /* Public SaaS shell: hide Streamlit/developer chrome and stale workspace sidebar. */
+        html body div[data-testid="stAppViewContainer"] section[data-testid="stSidebar"],
+        html body section[data-testid="stSidebar"],
+        html body [data-testid="stSidebarCollapsedControl"],
+        html body [data-testid="stSidebarCollapseButton"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            flex: 0 0 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            pointer-events: none !important;
+        }
+        html body div[data-testid="stAppViewContainer"] .main {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+        html body div[data-testid="stAppViewContainer"] .main .block-container {
+            width: 100% !important;
+            max-width: 1500px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
         #MainMenu,
         [data-testid="stToolbar"],
         [data-testid="stDecoration"],
