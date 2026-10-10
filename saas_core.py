@@ -103,7 +103,7 @@ def _read_refresh_token():
         pass
 
     probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 2)
+    st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 3)
 
     cookies = _auth_cookies()
     if cookies is not None:
@@ -1091,7 +1091,7 @@ def _auth_bootstrap_gate():
     # Streamlit rerun on a cold mobile connection. Keep the loading gate in
     # place for a few component cycles instead of briefly showing login and
     # then replacing it with the authenticated workspace.
-    if CookieController is not None and probes <= 3 and not st.session_state.get("saas_auth_error"):
+    if CookieController is not None and probes <= 2 and not st.session_state.get("saas_auth_error"):
         return None
     return False
 
