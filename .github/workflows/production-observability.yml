@@ -22,7 +22,8 @@ jobs:
       - run: python -m unittest tests.test_observability -v
       - name: Streamlit health endpoint
         if: ${{ vars.RUN_LIVE_HEALTHCHECK == 'true' }}
-        env: {SAAS_PUBLIC_URL: '${{ secrets.SAAS_PUBLIC_URL }}'}
+        env:
+          SAAS_PUBLIC_URL: ${{ vars.SAAS_PUBLIC_URL || secrets.SAAS_PUBLIC_URL || 'https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app' }}
         run: |
           python - <<'PY'
           import os, time, urllib.request
@@ -38,4 +39,11 @@ jobs:
           except urllib.error.HTTPError as e:
               raise RuntimeError(f'health endpoint returned HTTP {e.code}; Streamlit Cloud may redirect unauthenticated health probes') from e
           print('healthcheck latency_ms=',round((time.perf_counter()-started)*1000,1))
+          # Health alone is insufficient: confirm the homepage is the Streamlit app, not an unrelated embed/page.
+          with urllib.request.urlopen(base,timeout=30) as r:
+              homepage=r.read(500_000).decode('utf-8','replace').lower()
+              assert r.status==200, f'homepage HTTP {r.status}'
+              assert 'streamlit' in homepage, 'homepage HTML does not contain Streamlit markers'
+              assert 'statuspage.io/embed' not in homepage and 'status embed installed' not in homepage, 'homepage resolves to a Statuspage embed instead of the Streamlit app'
+          print('homepage_check=passed')
           PY
