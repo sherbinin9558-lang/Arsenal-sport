@@ -82,6 +82,18 @@ def run():
             for name, viewport in VIEWPORTS.items():
                 page = browser.new_page(viewport=viewport)
                 console_errors = []
+                http_errors = []
+                failed_requests = []
+                page.on("response", lambda response: http_errors.append({
+                    "status": response.status,
+                    "url": response.url,
+                    "resource_type": response.request.resource_type,
+                }) if response.status >= 400 else None)
+                page.on("requestfailed", lambda request: failed_requests.append({
+                    "url": request.url,
+                    "resource_type": request.resource_type,
+                    "failure": request.failure,
+                }))
                 page.on(
                     "console",
                     lambda msg: console_errors.append(msg.text)
@@ -132,8 +144,13 @@ def run():
                     if len(body_text.strip()) < 40:
                         raise RuntimeError("page rendered almost no text")
                     if console_errors:
+                        http_summary = " | ".join(
+                            f'HTTP {item["status"]} {item["resource_type"]}: {item["url"]}'
+                            for item in http_errors[:10]
+                        )
                         raise RuntimeError(
                             "browser console errors: " + " | ".join(console_errors[:5])
+                            + ("; HTTP details: " + http_summary if http_summary else "")
                         )
 
                     page.screenshot(path=str(artifact_dir / f"{name}.png"), full_page=True)
@@ -153,6 +170,8 @@ def run():
                         "title": page.title(),
                         "error": str(exc),
                         "console_errors": console_errors[:20],
+                        "http_errors": http_errors[:50],
+                        "failed_requests": failed_requests[:50],
                     }
                     try:
                         diagnostic["body_text"] = page.locator("body").inner_text(timeout=5000)[:12000]
