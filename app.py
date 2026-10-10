@@ -616,14 +616,23 @@ with st.sidebar:
     # Useful store snapshot stays near the top; account controls move below Telegram.
     render_sidebar_overview()
 
+    # Display the Telegram value saved for this tenant, never the platform-wide
+    # TELEGRAM_CHANNEL secret. A saved username is configuration, not proof that
+    # a bot/channel integration is connected.
     try:
-        tg_ch = st.secrets.get("TELEGRAM_CHANNEL", None)
-        if tg_ch:
-            st.success(f"📡 Telegram: @{tg_ch}")
+        _tenant_settings = data_load("settings", [])
+        _tenant_settings = (
+            _tenant_settings[0]
+            if _tenant_settings and isinstance(_tenant_settings[0], dict)
+            else {}
+        )
+        _tenant_telegram = str(_tenant_settings.get("telegram") or "").strip()
+        if _tenant_telegram:
+            st.info(f"📡 Telegram магазина: {_tenant_telegram}")
         else:
-            st.info("📡 Telegram не настроен")
+            st.info("📡 Telegram магазина не указан")
     except Exception:
-        st.info("📡 Telegram не настроен")
+        st.info("📡 Telegram магазина не указан")
 
     render_account_bar()
 
