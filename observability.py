@@ -16,6 +16,18 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info: payload['exception'] = {'type': record.exc_info[0].__name__, 'message': str(record.exc_info[1])}
         return json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
 
+def _read_sentry_dsn():
+    """Read Sentry DSN from process env or Streamlit Cloud secrets."""
+    dsn = os.getenv('SENTRY_DSN', '').strip()
+    if dsn:
+        return dsn
+    try:
+        import streamlit as st
+        return str(st.secrets.get('SENTRY_DSN', '') or '').strip()
+    except Exception:
+        # Streamlit secrets may be unavailable in local tests or non-Streamlit use.
+        return ''
+
 def configure_observability():
     global _CONFIGURED, _SENTRY
     if _CONFIGURED: return
@@ -24,7 +36,7 @@ def configure_observability():
     if not root.handlers:
         handler = logging.StreamHandler(sys.stdout); handler.setFormatter(JsonFormatter()); root.addHandler(handler)
     root.propagate = False
-    dsn = os.getenv('SENTRY_DSN','').strip()
+    dsn = _read_sentry_dsn()
     if dsn:
         try:
             import sentry_sdk
