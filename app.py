@@ -449,7 +449,7 @@ def render_platform_admin():
             "Подписка": sub.get("status","—"),
             "Создан": str(t.get("created_at",""))[:10],
         })
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.dataframe(rows, width="stretch", hide_index=True)
 
     if not tenants:
         st.info("Пока нет зарегистрированных магазинов.")
@@ -480,7 +480,7 @@ def render_platform_admin():
                                       key="platform_admin_sub_status")
         new_renew = st.toggle("Автопродление", value=current_renew, key="platform_admin_renew")
 
-    if st.button("Сохранить изменения", type="primary", use_container_width=True, key="platform_admin_save"):
+    if st.button("Сохранить изменения", type="primary", width="stretch", key="platform_admin_save"):
         try:
             platform_admin_set_tenant(tid, plan=new_plan, status=new_status)
             platform_admin_set_subscription(tid, plan=new_plan, status=new_sub_status, auto_renew=new_renew)
@@ -499,7 +499,7 @@ def render_platform_admin():
     st.write("**Администратор платформы:** определяется серверной конфигурацией.")
     st.write("**Безопасность:** секретные ключи и доступ к сервисной роли остаются вне интерфейса.")
     st.caption("Изменение системных секретов выполняется только в настройках окружения. Это предотвращает сохранение чувствительных данных в базе и в клиентском коде.")
-    if st.button("↻ Обновить данные админ-панели", key="platform_admin_refresh", use_container_width=True):
+    if st.button("↻ Обновить данные админ-панели", key="platform_admin_refresh", width="stretch"):
         st.rerun()
 
     st.markdown("---")
@@ -514,7 +514,7 @@ def render_platform_admin():
             "Подтверждён": "Да" if u.get("email_confirmed_at") else "Нет",
             "Создан": str(u.get("created_at",""))[:10],
         })
-    st.dataframe(account_rows, use_container_width=True, hide_index=True)
+    st.dataframe(account_rows, width="stretch", hide_index=True)
     st.caption("Вкладка доступна только владельцу платформы из SAAS_ADMIN_EMAIL. Service-role ключ нужен для загрузки и управления данными.")
 
 
@@ -594,7 +594,7 @@ with st.sidebar:
     )
 
     def _max_sidebar_launcher():
-        if st.button("⚡ Открыть MAX", use_container_width=True, type="primary", key="sidebar_max"):
+        if st.button("⚡ Открыть MAX", width="stretch", type="primary", key="sidebar_max"):
             st.session_state["open_max"] = True
             render_max()
 
@@ -731,7 +731,7 @@ st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobil
 
 # Mobile/tablet fallback: MAX remains reachable even if the native sidebar drawer is closed.
 with st.container(key="mobile_max_launcher"):
-    if st.button("⚡ Открыть MAX", type="primary", use_container_width=True, key="main_mobile_max"):
+    if st.button("⚡ Открыть MAX", type="primary", width="stretch", key="main_mobile_max"):
         st.session_state["open_max"] = True
         render_max()
 
@@ -1031,7 +1031,7 @@ if tab3.open:
         if st.button(
             "✨ Сгенерировать тексты",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="generate_texts_btn"
         ):
             p = products[idx]
@@ -1743,7 +1743,7 @@ if tab8.open:
     st.subheader("Instagram automation")
     st.caption("Очередь публикаций: генерация и подготовка безопасны; фактическая публикация требует подключённого API и отдельного подтверждения.")
     iq = instagram_queue()
-    if iq: st.dataframe(iq[:20], use_container_width=True, hide_index=True)
+    if iq: st.dataframe(iq[:20], width="stretch", hide_index=True)
     else: st.info("Очередь Instagram пока пуста.")
 
 # ========== 9: ПРАВОВАЯ ИНФОРМАЦИЯ ==========
