@@ -167,6 +167,33 @@ def run():
                 item["initial_url"] = page.url
                 item["title"] = page.title()
                 item["body_prefix"] = visible_page_text(page)
+                # Record browser navigation timing for the outer page and any
+                # Streamlit app iframe. This separates shell/network delay from
+                # the time required for the embedded app to become interactive.
+                frame_timings = []
+                for frame in page.frames:
+                    try:
+                        timing = frame.evaluate("""() => {
+                            const n = performance.getEntriesByType('navigation')[0];
+                            if (!n) return null;
+                            const ms = (v) => Number.isFinite(v) ? Math.round(v) : null;
+                            return {
+                                response_start_ms: ms(n.responseStart),
+                                dom_interactive_ms: ms(n.domInteractive),
+                                dom_content_loaded_ms: ms(n.domContentLoadedEventEnd),
+                                load_event_end_ms: ms(n.loadEventEnd),
+                                dom_complete_ms: ms(n.domComplete)
+                            };
+                        }""")
+                        if timing:
+                            frame_timings.append({
+                                "url": frame.url,
+                                "name": frame.name,
+                                **timing,
+                            })
+                    except Exception:
+                        continue
+                item["frame_navigation_timings"] = frame_timings
                 item["frames"] = [
                     {"url": frame.url, "name": frame.name}
                     for frame in page.frames
