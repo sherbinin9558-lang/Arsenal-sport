@@ -171,7 +171,10 @@ def refresh_session(refresh_token):
     return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
 
 def _establish_session(result):
-    token = result.get("access_token")
+    # A successful explicit login/signup starts a fresh auth lifecycle.
+    st.session_state.pop("_saas_logout_completed", None)
+    st.session_state.pop("_saas_cookie_restore_failed", None)
+    token = result.get("access_token)
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
     user = result.get("user") or get_user(token)
@@ -385,6 +388,11 @@ def sign_out(token):
     try: _request("POST","/auth/v1/logout",token=token)
     except Exception: pass
     _clear_refresh_token()
+    # Do not let a stale request-cookie/component snapshot re-authenticate the
+    # same Streamlit session immediately after the user explicitly logs out.
+    st.session_state["_saas_logout_completed"] = True
+    st.session_state.pop("_saas_cookie_probe_count", None)
+    st.session_state.pop("_saas_cookie_restore_failed", None)
     try:
         from observability import security_event
         security_event("logout", user_id=st.session_state.get("saas_user_id"))
@@ -1076,6 +1084,9 @@ def _auth_bootstrap_gate():
     """
     if st.session_state.get("saas_access_token"):
         return True
+    # Explicit logout wins over any stale browser-cookie snapshot for this run.
+    if st.session_state.get("_saas_logout_completed"):
+        return False
     if st.session_state.get("_saas_cookie_restore_failed"):
         st.session_state.pop("saas_auth_error", None)
         return False
