@@ -42,6 +42,24 @@ class SupabaseRequestError(RuntimeError):
         super().__init__(message)
         self.status_code = status_code
 
+def _safe_supabase_error(status_code):
+    """Return a stable user-facing message without exposing PostgREST/Auth bodies."""
+    messages = {
+        400: "Запрос к Supabase содержит недопустимые данные.",
+        401: "Сессия недействительна. Войдите в аккаунт повторно.",
+        403: "Недостаточно прав для выполнения операции.",
+        404: "Запрашиваемый ресурс не найден.",
+        409: "Данные изменились в другой сессии. Обновите страницу и повторите действие.",
+        422: "Supabase отклонил данные запроса.",
+        429: "Слишком много запросов. Повторите попытку позже.",
+    }
+    if status_code in messages:
+        return messages[status_code]
+    if status_code and status_code >= 500:
+        return "Сервис данных временно недоступен. Повторите попытку позже."
+    return "Не удалось выполнить запрос к Supabase."
+
+
 
 def _request(method,path,token=None,**kwargs):
     url, _ = _supabase_config()
@@ -54,10 +72,7 @@ def _request(method,path,token=None,**kwargs):
     try: data=r.json()
     except Exception: data={"message":r.text}
     if not r.ok:
-        raise SupabaseRequestError(
-            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
-            r.status_code,
-        )
+        raise SupabaseRequestError(_safe_supabase_error(r.status_code), r.status_code)
     return data
 
 
@@ -421,7 +436,7 @@ def _rest_get_paged(path, token, params=None):
         data = {"message": response.text}
     if not response.ok:
         raise SupabaseRequestError(
-            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
+            _safe_supabase_error(response.status_code),
             response.status_code,
         )
     total = None
