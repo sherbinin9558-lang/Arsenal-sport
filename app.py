@@ -538,6 +538,33 @@ font-weight:900!important;
 """, unsafe_allow_html=True)
 
 if not require_saas_access():
+    # Clear the authenticated workspace layout after logout. The workspace CSS
+    # forces the sidebar open on desktop; without this override the login page
+    # can inherit an empty 280px sidebar from the previous authenticated run.
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        pointer-events: none !important;
+    }
+    [data-testid="stAppViewContainer"] .main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    [data-testid="stAppViewContainer"] .main .block-container {
+        width: 100% !important;
+        max-width: 1500px !important;
+        margin: 0 auto !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     st.stop()
 
 mount_webmcp_tools()
