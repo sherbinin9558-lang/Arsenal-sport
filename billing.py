@@ -12,6 +12,7 @@ The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
 """
 import os, time, uuid, requests
+from urllib.parse import quote
 import streamlit as st
 
 PLANS = {
@@ -152,4 +153,28 @@ def get_payment(payment_id):
     except Exception: data={"description":r.text}
     if not r.ok:
         raise RuntimeError(data.get("description") or data.get("message") or str(data))
+    return data
+
+
+def get_refund(refund_id):
+    """Fetch a refund from YooKassa; never trust a webhook's refund status alone."""
+    if not configured():
+        raise RuntimeError("ЮKassa не настроена.")
+    refund_id = str(refund_id or "").strip()
+    if not refund_id:
+        raise ValueError("Идентификатор возврата обязателен.")
+    safe_id = quote(refund_id, safe="")
+    response = requests.get(
+        f"https://api.yookassa.ru/v3/refunds/{safe_id}",
+        auth=(SHOP_ID, SECRET_KEY),
+        timeout=20,
+    )
+    if not response.ok:
+        raise RuntimeError("Не удалось проверить состояние возврата в ЮKassa.")
+    try:
+        data = response.json()
+    except Exception as exc:
+        raise RuntimeError("ЮKassa вернула некорректный ответ по возврату.") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("ЮKassa вернула некорректный ответ по возврату.")
     return data

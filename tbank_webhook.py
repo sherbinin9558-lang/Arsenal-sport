@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
 
 from tbank_billing import get_state, _token
-from billing import get_payment
+from billing import get_payment, get_refund
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
 
@@ -286,29 +286,47 @@ async def payment_status(request: Request):
 
 @app.post("/webhooks/yookassa")
 async def yookassa_payment_status(request: Request):
-    if not _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET"):
-        raise HTTPException(status_code=401, detail="Webhook authentication required")
+    # Standard YooKassa HTTP notifications do not provide a configurable shared
+    # Bearer header. If our optional extra secret is supplied, validate it;
+    # otherwise authenticate by fetching the payment/refund from YooKassa.
+    _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET")
     body = await _read_body(request)
-    event = str(body.get("event") or "").lower()
-    obj = body.get("object") or {}
+    event = str(body.get("event") or "").strip().lower()
+    obj = body.get("object")
+    if not isinstance(obj, dict):
+        raise HTTPException(status_code=400, detail="Invalid notification object")
+    if not (event.startswith("payment.") or event.startswith("refund.")):
+        raise HTTPException(status_code=400, detail="Unsupported notification event")
 
-    # Refund notifications contain the refund id in object.id and the original
-    # payment id in object.payment_id. Never treat the refund id as a payment id.
     is_refund = event.startswith("refund.")
-    payment_id = str((obj.get("payment_id") if is_refund else obj.get("id")) or "")
-    if not payment_id:
-        raise HTTPException(status_code=400, detail="Payment id is required")
-
-    # Query YooKassa directly so the webhook body cannot forge payment state.
-    payment = get_payment(payment_id)
-    provider_status = str(payment.get("status") or "").lower()
     if is_refund:
-        if event == "refund.succeeded":
+        refund_id = str(obj.get("id") or "").strip()
+        payment_id = str(obj.get("payment_id") or "").strip()
+        if not refund_id or not payment_id:
+            raise HTTPException(status_code=400, detail="Refund and payment ids are required")
+        # A refund notification is not authoritative by itself. Fetch the refund
+        # from YooKassa and bind it to the original payment before changing access.
+        refund = get_refund(refund_id)
+        if str(refund.get("payment_id") or "") != payment_id:
+            raise HTTPException(status_code=400, detail="Refund/payment mismatch")
+        refund_status = str(refund.get("status") or "").lower()
+        if refund_status == "succeeded":
             status = "refunded"
+        elif refund_status == "canceled":
+            status = "refund_canceled"
         else:
             status = "refund_pending"
+        payment = get_payment(payment_id)
+        provider_status = str(payment.get("status") or "").lower()
     else:
+        payment_id = str(obj.get("id") or "").strip()
+        if not payment_id:
+            raise HTTPException(status_code=400, detail="Payment id is required")
+        # Verify current payment status directly; do not trust status in the body.
+        payment = get_payment(payment_id)
+        provider_status = str(payment.get("status") or "").lower()
         status = provider_status
+        refund_id = ""
 
     checkout = _checkout_by_provider_payment("yookassa", payment_id)
     if not checkout:
@@ -321,7 +339,9 @@ async def yookassa_payment_status(request: Request):
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
-    event_key = f"yookassa:{event or 'payment.status'}:{payment_id}:{status}"
+    # Include refund id so two distinct refunds for one payment do not collide.
+    event_object_id = refund_id if is_refund else payment_id
+    event_key = f"yookassa:{event}:{event_object_id}:{status}"
 
     try:
         result = _process_billing_event(

@@ -102,8 +102,8 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(result["yookassa"], "disabled")
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
-    def test_yookassa_requires_configured_bearer(self):
-        request = self._request(headers={})
+    def test_yookassa_rejects_wrong_optional_bearer(self):
+        request = self._request(headers={"authorization": "Bearer wrong-secret"})
         with self.assertRaises(Exception) as ctx:
             asyncio.run(tbank_webhook.yookassa_payment_status(request))
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
@@ -141,6 +141,7 @@ class WebhookSecurityTests(unittest.TestCase):
             "object": {"id": "refund-1", "payment_id": "payment-1"},
         }
         with patch.object(tbank_webhook, "_read_body", return_value=body), \
+             patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
              patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-1", "plan": "starter"
