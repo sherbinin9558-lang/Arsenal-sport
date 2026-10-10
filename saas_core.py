@@ -533,7 +533,22 @@ def login_ui():
     st.markdown(
         """
         <style>
-        /* Public SaaS shell: hide Streamlit/developer chrome from customers. */
+        /* Public SaaS shell: hide Streamlit/developer chrome and the inherited workspace drawer. */
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarCollapseButton"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            pointer-events: none !important;
+        }
+        [data-testid="stAppViewContainer"] .main {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
         #MainMenu,
         [data-testid="stToolbar"],
         [data-testid="stDecoration"],
@@ -704,10 +719,8 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Keep the public login screen free of synchronous network probes.
+    # Authentication itself reports actionable errors when the user submits the form.
 
     st.markdown(
         '<div class="public-shell">'
@@ -719,7 +732,7 @@ def login_ui():
         '<div class="public-hero">'
         '<div class="public-hero-kicker">ЕДИНЫЙ РАБОЧИЙ ЦЕНТР</div>'
         '<div class="public-hero-title">Ваш магазин. Один рабочий центр.</div>'
-        '<div class="public-hero-text">Каталог, контент, заявки, заказы и AI-помощник MAX — в одном месте.</div>'
+        '<div class="public-hero-text">Каталог, контент, заявки, заказы и AI-помощник «Вектор» — в одном месте.</div>'
         '</div></div>',
         unsafe_allow_html=True,
     )
@@ -742,7 +755,7 @@ def login_ui():
                     st.error(f"Не удалось войти: {e}")
 
     with tab2:
-        st.caption("Стартовая настройка занимает около минуты. После регистрации MAX поможет заполнить магазин.")
+        st.caption("Стартовая настройка занимает около минуты. После регистрации «Вектор» поможет заполнить магазин.")
         store = st.text_input("Название магазина", placeholder="Например, Demo Store", key="saas_signup_store")
         email = st.text_input("Email владельца", placeholder="you@example.com", key="saas_signup_email")
         password = st.text_input("Пароль", type="password", placeholder="Минимум 8 символов", key="saas_signup_password")
@@ -898,7 +911,7 @@ def render_sidebar_overview():
             f'<div><b>{quick.get("orders", 0)}</b><span>заказов</span></div>'
             f'<div><b>{quick.get("content", 0)}</b><span>контент</span></div>'
             '</div>'
-            '<div class="sidebar-quick-note">MAX помогает найти следующий полезный шаг.</div>'
+            '<div class="sidebar-quick-note">«Вектор» помогает найти следующий полезный шаг.</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -1074,7 +1087,7 @@ def onboarding_complete():
     return bool(_session_cached_value("_saas_onboarding_cache", cache_key, 15, load_onboarding))
 
 def render_onboarding():
-    st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">QUICK START</div><div class="dashboard-hero-title">Настроим магазин за 60 секунд</div><div class="dashboard-hero-text">Эти данные нужны MAX, чтобы писать контент, отвечать клиентам и подсказывать следующие действия. Их можно изменить позже.</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="dashboard-hero"><div class="dashboard-hero-kicker">QUICK START</div><div class="dashboard-hero-title">Настроим магазин за 60 секунд</div><div class="dashboard-hero-text">Эти данные нужны «Вектору», чтобы писать контент, отвечать клиентам и подсказывать следующие действия. Их можно изменить позже.</div></div>',unsafe_allow_html=True)
     with st.form("saas_onboarding_form"):
         business=st.selectbox("Что продаёте?",["Спортивный магазин","Одежда и обувь","Интернет-магазин","Другое"],key="onb_business")
         city=st.text_input("Город / регион",placeholder="Краснодарский край",key="onb_city")
@@ -1083,7 +1096,7 @@ def render_onboarding():
         shipping=st.selectbox("Доставка",["По России","По региону","Самовывоз","Другое"],key="onb_shipping")
         goal=st.selectbox("Главная цель",["Больше продаж","Больше заявок","Регулярный контент","Порядок в каталоге"],key="onb_goal")
         positioning=st.text_area("Чем магазин отличается?",placeholder="Например: большой выбор футбольной экипировки и быстрая доставка.",height=90,key="onb_positioning")
-        submitted=st.form_submit_button("Сохранить и открыть MAX",type="primary",use_container_width=True)
+        submitted=st.form_submit_button("Сохранить и открыть «Вектор»",type="primary",use_container_width=True)
     if submitted:
         try:
             onboarding_payload={"business_type":business,"city":city.strip(),"telegram":telegram.strip(),"instagram":instagram.strip(),"shipping":shipping,"goal":goal,"positioning":positioning.strip(),"onboarding_complete":True}
@@ -1091,7 +1104,7 @@ def render_onboarding():
             if existing and isinstance(existing[0],dict) and existing[0].get("_saas_record_id"):
                 onboarding_payload["_saas_record_id"]=existing[0]["_saas_record_id"]
             data_save("settings",[onboarding_payload])
-            st.session_state["saas_onboarding_complete"]=True; st.success("Магазин настроен. MAX готов к работе."); st.rerun()
+            st.session_state["saas_onboarding_complete"]=True; st.success("Магазин настроен. «Вектор» готов к работе."); st.rerun()
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
