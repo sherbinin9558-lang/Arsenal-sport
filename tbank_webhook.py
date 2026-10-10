@@ -166,13 +166,29 @@ def _verify_yookassa_payment_amount(payment, checkout):
         raise HTTPException(status_code=422, detail="Checkout currency verification failed")
 
 
+
+def _verify_tbank_payment_amount(payment, checkout):
+    """T-Bank reports Amount in kopecks; compare it to the server-side RUB checkout."""
+    try:
+        expected_rub = Decimal(str(checkout.get("expected_amount")))
+        actual_kopecks = Decimal(str(payment.get("Amount")))
+        expected_currency = str(checkout.get("expected_currency") or "").upper()
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if (not expected_rub.is_finite() or not actual_kopecks.is_finite()
+            or expected_rub <= 0 or expected_rub * 100 != actual_kopecks):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if expected_currency != "RUB":
+        raise HTTPException(status_code=422, detail="Checkout currency verification failed")
+
+
 def _checkout_by_payment(payment_id):
     url, _ = _supabase()
     rows = requests.get(
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": "eq.tbank",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -280,6 +296,8 @@ async def payment_status(request: Request):
 
     state = get_state(payment_id)
     status = str(state.get("Status") or "").upper()
+    if status == "CONFIRMED":
+        _verify_tbank_payment_amount(state, checkout)
     plan = str(checkout.get("plan") or "").lower()
     tenant = str(checkout.get("tenant_id") or "")
 
