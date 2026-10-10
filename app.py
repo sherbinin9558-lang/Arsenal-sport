@@ -538,6 +538,33 @@ font-weight:900!important;
 """, unsafe_allow_html=True)
 
 if not require_saas_access():
+    # Clear the authenticated workspace layout after logout. The workspace CSS
+    # forces the sidebar open on desktop; without this override the login page
+    # can inherit an empty 280px sidebar from the previous authenticated run.
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        pointer-events: none !important;
+    }
+    [data-testid="stAppViewContainer"] .main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    [data-testid="stAppViewContainer"] .main .block-container {
+        width: 100% !important;
+        max-width: 1500px !important;
+        margin: 0 auto !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     st.stop()
 
 mount_webmcp_tools()
@@ -585,16 +612,16 @@ except Exception as e:
 
 
 with st.sidebar:
-    # MAX is intentionally the first high-visibility action.
+    # The AI assistant is intentionally the first high-visibility action.
     st.markdown(
         '<div class="sidebar-max"><div class="sidebar-max-kicker">AI AGENT CONTENT MANAGER</div>'
-        '<div class="sidebar-max-title">⚡ MAX</div>'
+        '<div class="sidebar-max-title">⚡ ВЕКТОР</div>'
         '<div class="sidebar-max-text">Центр управления магазином</div></div>',
         unsafe_allow_html=True,
     )
 
     def _max_sidebar_launcher():
-        if st.button("⚡ Открыть MAX", width="stretch", type="primary", key="sidebar_max"):
+        if st.button("⚡ Открыть Вектор", width="stretch", type="primary", key="sidebar_max"):
             st.session_state["open_max"] = True
             render_max()
 
@@ -606,7 +633,7 @@ with st.sidebar:
         '<div class="sidebar-brand-kicker">AI AGENT</div>'
         '<div class="sidebar-brand-title">Content Manager</div>'
         '<div class="sidebar-brand-line"></div>'
-        '<div class="sidebar-brand-version">CONTENT STUDIO · v2.7 MAX</div>'
+        '<div class="sidebar-brand-version">CONTENT STUDIO · AI ВЕКТОР</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -685,16 +712,16 @@ st.markdown(
 /* 2) Native sidebar: stable width on desktop, compact drawer on touch devices. */
 section[data-testid="stSidebar"]{display:block!important;visibility:visible!important;opacity:1!important;background:#fff!important;border-right:1px solid #e4e7ec!important;}
 @media (min-width:769px){section[data-testid="stSidebar"]{width:280px!important;min-width:280px!important;max-width:280px!important;}section[data-testid="stSidebar"]>div:first-child{width:280px!important;max-width:280px!important;}}
-/* 3) Sidebar MAX. */
+/* 3) Sidebar AI assistant. */
 button[key="sidebar_max"]{background:linear-gradient(135deg,#b8ff00,#7cff00)!important;color:#101500!important;border:1px solid #d7ff72!important;box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.42)!important;font-weight:900!important;letter-spacing:.01em!important;} button[key="sidebar_max"]:hover{transform:translateY(-1px)!important;box-shadow:0 0 0 1px rgba(184,255,0,.75),0 0 24px rgba(184,255,0,.58)!important;}
-/* 4) Mobile/tablet MAX: normal document flow; never fixed/sticky. */
+/* 4) Mobile/tablet assistant: normal document flow; never fixed/sticky. */
 .st-key-mobile_max_launcher{display:none!important;}.st-key-mobile_max_launcher button{width:100%!important;min-height:48px!important;border-radius:12px!important;background:linear-gradient(135deg,#7cff00,#b8ff00)!important;color:#101500!important;border:1px solid #d7ff72!important;font-weight:900!important;box-shadow:0 0 0 1px rgba(184,255,0,.35),0 0 12px rgba(184,255,0,.24)!important;}.ai-workspace-label{margin:0 0 10px;padding:0 2px;font-size:.76rem;font-weight:800;letter-spacing:.02em;color:#697386;}
 @media (max-width:1100px){.st-key-mobile_max_launcher{display:block!important;width:100%!important;margin:0 0 10px!important;}.st-key-mobile_max_launcher button{width:100%!important;min-height:48px!important;touch-action:manipulation!important;}}
 /* Main layout. */
 .block-container{width:100%!important;max-width:1500px!important;margin:0 auto!important;padding-left:clamp(.75rem,2.5vw,2.5rem)!important;padding-right:clamp(.75rem,2.5vw,2.5rem)!important;}
 .main-title{font-size:2.05rem;font-weight:900;color:#24124f;text-align:left;margin:18px 0 12px;letter-spacing:.01em;text-shadow:0 0 10px rgba(91,70,214,.18);}
 .mobile-nav-hint{display:none;color:#7a8494;font-size:.74rem;margin:4px 0 8px;}html,body{overflow-x:hidden!important;}
-/* MAX dialog. */
+/* AI assistant dialog. */
 div[data-testid="stDialog"]{display:flex!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:auto!important;}
 div[data-testid="stDialog"]>div,div[data-testid="stDialog"] [role="dialog"],div[role="dialog"]{visibility:visible!important;opacity:1!important;pointer-events:auto!important;}
 div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:relative!important;z-index:2147483647!important;background:linear-gradient(180deg,#ffffff 0%,#f8f9fc 100%)!important;color:#17151c!important;border:1px solid #d9ddea!important;border-radius:22px!important;box-shadow:0 28px 90px rgba(12,16,28,.34),0 0 0 1px rgba(91,92,226,.06)!important;max-height:90vh!important;overflow:auto!important;} div[data-testid="stDialog"] [role="dialog"] *{visibility:visible!important;}
@@ -729,9 +756,9 @@ st.markdown('<div class="ai-workspace-label">AI-помощник магазин�
 
 st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
-# Mobile/tablet fallback: MAX remains reachable even if the native sidebar drawer is closed.
+# Mobile/tablet fallback: the AI assistant remains reachable if the native sidebar drawer is closed.
 with st.container(key="mobile_max_launcher"):
-    if st.button("⚡ Открыть MAX", type="primary", width="stretch", key="main_mobile_max"):
+    if st.button("⚡ Открыть Вектор", type="primary", width="stretch", key="main_mobile_max"):
         st.session_state["open_max"] = True
         render_max()
 
