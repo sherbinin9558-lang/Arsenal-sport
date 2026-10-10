@@ -12,6 +12,50 @@ VIEWPORTS = {
 }
 
 
+def find_visible_text(page, text, timeout_ms=60000):
+    """Find text in the top-level document or any Streamlit app iframe."""
+    import time
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        for frame in list(page.frames):
+            try:
+                locator = frame.get_by_text(text, exact=False).first
+                if locator.count() and locator.is_visible():
+                    return locator, frame
+            except Exception:
+                continue
+        page.wait_for_timeout(250)
+    raise RuntimeError(f"Visible text {text!r} not found in page or attached frames within {timeout_ms} ms")
+
+
+def find_visible_label(page, label, timeout_ms=30000):
+    """Find a labelled control in the top-level document or an app iframe."""
+    import time
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        for frame in list(page.frames):
+            try:
+                locator = frame.get_by_label(label, exact=True).first
+                if locator.count() and locator.is_visible():
+                    return locator, frame
+            except Exception:
+                continue
+        page.wait_for_timeout(250)
+    raise RuntimeError(f"Visible label {label!r} not found in page or attached frames within {timeout_ms} ms")
+
+
+def visible_text_all_frames(page):
+    chunks = []
+    for frame in page.frames:
+        try:
+            value = frame.locator("body").inner_text(timeout=3000).strip()
+            if value:
+                chunks.append(value)
+        except Exception:
+            continue
+    return "\\n".join(chunks)
+
+
 def run():
     url = os.getenv("SAAS_PUBLIC_URL", "").strip()
     email = os.getenv("E2E_EMAIL", "").strip()
@@ -59,26 +103,22 @@ def run():
                         raise RuntimeError(
                             f"PRODUCTION_HTTP_ERROR: initial document returned HTTP {response.status}"
                         )
-                    page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
-                        state="visible", timeout=60000
-                    )
-                    email_field = page.get_by_label("Email", exact=True).first
-                    password_field = page.get_by_label("Пароль", exact=True).first
-                    email_field.wait_for(state="visible", timeout=30000)
-                    password_field.wait_for(state="visible", timeout=30000)
+                    find_visible_text(page, "Ваш магазин. Один рабочий центр.", timeout_ms=60000)
+                    email_field, app_frame = find_visible_label(page, "Email", timeout_ms=30000)
+                    password_field, password_frame = find_visible_label(page, "Пароль", timeout_ms=30000)
 
                     mode = "public-login"
                     if authenticated:
                         email_field.fill(email)
                         password_field.fill(password)
-                        login = page.locator("button:visible").filter(has_text="Войти").last
+                        login = app_frame.locator("button:visible").filter(has_text="Войти").last
                         login.wait_for(state="visible", timeout=10000)
                         login.click()
                         password_field.wait_for(state="hidden", timeout=45000)
                         page.wait_for_timeout(1000)
                         mode = "authenticated"
 
-                    body_text = page.locator("body").inner_text(timeout=10000)
+                    body_text = visible_text_all_frames(page)
                     horizontal_overflow = page.evaluate(
                         "() => document.documentElement.scrollWidth > window.innerWidth + 2"
                     )
