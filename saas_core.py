@@ -998,7 +998,11 @@ def current_role(token=None):
 def team_members():
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token: return [{"user_id":st.session_state.get("saas_user_id","demo-user"),"role":"owner"}]
-    return _rest_get("/rest/v1/memberships",token,params={"select":"user_id,role,created_at","tenant_id":f"eq.{tenant_id()}","order":"created_at.asc"})
+    cache_key = f"{st.session_state.get('saas_user_id', '')}:{tenant_id()}"
+    return _session_cached_value(
+        "_saas_team_members_cache", cache_key, 5,
+        lambda: _rest_get("/rest/v1/memberships",token,params={"select":"user_id,role,created_at","tenant_id":f"eq.{tenant_id()}","order":"created_at.asc"}),
+    )
 
 def my_invitations():
     token=st.session_state.get("saas_access_token")
@@ -1012,12 +1016,20 @@ def my_invitations():
 def accept_invitation(invite_id):
     token=st.session_state.get("saas_access_token")
     if not token: raise RuntimeError("Нужно войти в аккаунт.")
-    return _request("POST","/rest/v1/rpc/accept_invitation",token=token,json={"invite_id":invite_id})
+    result = _request("POST","/rest/v1/rpc/accept_invitation",token=token,json={"invite_id":invite_id})
+    st.session_state.pop("_saas_team_invitations_cache", None)
+    st.session_state.pop("_saas_invitations_cache", None)
+    st.session_state.pop("_saas_team_members_cache", None)
+    return result
 
 def team_invitations():
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token: return []
-    return _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,created_at,expires_at","tenant_id":f"eq.{tenant_id()}","status":"eq.pending","order":"created_at.desc"})
+    cache_key = f"{st.session_state.get('saas_user_id', '')}:{tenant_id()}"
+    return _session_cached_value(
+        "_saas_team_invitations_cache", cache_key, 5,
+        lambda: _rest_get("/rest/v1/invitations",token,params={"select":"id,email,role,status,created_at,expires_at","tenant_id":f"eq.{tenant_id()}","status":"eq.pending","order":"created_at.desc"}),
+    )
 
 def can(action):
     role=current_role()
@@ -1031,8 +1043,11 @@ def set_member_role(target_user,new_role):
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token: return False
     if not can("manage_roles"): raise PermissionError("Только владелец или администратор может менять роли.")
-    if new_role not in ("admin","manager","editor","viewer"): raise ValueError("Недопустимая роль.")
-    return _request("POST","/rest/v1/rpc/set_member_role",token=token,json={"target_tenant":tenant_id(),"target_user":target_user,"new_role":new_role})
+    if new_role not in ("admin","manager","manager","editor","viewer"): raise ValueError("Недопустимая роль.")
+    result = _request("POST","/rest/v1/rpc/set_member_role",token=token,json={"target_tenant":tenant_id(),"target_user":target_user,"new_role":new_role})
+    st.session_state.pop("_saas_team_members_cache", None)
+    st.session_state.pop("_saas_role_cache", None)
+    return result
 
 def create_team_invitation(email,role):
     token=st.session_state.get("saas_access_token")
@@ -1543,6 +1558,8 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_saas_data_page_cache", None)
     st.session_state.pop("_saas_usage_snapshot_cache", None)
     st.session_state.pop("_saas_onboarding_cache", None)
+    st.session_state.pop("_saas_team_members_cache", None)
+    st.session_state.pop("_saas_team_invitations_cache", None)
     # WebMCP data is a derived snapshot of settings, products and content plan.
     # Clear it after successful writes so the next rerun publishes fresh data.
     st.session_state.pop("_webmcp_data_cache", None)
