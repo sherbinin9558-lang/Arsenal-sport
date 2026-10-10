@@ -177,7 +177,7 @@ def run():
                         and "incident or maintenance" in item["body_prefix"]
                     )
                 )
-                if statuspage_detected:
+                if statuspage_detected and ("Email" not in item["body_prefix"] or "Пароль" not in item["body_prefix"]):
                     raise RuntimeError(
                         "PRODUCTION_STATUSPAGE_INTERSTITIAL: the browser rendered the Statuspage "
                         "embed instead of the application login UI. This is a hosting/deployment/"
