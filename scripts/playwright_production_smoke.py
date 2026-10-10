@@ -27,46 +27,79 @@ TARGETS = [
 
 
 def health_check():
+    """Record the non-browser health result without confusing Streamlit auth redirects with browser availability."""
     url = f"{BASE_URL}/_stcore/health"
     started = time.perf_counter()
-    response = requests.get(url, timeout=60)
+    response = requests.get(url, timeout=60, allow_redirects=False)
     latency_ms = round((time.perf_counter() - started) * 1000)
     body = response.text.strip()
     result = {
         "url": url,
         "status": response.status_code,
+        "location": response.headers.get("Location", ""),
         "body": body[:500],
         "latency_ms": latency_ms,
     }
     (OUT / "health.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    # Streamlit Cloud may serve the SPA shell for this internal endpoint.
-    # Do not abort browser acceptance solely because the endpoint returns HTML;
-    # the homepage probe and real browser matrix below determine app availability.
+    location = result["location"]
+    if response.status_code in (301, 302, 303, 307, 308) and "share.streamlit.io/-/auth/" in location:
+        result["warning"] = (
+            "Non-browser health request was redirected to Streamlit's auth gateway. "
+            "This alone does not establish whether the app is public; continuing with real-browser checks."
+        )
+        print(f"WARNING: {result['warning']}")
+        return
     if response.status_code != 200:
         raise RuntimeError(f"Production health endpoint returned HTTP {response.status_code}: {result}")
-    if body != "ok":
+    if body.lower() != "ok":
         result["warning"] = (
             "Health endpoint did not return the expected plain-text 'ok'; "
-            "continuing with homepage and browser checks."
+            "continuing to the homepage and real-browser checks."
         )
         print(f"WARNING: {result['warning']}")
 
 
-
 def startup_http_probe():
-    """Capture raw production HTML before browser automation."""
+    """Capture a diagnostic homepage response; real-browser checks are authoritative for UI access."""
     url = BASE_URL
     started = time.perf_counter()
     result = {"url": url}
     try:
-        response = requests.get(url, timeout=60, headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"})
+        response = requests.get(
+            url,
+            timeout=60,
+            allow_redirects=False,
+            headers={"User-Agent": "AI-Agent-Content-Manager-Production-Smoke/1.0"},
+        )
         body = response.text[:20000]
-        result.update({"status": response.status_code, "latency_ms": round((time.perf_counter() - started) * 1000), "content_type": response.headers.get("content-type", ""), "server": response.headers.get("server", ""), "body_prefix": body, "streamlit_markers": {"has_streamlit": "streamlit" in body.lower(), "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")), "has_auth_email": "Email" in body, "has_auth_password": "Пароль" in body}})
+        result.update({
+            "status": response.status_code,
+            "location": response.headers.get("Location", ""),
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "content_type": response.headers.get("content-type", ""),
+            "server": response.headers.get("server", ""),
+            "body_prefix": body,
+            "streamlit_markers": {
+                "has_streamlit": "streamlit" in body.lower(),
+                "has_error": any(x in body.lower() for x in ("exception", "traceback", "error")),
+                "has_auth_email": "Email" in body,
+                "has_auth_password": "Пароль" in body,
+            },
+        })
     except Exception as exc:
-        result.update({"status": 0, "latency_ms": round((time.perf_counter() - started) * 1000), "error": f"{type(exc).__name__}: {exc}"})
+        result.update({
+            "status": 0,
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "error": f"{type(exc).__name__}: {exc}",
+        })
     (OUT / "startup-http.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    location = result.get("location", "")
+    if result.get("status") in (301, 302, 303, 307, 308) and "share.streamlit.io/-/auth/" in location:
+        print("WARNING: Non-browser homepage request redirected to Streamlit auth gateway; browser matrix will determine UI access.")
+        return
     if result.get("status") != 200:
         raise RuntimeError(f"Production application HTTP probe failed: {result}")
+
 
 def browser_url():
     parts = urlsplit(BASE_URL)
@@ -144,11 +177,45 @@ def run():
                     "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
                     "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
                 }
+                # A successful accessible-label lookup alone is insufficient: a
+                # status-page embed can expose unrelated accessible controls while
+                # the actual Streamlit app never renders. Require the expected login
+                # labels in the visible body text before reporting browser acceptance.
+                if (
+                    "Status embed installed correctly" in item["body_prefix"]
+                    and not item["content_markers"]["has_email"]
+                    and not item["content_markers"]["has_password"]
+                ):
+                    raise RuntimeError(
+                        "Only the Streamlit status-page embed rendered; the application UI and "
+                        "login form are absent. Browser acceptance must fail."
+                    )
+                if not item["content_markers"]["has_email"] or not item["content_markers"]["has_password"]:
+                    raise RuntimeError(
+                        "The expected login labels are missing from visible rendered page text; "
+                        "accessible controls alone are not enough to pass acceptance. "
+                        f"Rendered text prefix: {item['body_prefix'][:1000]!r}"
+                    )
                 # Streamlit Cloud can embed the rendered app in an iframe.
                 # Search the page and attached frames instead of assuming that
                 # the login controls belong to the top-level document.
                 _, email_frame_url = visible_label_locator(page, "Email", TIMEOUT_MS)
                 _, password_frame_url = visible_label_locator(page, "Пароль", 30000)
+                # Do not let an unrelated visible control or Streamlit's status-page
+                # embed produce a false positive. The rendered page must expose the
+                # actual app's login form in visible text as well as accessible controls.
+                rendered_text = visible_page_text(page)
+                if "Email" not in rendered_text or "Пароль" not in rendered_text:
+                    raise RuntimeError(
+                        "The browser found accessible login controls, but the rendered page "
+                        "does not contain the expected app login labels. This can indicate "
+                        "that only the Streamlit status-page embed loaded, not the application. "
+                        f"Rendered text prefix: {rendered_text[:1000]!r}"
+                    )
+                if "Status embed installed correctly" in rendered_text and "Email" not in rendered_text:
+                    raise RuntimeError(
+                        "Only the Streamlit status-page embed rendered; the app login UI is absent."
+                    )
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
                     "password_frame_url": password_frame_url,
