@@ -35,6 +35,9 @@ jobs:
       - name: Production Playwright smoke
         run: python scripts/playwright_production_smoke.py
 
+      - name: Responsive browser matrix regression
+        run: python scripts/browser_matrix.py
+
       - name: Upload Playwright artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v5
