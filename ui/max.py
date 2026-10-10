@@ -180,14 +180,14 @@ def _max_session_cached(cache_key, ttl_seconds, loader, spinner_text=None):
     return value
 
 
-@st.dialog("⚡ AI Agent Content Manager MAX", width="large")
+@st.dialog("⚡ Вектор — AI-помощник магазина", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
     current_revision = int(st.session_state.get("_app_data_revision", 0) or 0)
     if snap is not None and snap.get("_revision", current_revision) != current_revision:
         snap = None
     if snap is None:
-        with st.spinner("MAX загружает данные магазина…"):
+        with st.spinner("«Вектор» загружает данные магазина…"):
             snap = {
                 "products": load_products(),
                 "plan": load_plan(),
@@ -206,12 +206,12 @@ def render_max():
     low = low_stock_products(products)
     cm = conversion_metrics(leads, orders)
 
-    st.caption("MAX не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
+    st.caption("«Вектор» не просто показывает цифры — он превращает данные магазина в конкретные следующие действия.")
 
     # Safe AI-operator command center: read actions execute immediately;
     # write actions require an explicit confirmation and are logged.
     with st.container(border=True):
-        st.markdown("### MAX — AI-оператор")
+        st.markdown("### Вектор — AI-оператор")
         command = st.text_input(
             "Что нужно сделать?",
             placeholder="Например: проанализируй продажи или создай контент-план на 7 дней",
@@ -232,7 +232,7 @@ def render_max():
                 if operator_plan.action == "prepare_today":
                     if can_execute(operator_plan, approve):
                         if st.button("Выполнить безопасно", type="primary", key="max_operator_prepare_today"):
-                            with st.spinner("MAX готовит контент на сегодня…"):
+                            with st.spinner("«Вектор» готовит контент на сегодня…"):
                                 generated = seven_day_plan(products)
                                 existing = load_plan()
                                 existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
@@ -254,7 +254,7 @@ def render_max():
                 elif operator_plan.action == "create_7_day_plan":
                     if can_execute(operator_plan, approve):
                         if st.button("Выполнить безопасно", type="primary", key="max_operator_execute"):
-                            with st.spinner("MAX формирует план…"):
+                            with st.spinner("«Вектор» формирует план…"):
                                 generated = seven_day_plan(products)
                                 existing = load_plan()
                                 existing_keys = {(x.get("date"), x.get("product"), x.get("platform"), x.get("type")) for x in existing}
@@ -291,12 +291,12 @@ def render_max():
                     st.json(snap_summary)
                     _max_audit(audit_event("store_status", "completed", details=snap_summary))
                 elif operator_plan.action == "refresh_analysis":
-                    st.success("Анализ MAX обновлён по текущему снимку данных.")
+                    st.success("Анализ «Вектора» обновлён по текущему снимку данных.")
                     _max_audit(audit_event("refresh_analysis", "completed"))
 
         audit_log = st.session_state.get("max_audit_log", [])
         if audit_log:
-            with st.expander("Журнал действий MAX"):
+            with st.expander("Журнал действий «Вектора»"):
                 for event in audit_log[:10]:
                     st.caption(f"{event['timestamp']} · {event['action']} · {event['status']}")
         try:
@@ -307,7 +307,7 @@ def render_max():
                 "Загружаем сводку использования…",
             )
             st.caption(
-                f"Экономика MAX за 30 дней: {usage['requests']} операций · "
+                f"Экономика «Вектора» за 30 дней: {usage['requests']} операций · "
                 f"оценочная AI-себестоимость {usage['cost_rub']:.4f} ₽"
             )
         except Exception:
@@ -320,16 +320,16 @@ def render_max():
             f"_max_recommendations:{tenant_key}:{revision_key}",
             20,
             lambda: growth_recommendations(products, leads, orders, plan),
-            "MAX анализирует данные магазина…",
+            "«Вектор» анализирует данные магазина…",
         )
     except Exception:
         max_recs = []
     if max_recs:
-        st.markdown('<div class="max-ai-plan"><div class="max-ai-plan-title">✦ План действий MAX</div>' +
+        st.markdown('<div class="max-ai-plan"><div class="max-ai-plan-title">✦ План действий «Вектора»</div>' +
                     ''.join(f'<div class="max-ai-plan-item">• {x}</div>' for x in max_recs[:4]) +
                     '</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="empty-state">MAX готов. Добавьте первый товар, чтобы получить персональные рекомендации.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="empty-state">«Вектор» готов. Добавьте первый товар, чтобы получить персональные рекомендации.</div>', unsafe_allow_html=True)
 
     a, b, c, d, e = st.columns(5)
     a.metric("Товары", len(products))
@@ -340,7 +340,7 @@ def render_max():
 
     st.markdown("---")
     section = st.radio(
-        "Раздел MAX",
+        "Раздел «Вектор»",
         ["Обзор", "Аккаунт", "Настройки", "AI-продавец", "CRM", "Заказы", "Склад", "Контент", "Автоматизация", "Аналитика"],
         horizontal=True,
         key="max_section",
@@ -366,9 +366,9 @@ def render_max():
         if low:
             st.warning(f"Низкий остаток: {len(low)} товаров (порог ≤ 2).")
 
-        st.markdown("### ⚡ MAX может сделать это сейчас")
+        st.markdown("### ⚡ Вектор может сделать это сейчас")
         if not products:
-            st.info("Добавьте первый товар — после этого MAX сможет создать контент и план действий.")
+            st.info("Добавьте первый товар — после этого «Вектор» сможет создать контент и план действий.")
         else:
             qa, qb = st.columns(2)
             with qa:
@@ -381,7 +381,7 @@ def render_max():
                     if not quick_approve:
                         st.warning("Сначала подтвердите изменение данных.")
                     else:
-                        with st.spinner("MAX готовит план…"):
+                        with st.spinner("«Вектор» готовит план…"):
                             suggestions = seven_day_plan(products)
                             existing = load_plan()
                             existing_keys = {(x.get("date"), x.get("product")) for x in existing}
@@ -400,7 +400,7 @@ def render_max():
                             st.success(f"Готово: добавлено {added} идей.")
                             st.rerun()
             with qb:
-                if st.button("↻ Обновить анализ MAX", use_container_width=True, key="max_refresh"):
+                if st.button("↻ Обновить анализ «Вектора»", use_container_width=True, key="max_refresh"):
                     st.session_state.pop("max_data_snapshot", None)
                     st.rerun()
 
@@ -624,7 +624,7 @@ def render_max():
             if cache_key in cache:
                 ans, found = cache[cache_key]
             else:
-                with st.spinner("MAX ищет подходящие товары…"):
+                with st.spinner("«Вектор» ищет подходящие товары…"):
                     ans, found = ai_sales_reply(products, q)
                 cache[cache_key] = (ans, found)
                 if len(cache) > 20:
@@ -645,7 +645,7 @@ def render_max():
                 if cache_key in cache:
                     ans, new_found = cache[cache_key]
                 else:
-                    with st.spinner("MAX готовит ответ клиенту…"):
+                    with st.spinner("«Вектор» готовит ответ клиенту…"):
                         ans, new_found = sales_followup(products, follow, found)
                     cache[cache_key] = (ans, new_found)
                     if len(cache) > 20:
@@ -910,7 +910,7 @@ def render_max():
                     products_now = load_products()
                     current_stock_idx = _current_product_index(products_now, stock_record_id, stock_idx)
                     if current_stock_idx is None:
-                        st.error("Товар изменился или был удалён. Обновите MAX и повторите.")
+                        st.error("Товар изменился или был удалён. Обновите данные и повторите.")
                         st.stop()
                     products_now[current_stock_idx]["stock_by_size"] = stock
                     products_now[current_stock_idx]["total_stock"] = sum(stock.values())
@@ -1075,7 +1075,7 @@ def render_max():
 
 
 
-    if st.button("Закрыть MAX", key="close_max"):
+    if st.button("Закрыть «Вектор»", key="close_max"):
         st.session_state["open_max"] = False
         st.rerun()
 
