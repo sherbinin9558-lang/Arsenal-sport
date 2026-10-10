@@ -1043,7 +1043,7 @@ def set_member_role(target_user,new_role):
     token=st.session_state.get("saas_access_token")
     if not saas_enabled() or not token: return False
     if not can("manage_roles"): raise PermissionError("Только владелец или администратор может менять роли.")
-    if new_role not in ("admin","manager","manager","editor","viewer"): raise ValueError("Недопустимая роль.")
+    if new_role not in ("admin","manager","editor","viewer"): raise ValueError("Недопустимая роль.")
     result = _request("POST","/rest/v1/rpc/set_member_role",token=token,json={"target_tenant":tenant_id(),"target_user":target_user,"new_role":new_role})
     st.session_state.pop("_saas_team_members_cache", None)
     st.session_state.pop("_saas_role_cache", None)
