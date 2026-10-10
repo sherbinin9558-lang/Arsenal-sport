@@ -177,6 +177,25 @@ def run():
                     "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
                     "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
                 }
+                # A successful accessible-label lookup alone is insufficient: a
+                # status-page embed can expose unrelated accessible controls while
+                # the actual Streamlit app never renders. Require the expected login
+                # labels in the visible body text before reporting browser acceptance.
+                if (
+                    "Status embed installed correctly" in item["body_prefix"]
+                    and not item["content_markers"]["has_email"]
+                    and not item["content_markers"]["has_password"]
+                ):
+                    raise RuntimeError(
+                        "Only the Streamlit status-page embed rendered; the application UI and "
+                        "login form are absent. Browser acceptance must fail."
+                    )
+                if not item["content_markers"]["has_email"] or not item["content_markers"]["has_password"]:
+                    raise RuntimeError(
+                        "The expected login labels are missing from visible rendered page text; "
+                        "accessible controls alone are not enough to pass acceptance. "
+                        f"Rendered text prefix: {item['body_prefix'][:1000]!r}"
+                    )
                 # Streamlit Cloud can embed the rendered app in an iframe.
                 # Search the page and attached frames instead of assuming that
                 # the login controls belong to the top-level document.
