@@ -238,11 +238,11 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("getAll()", source)
         self.assertIn("_AUTH_COOKIE_DAYS = 30", source)
         self.assertIn("_saas_cookie_probe_count", source)
-        self.assertIn("min(probe_count + 1, 2)", source)
+        self.assertIn("min(probe_count + 1, 3)", source)
         self.assertIn("request_token = st.context.cookies.get(_AUTH_COOKIE)", source)
         from saas_core import _auth_bootstrap_gate
         gate_source = inspect.getsource(_auth_bootstrap_gate)
-        self.assertIn("probes <= 1", gate_source)
+        self.assertIn("probes <= 2", gate_source)
         self.assertIn("return None", gate_source)
         self.assertNotIn("time.sleep(0.15)", gate_source)
         self.assertNotIn("st.rerun()", gate_source)
