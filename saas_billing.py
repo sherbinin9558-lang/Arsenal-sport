@@ -52,7 +52,7 @@ def activate_paid_subscription(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError("Не удалось обновить подписку в платёжной базе.")
+        raise RuntimeError("Не удалось активировать подписку в платёжной базе.")
     st.session_state["saas_plan"] = plan
     st.session_state["saas_tenant_status"] = "active"
     return True
