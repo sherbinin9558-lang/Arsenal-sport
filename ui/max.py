@@ -43,7 +43,7 @@ from free_automation import (
     update_order,
 )
 from growth_engine import ai_summary, recommendations as growth_recommendations
-from app_data import _growth_snapshot
+from app_data import _cached_growth_recommendations, _growth_snapshot
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
 from max_operator import audit_event, build_business_snapshot, can_execute, execute_write, plan_action
@@ -319,7 +319,7 @@ def render_max():
         max_recs = _max_session_cached(
             f"_max_recommendations:{tenant_key}:{revision_key}",
             20,
-            lambda: growth_recommendations(products, leads, orders, plan),
+            lambda: _cached_growth_recommendations(products, leads, orders, plan),
             "MAX анализирует данные магазина…",
         )
     except Exception:
