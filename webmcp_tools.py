@@ -116,6 +116,15 @@ export default function(component) {
 )
 
 def _webmcp_data():
+    # Streamlit reruns the whole script on every tab interaction. Avoid three
+    # repeated Supabase reads for the read-only WebMCP snapshot on every rerun.
+    # The cache is session-local and tenant-scoped; successful writes invalidate
+    # it through saas_core._invalidate_computed_snapshots().
+    tenant = str(st.session_state.get("saas_tenant_id") or "anonymous")
+    cached = st.session_state.get("_webmcp_data_cache")
+    if isinstance(cached, dict) and cached.get("tenant") == tenant:
+        return dict(cached.get("value") or {})
+
     def safe_product(row):
         if not isinstance(row, dict):
             return row
@@ -147,7 +156,9 @@ def _webmcp_data():
     except Exception:
         content_plan = []
 
-    return {"settings": settings, "products": products, "content_plan": content_plan}
+    snapshot = {"settings": settings, "products": products, "content_plan": content_plan}
+    st.session_state["_webmcp_data_cache"] = {"tenant": tenant, "value": snapshot}
+    return snapshot
 
 def mount_webmcp_tools():
     _WEBMCP_COMPONENT(data=_webmcp_data(), key="arsenal-sport-webmcp")
