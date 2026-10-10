@@ -542,7 +542,7 @@ if not require_saas_access():
     # Use a high-specificity override before stopping on the public auth screen.
     st.markdown("""
     <style>
-    html body div[data-testid="stAppViewContainer"] section[data-testid="stSidebar"],
+    html body [data-testid="stSidebar"],
     html body section[data-testid="stSidebar"],
     html body [data-testid="stSidebarCollapsedControl"],
     html body [data-testid="stSidebarCollapseButton"] {
@@ -558,12 +558,29 @@ if not require_saas_access():
         border: 0 !important;
         pointer-events: none !important;
     }
+    html body div[data-testid="stAppViewContainer"] {
+        display: block !important;
+    }
+    html body div[data-testid="stAppViewContainer"] [data-testid="stSidebar"],
+    html body div[data-testid="stAppViewContainer"] [data-testid="stSidebar"] * {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        pointer-events: none !important;
+    }
     html body div[data-testid="stAppViewContainer"] .main,
     html body div[data-testid="stAppViewContainer"] .main .block-container {
         width: 100% !important;
         max-width: 1500px !important;
         margin-left: auto !important;
         margin-right: auto !important;
+        padding-left: clamp(1rem, 4vw, 3rem) !important;
+        padding-right: clamp(1rem, 4vw, 3rem) !important;
     }
     </style>
     """, unsafe_allow_html=True)
