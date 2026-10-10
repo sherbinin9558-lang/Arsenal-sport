@@ -52,6 +52,14 @@ def run():
                     initial_status = response.status if response is not None else None
                     frame_urls = [frame.url for frame in page.frames]
                     body_text = page.locator("body").inner_text(timeout=10000)
+                    # The Statuspage iframe may coexist with a healthy app; inspect all frames.
+                    for frame in page.frames:
+                        try:
+                            frame_text = frame.locator("body").inner_text(timeout=1000)
+                            if frame_text.strip() and frame_text not in body_text:
+                                body_text += "\n" + frame_text
+                        except Exception:
+                            pass
                     body_prefix = " ".join(body_text.split())[:500]
 
                     if "share.streamlit.io/-/auth/" in page.url or any(
@@ -70,7 +78,7 @@ def run():
                             and "incident or maintenance" in body_text
                         )
                     )
-                    if statuspage_detected:
+                    if statuspage_detected and ("Email" not in body_text or "Пароль" not in body_text):
                         raise RuntimeError(
                             "PRODUCTION_STATUSPAGE_INTERSTITIAL: application UI was replaced by "
                             "a Statuspage embed; this is a hosting/deployment/access diagnostic, "
