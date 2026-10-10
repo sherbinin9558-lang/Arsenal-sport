@@ -691,10 +691,10 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Keep the login form non-blocking. A health request here ran synchronously
+    # before every anonymous login render and could delay first paint on a slow
+    # Supabase connection. The actual sign-in / sign-up request reports failures
+    # when the user submits the form, so this probe is not needed in the UI path.
 
     st.markdown(
         '<div class="public-shell">'
