@@ -95,5 +95,18 @@ class AuthHardeningTests(unittest.TestCase):
         self.assertNotIn("saas_auth_error", saas_core.st.session_state)
 
 
+    def test_explicit_logout_prevents_stale_cookie_restore(self):
+        saas_core.st.session_state["_saas_logout_completed"] = True
+        with patch.object(saas_core, "_restore_session_from_cookie") as restore:
+            self.assertFalse(saas_core._auth_bootstrap_gate())
+        restore.assert_not_called()
+
+    def test_sign_out_marks_session_logged_out_even_if_remote_logout_fails(self):
+        with patch.object(saas_core, "_request", side_effect=RuntimeError("network unavailable")), \
+             patch.object(saas_core, "_clear_refresh_token"):
+            saas_core.sign_out("access-token")
+        self.assertTrue(saas_core.st.session_state["_saas_logout_completed"])
+
+
 if __name__ == "__main__":
     unittest.main()
