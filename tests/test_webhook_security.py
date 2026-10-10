@@ -37,9 +37,9 @@ class WebhookSecurityTests(unittest.TestCase):
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
                  "tenant_id": "tenant-1",
-                 "plan": "starter",
+                 "plan": "starter", "expected_amount": "990.00", "expected_currency": "RUB",
              }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
             response = asyncio.run(tbank_webhook.payment_status(request))
         self.assertEqual(response.body, b"OK")
@@ -53,9 +53,9 @@ class WebhookSecurityTests(unittest.TestCase):
              patch.object(tbank_webhook, "_token", return_value="signed"), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
                  "tenant_id": "tenant-1",
-                 "plan": "starter",
+                 "plan": "starter", "expected_amount": "990.00", "expected_currency": "RUB",
              }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
             response = asyncio.run(tbank_webhook.payment_status(request))
         self.assertEqual(response.body, b"OK")
