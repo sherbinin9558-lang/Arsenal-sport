@@ -29,18 +29,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Install Playwright browsers
+      - name: Install browsers required by production smoke
         run: playwright install --with-deps chromium firefox webkit
 
       - name: Production Playwright smoke
         run: python scripts/playwright_production_smoke.py
+
+      - name: Responsive browser matrix regression
+        run: python scripts/browser_matrix.py
 
       - name: Upload Playwright artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v5
         with:
           name: playwright-production-report
-          path: artifacts/playwright-production/
+          path: |
+            artifacts/playwright-production/
+            artifacts/browser-matrix/
           retention-days: 14
 
   browserstack:
