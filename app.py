@@ -19,7 +19,10 @@ from ui.dashboard import render_dashboard
 from ui.settings import render_settings
 from ui.legal import render_legal
 from production_ops import observability_snapshot, provider_health
-from observability import configure_observability, install_exception_hook
+from observability_import import load_observability
+_observability = load_observability()
+configure_observability = _observability.configure_observability
+install_exception_hook = _observability.install_exception_hook
 
 configure_observability()
 install_exception_hook()
