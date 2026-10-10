@@ -437,13 +437,33 @@ def render_max():
             sub_auto=subscription_snapshot()
             auto_default=bool(sub_auto.get("auto_renew", st.session_state.get("auto_renew", False)))
             if current_role() in ("owner","admin"):
-                auto=st.toggle("Автоматически продлевать подписку", value=auto_default, key="billing_auto_renew")
-                if auto != auto_default:
-                    result = execute_write("account_auto_renew", True, lambda: set_auto_renew(auto), details={"auto_renew": auto})
-                    if result["ok"]:
-                        st.success("Настройка автопродления сохранена.")
+                if auto_default:
+                    auto=st.toggle(
+                        "Сохранённый флаг автопродления (списания не выполняются)",
+                        value=True,
+                        key="billing_auto_renew",
+                    )
+                    if not auto:
+                        result = execute_write(
+                            "account_auto_renew", True,
+                            lambda: set_auto_renew(False),
+                            details={"auto_renew": False},
+                        )
+                        if result["ok"]:
+                            st.success("Флаг автопродления отключён.")
+                else:
+                    st.toggle(
+                        "Автопродление не подключено в этой версии",
+                        value=False,
+                        key="billing_auto_renew_unavailable",
+                        disabled=True,
+                    )
+                st.caption(
+                    "Автоматические повторные списания пока не реализованы. "
+                    "Для продления подписки потребуется ручная оплата."
+                )
             else:
-                st.caption("Изменять автопродление может только владелец или администратор.")
+                st.caption("Изменять настройки подписки может только владелец или администратор.")
         except Exception as e:
             st.info(f"Автопродление пока не настроено: {e}")
         st.markdown("---")

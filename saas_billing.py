@@ -52,7 +52,7 @@ def activate_paid_subscription(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError(response.text)
+        raise RuntimeError("Не удалось обновить состояние подписки. Проверьте настройки и журнал сервиса.")
     st.session_state["saas_plan"] = plan
     st.session_state["saas_tenant_status"] = "active"
     return True
@@ -68,11 +68,16 @@ def set_auto_renew(
     supabase_url,
 ):
     tid = tenant_id()
-    if not saas_is_enabled:
-        st.session_state["auto_renew"] = bool(enabled)
-        return True
-    if current_role() not in ("owner", "admin"):
+    if saas_is_enabled and current_role() not in ("owner", "admin"):
         raise PermissionError("Только владелец или администратор может менять автопродление.")
+    if enabled:
+        raise RuntimeError(
+            "Автопродление пока недоступно: автоматические повторные списания не реализованы. "
+            "Продление подписки требует ручной оплаты."
+        )
+    if not saas_is_enabled:
+        st.session_state["auto_renew"] = False
+        return True
     if not service_key:
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY не настроен.")
     headers = {
@@ -89,7 +94,7 @@ def set_auto_renew(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError(response.text)
+        raise RuntimeError("Не удалось обновить настройки автопродления. Проверьте журнал сервиса.")
     st.session_state["auto_renew"] = bool(enabled)
     return True
 
