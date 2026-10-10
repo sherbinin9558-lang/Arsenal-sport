@@ -143,6 +143,18 @@ def visible_page_text(page):
     return "\n".join(chunks)[:20000]
 
 
+def wait_for_expected_login_text(page, timeout_ms=45000):
+    """Allow Streamlit Cloud's transient status/boot shell to settle before judging the app."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    latest_text = ""
+    while time.monotonic() < deadline:
+        latest_text = visible_page_text(page)
+        if "Email" in latest_text and "Пароль" in latest_text:
+            return latest_text
+        page.wait_for_timeout(500)
+    return latest_text
+
+
 def run():
     health_check()
     startup_http_probe()
@@ -164,9 +176,12 @@ def run():
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
                 page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+                # Streamlit Cloud may first render a transient status/boot shell while the
+                # app starts. Wait for the actual login UI before judging this browser run.
+                startup_text = wait_for_expected_login_text(page, timeout_ms=45000)
                 item["initial_url"] = page.url
                 item["title"] = page.title()
-                item["body_prefix"] = visible_page_text(page)
+                item["body_prefix"] = startup_text
                 item["frames"] = [
                     {"url": frame.url, "name": frame.name}
                     for frame in page.frames
