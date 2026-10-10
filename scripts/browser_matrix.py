@@ -46,19 +46,45 @@ def run():
                 )
                 try:
                     response = page.goto(url, wait_until="domcontentloaded", timeout=90000)
-                    # Community Cloud redirects private apps to its auth gateway.
-                    # Detect that deployment condition immediately instead of waiting
-                    # for a misleading UI-selector timeout.
-                    if "share.streamlit.io/-/auth/" in page.url:
+                    # Community Cloud can return an interstitial without leaving the
+                    # app URL. Check the rendered document and frame URLs as well as
+                    # the final URL, so a hosting/status page fails fast with evidence.
+                    initial_status = response.status if response is not None else None
+                    frame_urls = [frame.url for frame in page.frames]
+                    body_text = page.locator("body").inner_text(timeout=10000)
+                    body_prefix = " ".join(body_text.split())[:500]
+
+                    if "share.streamlit.io/-/auth/" in page.url or any(
+                        "share.streamlit.io/-/auth/" in frame_url for frame_url in frame_urls
+                    ):
                         raise RuntimeError(
-                            "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud requires "
-                            "authentication for this app. Make the app public or provide "
-                            "a dedicated E2E viewer session; application UI was not reached."
+                            "PRODUCTION_ACCESS_BLOCKED: Streamlit Community Cloud auth gateway "
+                            f"detected; initial_http_status={initial_status}; final_url={page.url}; "
+                            f"body_prefix={body_prefix!r}"
                         )
+
+                    statuspage_detected = (
+                        any("statuspage.io/embed/frame" in frame_url for frame_url in frame_urls)
+                        or (
+                            "Status embed installed" in body_text
+                            and "incident or maintenance" in body_text
+                        )
+                    )
+                    if statuspage_detected:
+                        raise RuntimeError(
+                            "PRODUCTION_STATUSPAGE_INTERSTITIAL: application UI was replaced by "
+                            "a Statuspage embed; this is a hosting/deployment/access diagnostic, "
+                            f"not an application selector failure. initial_http_status={initial_status}; "
+                            f"final_url={page.url}; frames={frame_urls[:10]!r}; "
+                            f"body_prefix={body_prefix!r}"
+                        )
+
                     if response is not None and response.status >= 400:
                         raise RuntimeError(
-                            f"PRODUCTION_HTTP_ERROR: initial document returned HTTP {response.status}"
+                            f"PRODUCTION_HTTP_ERROR: initial document returned HTTP {response.status}; "
+                            f"final_url={page.url}; body_prefix={body_prefix!r}"
                         )
+
                     page.get_by_text("Ваш магазин. Один рабочий центр.", exact=False).first.wait_for(
                         state="visible", timeout=60000
                     )
@@ -118,6 +144,10 @@ def run():
                         diagnostic["body_text"] = page.locator("body").inner_text(timeout=5000)[:12000]
                     except Exception as body_exc:
                         diagnostic["body_text_error"] = str(body_exc)
+                    try:
+                        diagnostic["frame_urls"] = [frame.url for frame in page.frames][:20]
+                    except Exception as frame_exc:
+                        diagnostic["frame_urls_error"] = str(frame_exc)
                     try:
                         page.screenshot(path=str(artifact_dir / f"{name}-failure.png"), full_page=True)
                         diagnostic["screenshot"] = f"{name}-failure.png"
