@@ -50,7 +50,8 @@ def _request(method,path,token=None,**kwargs):
     extra_headers=kwargs.pop("headers",None) or {}
     headers=_headers(token)
     headers.update(extra_headers)
-    r=requests.request(method,f"{url}{path}",headers=headers,timeout=20,**kwargs)
+    request_timeout = kwargs.pop("timeout", 20)
+    r=requests.request(method,f"{url}{path}",headers=headers,timeout=request_timeout,**kwargs)
     try: data=r.json()
     except Exception: data={"message":r.text}
     if not r.ok:
@@ -520,8 +521,12 @@ def _set_identity(user,tenant):
 def supabase_health():
     if not saas_enabled(): return False, "Supabase не настроен: проверьте SUPABASE_URL и SUPABASE_ANON_KEY."
     try:
-        _request("GET", "/auth/v1/settings"); return True, "Supabase Auth доступен."
-    except Exception as e: return False, f"Supabase недоступен: {e}"
+        # This is only a UI health probe, not an authentication decision.
+        # Keep a slow Supabase instance from blocking the login screen for 20s.
+        _request("GET", "/auth/v1/settings", timeout=3)
+        return True, "Supabase Auth доступен."
+    except Exception:
+        return False, "Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд."
 
 def login_ui():
     """Render the public SaaS entry screen with product-first branding."""
