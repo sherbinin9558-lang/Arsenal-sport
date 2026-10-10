@@ -1543,6 +1543,9 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_saas_data_page_cache", None)
     st.session_state.pop("_saas_usage_snapshot_cache", None)
     st.session_state.pop("_saas_onboarding_cache", None)
+    # WebMCP data is a derived snapshot of settings, products and content plan.
+    # Clear it after successful writes so the next rerun publishes fresh data.
+    st.session_state.pop("_webmcp_data_cache", None)
 
 
 def data_save(entity,rows):
