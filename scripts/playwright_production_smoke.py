@@ -113,8 +113,6 @@ def visible_label_locator(page, label, timeout_ms):
     deadline = time.monotonic() + timeout_ms / 1000
     last_error = None
     while time.monotonic() < deadline:
-        # Streamlit Cloud may attach/navigate the app iframe after the outer shell loads.
-        # Rebuild the frame list on every poll so newly attached frames are included.
         contexts = [page.main_frame] + [frame for frame in page.frames if frame != page.main_frame]
         for frame in contexts:
             try:
@@ -171,50 +169,43 @@ def run():
                     {"url": frame.url, "name": frame.name}
                     for frame in page.frames
                 ]
+                frame_urls = [frame["url"] for frame in item["frames"]]
+                statuspage_detected = (
+                    any("statuspage.io/embed/frame" in frame_url for frame_url in frame_urls)
+                    or (
+                        "Status embed installed" in item["body_prefix"]
+                        and "incident or maintenance" in item["body_prefix"]
+                    )
+                )
+                if statuspage_detected:
+                    raise RuntimeError(
+                        "PRODUCTION_STATUSPAGE_INTERSTITIAL: the browser rendered the Statuspage "
+                        "embed instead of the application login UI. This is a hosting/deployment/"
+                        "access diagnostic, not a selector timeout. "
+                        f"initial_url={item['initial_url']!r}; frames={frame_urls[:10]!r}; "
+                        f"body_prefix={item['body_prefix'][:1000]!r}"
+                    )
+
                 item["content_markers"] = {
                     "has_email": "Email" in item["body_prefix"],
                     "has_password": "Пароль" in item["body_prefix"],
                     "has_exception": any(x in item["body_prefix"].lower() for x in ("exception", "traceback", "error")),
                     "has_streamlit_shell": "hosted with streamlit" in item["body_prefix"].lower(),
                 }
-                # A successful accessible-label lookup alone is insufficient: a
-                # status-page embed can expose unrelated accessible controls while
-                # the actual Streamlit app never renders. Require the expected login
-                # labels in the visible body text before reporting browser acceptance.
-                if (
-                    "Status embed installed correctly" in item["body_prefix"]
-                    and not item["content_markers"]["has_email"]
-                    and not item["content_markers"]["has_password"]
-                ):
-                    raise RuntimeError(
-                        "Only the Streamlit status-page embed rendered; the application UI and "
-                        "login form are absent. Browser acceptance must fail."
-                    )
                 if not item["content_markers"]["has_email"] or not item["content_markers"]["has_password"]:
                     raise RuntimeError(
                         "The expected login labels are missing from visible rendered page text; "
                         "accessible controls alone are not enough to pass acceptance. "
                         f"Rendered text prefix: {item['body_prefix'][:1000]!r}"
                     )
-                # Streamlit Cloud can embed the rendered app in an iframe.
-                # Search the page and attached frames instead of assuming that
-                # the login controls belong to the top-level document.
                 _, email_frame_url = visible_label_locator(page, "Email", TIMEOUT_MS)
                 _, password_frame_url = visible_label_locator(page, "Пароль", 30000)
-                # Do not let an unrelated visible control or Streamlit's status-page
-                # embed produce a false positive. The rendered page must expose the
-                # actual app's login form in visible text as well as accessible controls.
                 rendered_text = visible_page_text(page)
                 if "Email" not in rendered_text or "Пароль" not in rendered_text:
                     raise RuntimeError(
                         "The browser found accessible login controls, but the rendered page "
-                        "does not contain the expected app login labels. This can indicate "
-                        "that only the Streamlit status-page embed loaded, not the application. "
+                        "does not contain the expected app login labels. "
                         f"Rendered text prefix: {rendered_text[:1000]!r}"
-                    )
-                if "Status embed installed correctly" in rendered_text and "Email" not in rendered_text:
-                    raise RuntimeError(
-                        "Only the Streamlit status-page embed rendered; the app login UI is absent."
                     )
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
@@ -227,6 +218,7 @@ def run():
                 item["url"] = page.url
                 item["title"] = page.title()
                 item["body"] = visible_page_text(page)
+                item["frames"] = [{"url": frame.url, "name": frame.name} for frame in page.frames]
                 item["console_errors"] = console_errors[-100:]
                 item["page_errors"] = page_errors[-100:]
                 item["request_failures"] = request_failures[-100:]
