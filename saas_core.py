@@ -691,10 +691,8 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Keep the login screen render path free of a blocking Supabase health request.
+    # Authentication requests report availability errors when the user submits the form.
 
     st.markdown(
         '<div class="public-shell">'
@@ -1087,7 +1085,7 @@ def _auth_bootstrap_gate():
     # Only defer once, and only when the browser cookie component exists.
     # New users still reach login immediately when the component is unavailable.
     probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    if CookieController is not None and probes <= 1 and not st.session_state.get("saas_auth_error"):
+    if CookieController is not None and probes <= 1:
         return None
     return False
 
