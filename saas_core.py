@@ -174,7 +174,7 @@ def _establish_session(result):
     # A successful explicit login/signup starts a fresh auth lifecycle.
     st.session_state.pop("_saas_logout_completed", None)
     st.session_state.pop("_saas_cookie_restore_failed", None)
-    token = result.get("access_token)
+    token = result.get("access_token")
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
     user = result.get("user") or get_user(token)
