@@ -24,3 +24,24 @@ def test_terminal_checkout_guard_applies_to_all_later_event_statuses():
     assert "'refund_pending'" not in guard
     assert "'refund_canceled'" not in guard
     assert "'ignored', true, 'reason', 'checkout_terminal'" in guard
+
+def test_all_terminal_checkout_states_are_guarded_before_event_handling():
+    migration = Path(
+        "supabase/migrations/20261009193000_prevent_reactivation_after_refund.sql"
+    ).read_text(encoding="utf-8")
+    guard_start = migration.index("-- A terminal checkout is immutable:")
+    event_handler = migration.index(
+        "if normalized_status in ('succeeded','confirmed') then", guard_start
+    )
+    guard = migration[guard_start:event_handler]
+    terminal_states = (
+        "refunded",
+        "reversed",
+        "canceled",
+        "cancelled",
+        "rejected",
+        "deadline_expired",
+    )
+    for state in terminal_states:
+        assert f"'{state}'" in guard
+    assert "return jsonb_build_object('ignored', true, 'reason', 'checkout_terminal')" in guard
