@@ -2,6 +2,28 @@
 
 Status: **PREPARATION ONLY**. This document does not authorize applying migrations to production or enabling live payments.
 
+## Backup and restore on the current Free project
+
+The connected Supabase project is on the Free plan. Supabase documents that automated downloadable database backups are not available on Free; its recommended approach is a manual logical export with the Supabase CLI and an off-site copy. Source: https://supabase.com/docs/guides/platform/backups
+
+Current read-only snapshot (2026-10-11): PostgreSQL 17.11, database approximately 15 MB, 9 public tables. RLS was enabled on all 9 public tables inspected. This is a size snapshot, not a verified backup.
+
+Before release, an operator with database credentials must:
+1. From Supabase Dashboard, open **Connect** and copy the database connection string. Prefer the session pooler if the machine/network is IPv4-only. Never paste the password or connection string into a GitHub issue, PR, chat, or logs.
+2. Run Supabase CLI `db dump` in a trusted local environment with Docker available. Keep role, schema, and data dumps separate:
+   ```sh
+   supabase db dump --db-url "$DB_URL" -f roles.sql --role-only
+   supabase db dump --db-url "$DB_URL" -f schema.sql
+   supabase db dump --db-url "$DB_URL" -f data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+   ```
+3. Store the three files encrypted, outside the application repository, and record checksums and the UTC creation time. Do not upload database dumps as ordinary GitHub Actions artifacts or commit them to Git.
+4. Back up Storage objects separately: database dumps include Storage metadata but not the actual files. Also preserve application secrets/provider configuration separately using an approved secrets manager; never put secrets in the dump manifest.
+5. Verify the files are non-empty and checksums match after copying. A successful dump alone is not proof of restorability.
+6. Perform a restore rehearsal into a disposable local Supabase/Postgres environment, not Production. Validate schema, row counts for critical tables, RLS/policies, functions/triggers, auth-related objects, and Storage object recovery separately. Keep the rehearsal log with the backup manifest.
+7. If no disposable restore target is available, mark restore verification **NOT DONE** and block the production billing migrations. Do not create a paid Supabase project/branch without explicit cost approval.
+
+The Supabase CLI backup/restore guide is https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore. Do not use a raw pg_dump as a drop-in replacement without reviewing Supabase-specific exclusions and restore compatibility.
+
 ## Required migration order
 
 Apply in timestamp order, and only after a verified backup and a tested restore path:
