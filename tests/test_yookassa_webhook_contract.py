@@ -199,3 +199,28 @@ def test_cumulative_full_refund_marks_payment_refunded(monkeypatch):
         },
     )
     assert result == "refunded"
+
+
+
+def test_successful_refund_without_amount_fails_closed():
+    with pytest.raises(Exception) as exc:
+        tbank_webhook._classify_yookassa_refund(
+            {"status": "succeeded"},
+            {
+                "amount": {"value": "990.00", "currency": "RUB"},
+                "refunded_amount": {"value": "990.00", "currency": "RUB"},
+            },
+        )
+    assert getattr(exc.value, "status_code", None) == 422
+
+
+def test_inconsistent_cumulative_refund_total_is_retryable():
+    with pytest.raises(Exception) as exc:
+        tbank_webhook._classify_yookassa_refund(
+            {"amount": {"value": "600.00", "currency": "RUB"}},
+            {
+                "amount": {"value": "990.00", "currency": "RUB"},
+                "refunded_amount": {"value": "300.00", "currency": "RUB"},
+            },
+        )
+    assert getattr(exc.value, "status_code", None) == 409
