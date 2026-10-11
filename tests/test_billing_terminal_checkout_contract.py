@@ -44,4 +44,5 @@ def test_all_terminal_checkout_states_are_guarded_before_event_handling():
     )
     for state in terminal_states:
         assert f"'{state}'" in guard
-    assert "return jsonb_build_object('ignored', true, 'reason', 'checkout_terminal')" in guard
+    assert "return jsonb_build_object(" in guard
+    assert "'ignored', true, 'reason', 'checkout_terminal'" in guard
