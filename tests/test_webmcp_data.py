@@ -5,6 +5,11 @@ import webmcp_tools
 
 
 class WebMCPDataRegressionTests(unittest.TestCase):
+    def setUp(self):
+        # Keep tests independent: Streamlit session state can survive between
+        # calls in the same test process, including the WebMCP snapshot cache.
+        webmcp_tools.st.session_state.pop("_webmcp_data_cache", None)
+
     def test_webmcp_data_reads_authenticated_store_data(self):
         fixtures = {
             "settings": [{
