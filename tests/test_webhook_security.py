@@ -239,6 +239,22 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertTrue(any(m.get("status") == 413 for m in sent))
         self.assertIn(b"Request too large", body)
 
+    def test_tbank_authorized_event_does_not_reach_billing_rpc(self):
+        request = self._request(headers={})
+        payload = {"PaymentId": "payment-auth", "Token": "valid-token"}
+        with patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": ""}, clear=False), \
+             patch.object(tbank_webhook, "_read_body", return_value=payload), \
+             patch.object(tbank_webhook, "_token", return_value="valid-token"), \
+             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
+                 "tenant_id": "tenant-1", "plan": "starter",
+                 "expected_amount": "990.00", "expected_currency": "RUB"
+             }), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "AUTHORIZED", "Amount": 99000}), \
+             patch.object(tbank_webhook, "_process_billing_event") as process:
+            response = asyncio.run(tbank_webhook.payment_status(request))
+        self.assertEqual(response.body, b"OK")
+        process.assert_not_called()
+
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
     def test_yookassa_refund_event_uses_original_payment_id(self):
         request = self._request(headers={"authorization": "Bearer yoo-secret"})
