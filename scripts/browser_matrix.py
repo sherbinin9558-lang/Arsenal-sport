@@ -152,7 +152,8 @@ def run():
                     def is_known_platform_404(item):
                         url = item.get("url", "")
                         return item.get("status") == 404 and (
-                            url == "https://sdk.us.heap-api.com/js/heap-.js"\n                            or url == "https://cdn.heapanalytics.com/js/heap-.js"
+                            url == "https://sdk.us.heap-api.com/js/heap-.js"
+                            or url == "https://cdn.heapanalytics.com/js/heap-.js"
                             or url == "https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app/api/v2/user/details"
                         )
 
