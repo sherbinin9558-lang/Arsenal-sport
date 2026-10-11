@@ -4,7 +4,7 @@ This workflow is a preparation tool. It does not apply migrations to Production,
 
 ## Automated validation
 
-Pull requests changing the workflow run a secret-free test job. It verifies the explicit production dispatch guard, tests accepted/rejected synthetic connection-URI shapes, and runs a synthetic encryption/decryption round-trip plus checksum/HMAC tamper detection. These tests do not access the Production database, read repository secrets, or prove that the saved secret values are correct.
+Pull requests changing the workflow run a secret-free test job. It verifies the explicit production dispatch guard, tests accepted/rejected synthetic connection-URI shapes, executes unit tests for the PostgreSQL-major-version pinning helper (replace, insert, preserve unrelated settings, and reject malformed/duplicate sections), and runs a synthetic encryption/decryption round-trip plus checksum/HMAC tamper detection. These tests do not access the Production database, read repository secrets, or prove that the saved secret values are correct.
 
 ## Before running
 
