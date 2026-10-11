@@ -24,7 +24,7 @@ jobs:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
-      - name: Validate required secrets
+      - name: Validate required secrets and target project
         shell: bash
         run: |
           set -euo pipefail
@@ -34,6 +34,25 @@ jobs:
             echo "::error::Use a unique random backup passphrase of at least 24 characters"
             exit 1
           fi
+          python - <<'PY'
+          import os
+          import sys
+          from urllib.parse import unquote, urlsplit
+
+          expected_ref = "lmdiwzkuvictysmdtuld"
+          uri = urlsplit(os.environ["SUPABASE_DB_URL"])
+          username = unquote(uri.username or "")
+          hostname = (uri.hostname or "").lower()
+          valid_scheme = uri.scheme in {"postgres", "postgresql"}
+          valid_database = uri.path.rstrip("/") == "/postgres"
+          valid_credentials = bool(username and uri.password)
+          valid_pooler_target = hostname.endswith(".pooler.supabase.com") and expected_ref in username.split(".")
+          valid_direct_target = hostname == f"db.{expected_ref}.supabase.co"
+          if not (valid_scheme and valid_database and valid_credentials and (valid_pooler_target or valid_direct_target)):
+              print("::error::SUPABASE_DB_URL does not appear to target the expected Supabase project/database. Re-copy the connection URI from the project's Session Pooler settings; do not print it to logs.")
+              sys.exit(1)
+          print("Connection URI structure and expected project target validated without printing credentials.")
+          PY
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
@@ -65,6 +84,7 @@ jobs:
             -pass env:BACKUP_ENCRYPTION_PASSPHRASE
           test -s supabase-backup-encrypted.tar.gz.enc
           sha256sum supabase-backup-encrypted.tar.gz.enc > supabase-backup-encrypted.sha256
+          openssl dgst -sha256 -hmac "$BACKUP_ENCRYPTION_PASSPHRASE" supabase-backup-encrypted.tar.gz.enc | awk '{print $NF}' > supabase-backup-encrypted.hmac
           rm -f backup-work.tar.gz
 
       - name: Install local Supabase stack for isolated restore test
@@ -80,6 +100,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sha256sum -c supabase-backup-encrypted.sha256
+          expected_hmac="$(cat supabase-backup-encrypted.hmac)"
+          actual_hmac="$(openssl dgst -sha256 -hmac "$BACKUP_ENCRYPTION_PASSPHRASE" supabase-backup-encrypted.tar.gz.enc | awk '{print $NF}')"
+          [[ "$actual_hmac" == "$expected_hmac" ]] || { echo "::error::Encrypted backup authentication check failed"; exit 1; }
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
             -in supabase-backup-encrypted.tar.gz.enc -out "$RUNNER_TEMP/backup.tar.gz" \
             -pass env:BACKUP_ENCRYPTION_PASSPHRASE
@@ -103,12 +127,13 @@ jobs:
 
       - name: Upload encrypted backup only
         if: always() && hashFiles('supabase-backup-encrypted.tar.gz.enc') != ''
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: supabase-encrypted-backup-${{ github.run_id }}
           path: |
             supabase-backup-encrypted.tar.gz.enc
             supabase-backup-encrypted.sha256
+            supabase-backup-encrypted.hmac
           retention-days: 7
           if-no-files-found: error
 
