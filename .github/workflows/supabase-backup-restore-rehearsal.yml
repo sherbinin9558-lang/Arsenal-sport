@@ -43,6 +43,8 @@ jobs:
               "BACKUP_ENCRYPTION_PASSPHRASE: " + dispatch_expr + " secrets.BACKUP_ENCRYPTION_PASSPHRASE }}",
               "uses: supabase/setup-cli@v3",
               "uses: actions/upload-artifact@v7",
+              "(cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)",
+              "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
           ]
           missing = [line for line in required if line not in source]
           if missing:
@@ -82,9 +84,13 @@ jobs:
           temp_dir="$(mktemp -d)"
           trap 'rm -rf "$temp_dir"' EXIT
           export TEST_BACKUP_PASSPHRASE="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-          printf 'synthetic backup content only; no production data\n' > "$temp_dir/plain.txt"
+          mkdir -p "$temp_dir/package" "$temp_dir/unpacked"
+          printf 'synthetic SQL content only; no production data\n' > "$temp_dir/package/data.sql"
+          printf 'synthetic schema content only; no production data\n' > "$temp_dir/package/schema.sql"
+          (cd "$temp_dir/package" && sha256sum data.sql schema.sql > SHA256SUMS)
+          tar -czf "$temp_dir/backup.tar.gz" -C "$temp_dir/package" data.sql schema.sql SHA256SUMS
           openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
-            -in "$temp_dir/plain.txt" -out "$temp_dir/archive.enc" \
+            -in "$temp_dir/backup.tar.gz" -out "$temp_dir/archive.enc" \
             -pass env:TEST_BACKUP_PASSPHRASE
           sha256sum "$temp_dir/archive.enc" > "$temp_dir/archive.sha256"
           openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}' > "$temp_dir/archive.hmac"
@@ -93,14 +99,17 @@ jobs:
           actual_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}')"
           [[ "$actual_hmac" == "$expected_hmac" ]]
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
-            -in "$temp_dir/archive.enc" -out "$temp_dir/restored.txt" \
+            -in "$temp_dir/archive.enc" -out "$temp_dir/restored.tar.gz" \
             -pass env:TEST_BACKUP_PASSPHRASE
-          cmp "$temp_dir/plain.txt" "$temp_dir/restored.txt"
+          tar -xzf "$temp_dir/restored.tar.gz" -C "$temp_dir/unpacked"
+          (cd "$temp_dir/unpacked" && sha256sum -c SHA256SUMS)
+          cmp "$temp_dir/package/data.sql" "$temp_dir/unpacked/data.sql"
+          cmp "$temp_dir/package/schema.sql" "$temp_dir/unpacked/schema.sql"
           cp "$temp_dir/archive.enc" "$temp_dir/tampered.enc"
           printf x >> "$temp_dir/tampered.enc"
           tampered_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/tampered.enc" | awk '{print $NF}')"
           [[ "$tampered_hmac" != "$expected_hmac" ]]
-          echo "Synthetic encryption round-trip and tamper rejection passed."
+          echo "Synthetic package checksum, encryption round-trip, and tamper rejection passed."
 
   backup-and-restore:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}
@@ -163,7 +172,7 @@ jobs:
             echo "dump_tool=supabase-cli"
             echo "postgres_target=17"
           } > backup-work/manifest.txt
-          sha256sum backup-work/roles.sql backup-work/schema.sql backup-work/data.sql backup-work/manifest.txt > backup-work/SHA256SUMS
+          (cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)
           tar -czf backup-work.tar.gz -C backup-work roles.sql schema.sql data.sql manifest.txt SHA256SUMS
           openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
             -in backup-work.tar.gz -out supabase-backup-encrypted.tar.gz.enc \
