@@ -127,7 +127,7 @@ def _webmcp_data():
 
     def safe_product(row):
         if not isinstance(row, dict):
-            return row
+            return None
         allowed = ("_saas_record_id", "name", "brand", "category", "sport", "description", "size", "stock")
         return {k: row.get(k) for k in allowed if k in row}
 
@@ -143,7 +143,10 @@ def _webmcp_data():
     }
 
     try:
-        products = [safe_product(row) for row in data_load("products", [])]
+        products = [
+            safe_row for row in data_load("products", [])
+            if (safe_row := safe_product(row)) is not None
+        ]
     except Exception:
         products = []
     try:
