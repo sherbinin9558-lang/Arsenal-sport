@@ -572,7 +572,10 @@ try:
         from billing import get_checkout_by_order, get_payment
 
         if checkout_id:
-            checkout = get_checkout_by_order(str(checkout_id), st.session_state.get("saas_tenant_id"))
+            tenant_id = str(st.session_state.get("saas_tenant_id") or "")
+            if not tenant_id:
+                raise RuntimeError("Сначала войдите в аккаунт магазина.")
+            checkout = get_checkout_by_order(str(checkout_id), tenant_id)
             if not checkout or not checkout.get("provider_payment_id"):
                 raise RuntimeError("Checkout-сессия не найдена.")
             payment_id = str(checkout["provider_payment_id"])
