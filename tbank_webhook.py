@@ -169,6 +169,42 @@ def _verify_yookassa_payment_amount(payment, checkout):
         raise HTTPException(status_code=422, detail="Checkout currency verification failed")
 
 
+def _classify_yookassa_refund(refund, payment):
+    """Do not deactivate a subscription unless the provider confirms a full cumulative refund."""
+    refund_amount = refund.get("amount") if isinstance(refund, dict) else None
+    payment_amount = payment.get("amount") if isinstance(payment, dict) else None
+    refunded_amount = payment.get("refunded_amount") if isinstance(payment, dict) else None
+    try:
+        refund_value = Decimal(str(refund_amount.get("value")))
+        paid_value = Decimal(str(payment_amount.get("value")))
+    except (AttributeError, InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Refund amount verification failed")
+
+    refund_currency = str(refund_amount.get("currency") or "").upper()
+    payment_currency = str(payment_amount.get("currency") or "").upper()
+    if (not refund_value.is_finite() or not paid_value.is_finite()
+            or refund_value <= 0 or paid_value <= 0 or refund_value > paid_value):
+        raise HTTPException(status_code=422, detail="Refund amount verification failed")
+    if not payment_currency or refund_currency != payment_currency:
+        raise HTTPException(status_code=422, detail="Refund currency verification failed")
+
+    if isinstance(refunded_amount, dict) and refunded_amount.get("value") is not None:
+        try:
+            cumulative_value = Decimal(str(refunded_amount.get("value")))
+        except (InvalidOperation, TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="Refund total verification failed")
+        cumulative_currency = str(refunded_amount.get("currency") or "").upper()
+        if not cumulative_value.is_finite() or cumulative_value < refund_value or cumulative_value > paid_value:
+            raise HTTPException(status_code=409, detail="Provider refund total is not yet consistent")
+        if cumulative_currency != payment_currency:
+            raise HTTPException(status_code=422, detail="Refund currency verification failed")
+        return "refunded" if cumulative_value == paid_value else "partial_refunded"
+
+    # Without a provider-reported cumulative total, only a single refund equal to the
+    # original payment is sufficient evidence for a full refund.
+    return "refunded" if refund_value == paid_value else "partial_refunded"
+
+
 def _verify_tbank_payment_amount(payment, checkout):
     """Compare T-Bank's settled amount in kopecks against the server-side RUB checkout."""
     try:
@@ -352,14 +388,16 @@ async def yookassa_payment_status(request: Request):
         if str(refund.get("payment_id") or "") != payment_id:
             raise HTTPException(status_code=400, detail="Refund/payment mismatch")
         refund_status = str(refund.get("status") or "").lower()
+        payment = get_payment(payment_id)
+        if str(payment.get("id") or payment_id) != payment_id:
+            raise HTTPException(status_code=400, detail="Payment id mismatch")
+        provider_status = str(payment.get("status") or "").lower()
         if refund_status == "succeeded":
-            status = "refunded"
+            status = _classify_yookassa_refund(refund, payment)
         elif refund_status == "canceled":
             status = "refund_canceled"
         else:
             status = "refund_pending"
-        payment = get_payment(payment_id)
-        provider_status = str(payment.get("status") or "").lower()
     else:
         payment_id = str(obj.get("id") or "").strip()
         if not payment_id:
