@@ -93,10 +93,37 @@ jobs:
             -in "$temp_dir/backup.tar.gz" -out "$temp_dir/archive.enc" \
             -pass env:TEST_BACKUP_PASSPHRASE
           sha256sum "$temp_dir/archive.enc" > "$temp_dir/archive.sha256"
-          openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}' > "$temp_dir/archive.hmac"
+          python - "$temp_dir/archive.enc" "$temp_dir/archive.hmac" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              digest = hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest()
+          with open(sys.argv[2], "w", encoding="ascii") as out:
+              out.write(digest + "\n")
+          PY
           sha256sum -c "$temp_dir/archive.sha256"
           expected_hmac="$(cat "$temp_dir/archive.hmac")"
-          actual_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}')"
+          actual_hmac="$(python - "$temp_dir/archive.enc" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
           [[ "$actual_hmac" == "$expected_hmac" ]]
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
             -in "$temp_dir/archive.enc" -out "$temp_dir/restored.tar.gz" \
@@ -107,7 +134,20 @@ jobs:
           cmp "$temp_dir/package/schema.sql" "$temp_dir/unpacked/schema.sql"
           cp "$temp_dir/archive.enc" "$temp_dir/tampered.enc"
           printf x >> "$temp_dir/tampered.enc"
-          tampered_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/tampered.enc" | awk '{print $NF}')"
+          tampered_hmac="$(python - "$temp_dir/tampered.enc" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
           [[ "$tampered_hmac" != "$expected_hmac" ]]
           echo "Synthetic package checksum, encryption round-trip, and tamper rejection passed."
 
@@ -179,7 +219,21 @@ jobs:
             -pass env:BACKUP_ENCRYPTION_PASSPHRASE
           test -s supabase-backup-encrypted.tar.gz.enc
           sha256sum supabase-backup-encrypted.tar.gz.enc > supabase-backup-encrypted.sha256
-          openssl dgst -sha256 -hmac "$BACKUP_ENCRYPTION_PASSPHRASE" supabase-backup-encrypted.tar.gz.enc | awk '{print $NF}' > supabase-backup-encrypted.hmac
+          python - supabase-backup-encrypted.tar.gz.enc supabase-backup-encrypted.hmac <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              digest = hmac.new(
+                  os.environ["BACKUP_ENCRYPTION_PASSPHRASE"].encode("utf-8"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest()
+          with open(sys.argv[2], "w", encoding="ascii") as out:
+              out.write(digest + "\n")
+          PY
           rm -f backup-work.tar.gz
 
       - name: Install local Supabase stack for isolated restore test
@@ -197,7 +251,20 @@ jobs:
           set -euo pipefail
           sha256sum -c supabase-backup-encrypted.sha256
           expected_hmac="$(cat supabase-backup-encrypted.hmac)"
-          actual_hmac="$(openssl dgst -sha256 -hmac "$BACKUP_ENCRYPTION_PASSPHRASE" supabase-backup-encrypted.tar.gz.enc | awk '{print $NF}')"
+          actual_hmac="$(python - supabase-backup-encrypted.tar.gz.enc <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["BACKUP_ENCRYPTION_PASSPHRASE"].encode("utf-8"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
           [[ "$actual_hmac" == "$expected_hmac" ]] || { echo "::error::Encrypted backup authentication check failed"; exit 1; }
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
             -in supabase-backup-encrypted.tar.gz.enc -out "$RUNNER_TEMP/backup.tar.gz" \
