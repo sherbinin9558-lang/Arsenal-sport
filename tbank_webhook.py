@@ -99,9 +99,10 @@ async def readyz():
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
     tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
+    # Readiness must reflect the credentials required for authoritative provider API reads.
     yookassa_ready = bool(
         _env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY")
-    ) or bool(_env("YOOKASSA_WEBHOOK_SECRET"))
+    )
     if not tbank_ready and not yookassa_ready:
         raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
     return {
