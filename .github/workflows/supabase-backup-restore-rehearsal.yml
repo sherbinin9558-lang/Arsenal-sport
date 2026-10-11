@@ -1,0 +1,120 @@
+name: Supabase backup and restore rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: "Type BACKUP_PRODUCTION to confirm read-only export from the configured Supabase project"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backup-restore-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  backup-and-restore:
+    if: ${{ inputs.confirm_target == 'BACKUP_PRODUCTION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DB_URL repository secret"; exit 1; }
+          test -n "$BACKUP_ENCRYPTION_PASSPHRASE" || { echo "::error::Missing BACKUP_ENCRYPTION_PASSPHRASE repository secret"; exit 1; }
+          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || ${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
+            echo "::error::Use a unique random backup passphrase of at least 24 characters"
+            exit 1
+          fi
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Export database using Supabase-aware dumps
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p backup-work
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          test -s backup-work/roles.sql
+          test -s backup-work/schema.sql
+          test -s backup-work/data.sql
+          {
+            echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "supabase_project_ref=lmdiwzkuvictysmdtuld"
+            echo "dump_tool=supabase-cli"
+            echo "postgres_target=17"
+          } > backup-work/manifest.txt
+          sha256sum backup-work/roles.sql backup-work/schema.sql backup-work/data.sql backup-work/manifest.txt > backup-work/SHA256SUMS
+          tar -czf backup-work.tar.gz -C backup-work roles.sql schema.sql data.sql manifest.txt SHA256SUMS
+          openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
+            -in backup-work.tar.gz -out supabase-backup-encrypted.tar.gz.enc \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+          test -s supabase-backup-encrypted.tar.gz.enc
+          sha256sum supabase-backup-encrypted.tar.gz.enc > supabase-backup-encrypted.sha256
+          rm -f backup-work.tar.gz
+
+      - name: Install local Supabase stack for isolated restore test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/restore-target"
+          cd "$RUNNER_TEMP/restore-target"
+          supabase init
+          supabase start
+
+      - name: Restore into isolated local Supabase database
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in supabase-backup-encrypted.tar.gz.enc -out "$RUNNER_TEMP/backup.tar.gz" \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+          mkdir -p "$RUNNER_TEMP/backup-unpacked"
+          tar -xzf "$RUNNER_TEMP/backup.tar.gz" -C "$RUNNER_TEMP/backup-unpacked"
+          (cd "$RUNNER_TEMP/backup-unpacked" && sha256sum -c SHA256SUMS)
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
+            postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --single-transaction --set ON_ERROR_STOP=1 \
+              --file /backup/roles.sql \
+              --file /backup/schema.sql \
+              --command 'SET session_replication_role = replica' \
+              --file /backup/data.sql
+          docker run --rm --network host postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --set ON_ERROR_STOP=1 \
+              --command "SELECT count(*) AS restored_public_tables FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
+          echo "Restore rehearsal completed against a disposable local Supabase stack."
+
+      - name: Upload encrypted backup only
+        if: always() && hashFiles('supabase-backup-encrypted.tar.gz.enc') != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: supabase-encrypted-backup-${{ github.run_id }}
+          path: |
+            supabase-backup-encrypted.tar.gz.enc
+            supabase-backup-encrypted.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Cleanup plaintext and local database
+        if: always()
+        shell: bash
+        run: |
+          rm -rf backup-work backup-work.tar.gz "$RUNNER_TEMP/backup.tar.gz" "$RUNNER_TEMP/backup-unpacked" "$RUNNER_TEMP/restore-target"
+          docker rm -f $(docker ps -aq --filter "name=supabase_") >/dev/null 2>&1 || true
