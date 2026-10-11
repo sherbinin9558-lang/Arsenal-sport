@@ -52,9 +52,9 @@ begin
   if not found then raise exception 'CHECKOUT_NOT_FOUND'; end if;
   if checkout.plan <> p_plan then raise exception 'PLAN_MISMATCH'; end if;
 
-  -- Do not let a delayed success notification undo a terminal refund/reversal/cancellation.
-  if normalized_status in ('succeeded','confirmed')
-     and lower(coalesce(checkout.status,'')) in
+  -- A terminal checkout is immutable: late pending, canceled-refund, or success events
+  -- must not overwrite a completed refund/reversal/cancellation state.
+  if lower(coalesce(checkout.status,'')) in
          ('refunded','reversed','canceled','cancelled','rejected','deadline_expired') then
     update public.billing_webhook_events
        set status = 'processed', processed_at = now(),
