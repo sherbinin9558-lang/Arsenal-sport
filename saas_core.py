@@ -38,9 +38,46 @@ def _headers(token=None):
     }
 
 class SupabaseRequestError(RuntimeError):
-    def __init__(self, message, status_code=None):
+    def __init__(self, message, status_code=None, error_code=None):
         super().__init__(message)
         self.status_code = status_code
+        self.error_code = error_code
+
+
+_SUPABASE_CONFLICT_CODES = (
+    "DATA_CONFLICT",
+    "RECORD_NOT_FOUND",
+    "RECORD_ALREADY_EXISTS",
+)
+
+
+def _supabase_error_code(data):
+    """Extract only allow-listed machine markers; never expose the backend body."""
+    if not isinstance(data, dict):
+        return None
+    text = " ".join(
+        str(data.get(key) or "")
+        for key in ("code", "message", "details", "hint", "msg", "error")
+    )
+    return next((code for code in _SUPABASE_CONFLICT_CODES if code in text), None)
+
+
+def _safe_supabase_error(status_code):
+    """Return a stable user-facing message without exposing PostgREST/Auth bodies."""
+    messages = {
+        400: "Запрос к Supabase содержит недопустимые данные.",
+        401: "Сессия недействительна. Войдите в аккаунт повторно.",
+        403: "Недостаточно прав для выполнения операции.",
+        404: "Запрашиваемый ресурс не найден.",
+        409: "Данные изменились в другой сессии. Обновите страницу и повторите действие.",
+        422: "Supabase отклонил данные запроса.",
+        429: "Слишком много запросов. Повторите попытку позже.",
+    }
+    if status_code in messages:
+        return messages[status_code]
+    if status_code and status_code >= 500:
+        return "Сервис данных временно недоступен. Повторите попытку позже."
+    return "Не удалось выполнить запрос к Supabase."
 
 
 def _request(method,path,token=None,**kwargs):
@@ -56,8 +93,9 @@ def _request(method,path,token=None,**kwargs):
     except Exception: data={"message":r.text}
     if not r.ok:
         raise SupabaseRequestError(
-            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
+            _safe_supabase_error(r.status_code),
             r.status_code,
+            error_code=_supabase_error_code(data),
         )
     return data
 
@@ -430,8 +468,9 @@ def _rest_get_paged(path, token, params=None):
         data = {"message": response.text}
     if not response.ok:
         raise SupabaseRequestError(
-            data.get("msg") or data.get("message") or data.get("error_description") or str(data),
+            _safe_supabase_error(response.status_code),
             response.status_code,
+            error_code=_supabase_error_code(data),
         )
     total = None
     content_range = response.headers.get("Content-Range", "")
@@ -1513,7 +1552,7 @@ def data_update_record(entity, record_id, payload, expected_updated_at):
         })
         _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
-        if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
+        if e.status_code in (400, 409) and e.error_code in ("DATA_CONFLICT", "RECORD_NOT_FOUND"):
             _invalidate_entity_cache(entity)
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.") from e
         raise
@@ -1534,7 +1573,7 @@ def data_delete_record(entity, record_id, expected_updated_at):
         })
         _invalidate_computed_snapshots()
     except SupabaseRequestError as e:
-        if e.status_code in (400, 409) and any(x in str(e) for x in ("DATA_CONFLICT", "RECORD_NOT_FOUND")):
+        if e.status_code in (400, 409) and e.error_code in ("DATA_CONFLICT", "RECORD_NOT_FOUND"):
             _invalidate_entity_cache(entity)
             raise DataConflictError("Данные изменились в другой сессии. Обновите страницу и повторите.") from e
         raise
@@ -1651,13 +1690,10 @@ def data_save(entity,rows):
             },
         )
     except SupabaseRequestError as e:
-        message=str(e)
-        if e.status_code in (400,409) and any(
-            marker in message for marker in (
-                "DATA_CONFLICT",
-                "RECORD_NOT_FOUND",
-                "RECORD_ALREADY_EXISTS",
-            )
+        if e.status_code in (400,409) and e.error_code in (
+            "DATA_CONFLICT",
+            "RECORD_NOT_FOUND",
+            "RECORD_ALREADY_EXISTS",
         ):
             _invalidate_entity_cache(entity)
             raise DataConflictError(

@@ -64,7 +64,7 @@ class CoreRegressionTests(unittest.TestCase):
         with patch.object(saas_core, "saas_enabled", return_value=True), \
              patch.object(saas_core, "can", return_value=True), \
              patch.object(saas_core, "tenant_id", return_value="tenant-1"), \
-             patch.object(saas_core, "_rest_post", side_effect=saas_core.SupabaseRequestError("DATA_CONFLICT", 409)):
+             patch.object(saas_core, "_rest_post", side_effect=saas_core.SupabaseRequestError("Безопасное сообщение", 409, error_code="DATA_CONFLICT")):
             with self.assertRaises(saas_core.DataConflictError):
                 saas_core.data_save("products", [
                     {"_saas_record_id": "p1", "name": "new"}
