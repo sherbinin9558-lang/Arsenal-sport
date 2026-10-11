@@ -176,3 +176,26 @@ def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
         billing.get_refund('refund/with?unsafe=query')
     assert 'PRIVATE_PROVIDER_SECRET' not in str(exc.value)
     assert '/v3/refunds/refund%2Fwith%3Funsafe%3Dquery' in call.call_args.args[0]
+
+
+
+def test_successful_partial_refund_does_not_mark_payment_fully_refunded(monkeypatch):
+    result = tbank_webhook._classify_yookassa_refund(
+        {"amount": {"value": "300.00", "currency": "RUB"}},
+        {
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "refunded_amount": {"value": "300.00", "currency": "RUB"},
+        },
+    )
+    assert result == "partial_refunded"
+
+
+def test_cumulative_full_refund_marks_payment_refunded(monkeypatch):
+    result = tbank_webhook._classify_yookassa_refund(
+        {"amount": {"value": "690.00", "currency": "RUB"}},
+        {
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "refunded_amount": {"value": "990.00", "currency": "RUB"},
+        },
+    )
+    assert result == "refunded"
