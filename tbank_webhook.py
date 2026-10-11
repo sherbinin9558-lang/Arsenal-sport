@@ -9,13 +9,14 @@ import hashlib
 import hmac
 import json
 import os
+from decimal import Decimal, InvalidOperation
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
 
 from tbank_billing import get_state, _token
-from billing import get_payment
+from billing import get_payment, get_refund
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
 
@@ -98,7 +99,9 @@ async def readyz():
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
     tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
-    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
+    yookassa_ready = bool(
+        _env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY")
+    ) or bool(_env("YOOKASSA_WEBHOOK_SECRET"))
     if not tbank_ready and not yookassa_ready:
         raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
     return {
@@ -136,7 +139,7 @@ def _checkout_by_provider_payment(provider, payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": f"eq.{provider}",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -147,13 +150,46 @@ def _checkout_by_provider_payment(provider, payment_id):
     data = response.json()
     return data[0] if data else None
 
+def _verify_yookassa_payment_amount(payment, checkout):
+    """Require provider settlement amount/currency to match the server-created checkout."""
+    expected_amount = checkout.get("expected_amount")
+    expected_currency = str(checkout.get("expected_currency") or "").upper()
+    actual = payment.get("amount") if isinstance(payment, dict) else None
+    actual_amount = actual.get("value") if isinstance(actual, dict) else None
+    actual_currency = str(actual.get("currency") or "").upper() if isinstance(actual, dict) else ""
+    try:
+        expected = Decimal(str(expected_amount))
+        received = Decimal(str(actual_amount))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if not expected.is_finite() or not received.is_finite() or expected <= 0 or received != expected:
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if not expected_currency or actual_currency != expected_currency:
+        raise HTTPException(status_code=422, detail="Checkout currency verification failed")
+
+
+def _verify_tbank_payment_amount(payment, checkout):
+    """Compare T-Bank's settled amount in kopecks against the server-side RUB checkout."""
+    try:
+        expected_rub = Decimal(str(checkout.get("expected_amount")))
+        actual_kopecks = Decimal(str(payment.get("Amount")))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    expected_currency = str(checkout.get("expected_currency") or "").upper()
+    if (not expected_rub.is_finite() or not actual_kopecks.is_finite()
+            or expected_rub <= 0 or expected_rub * 100 != actual_kopecks):
+        raise HTTPException(status_code=422, detail="Checkout amount verification failed")
+    if expected_currency != "RUB":
+        raise HTTPException(status_code=422, detail="Checkout currency verification failed")
+
+
 def _checkout_by_payment(payment_id):
     url, _ = _supabase()
     rows = requests.get(
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": "eq.tbank",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -264,6 +300,8 @@ async def payment_status(request: Request):
 
     state = get_state(payment_id)
     status = str(state.get("Status") or "").upper()
+    if status == "CONFIRMED":
+        _verify_tbank_payment_amount(state, checkout)
     plan = str(checkout.get("plan") or "").lower()
     tenant = str(checkout.get("tenant_id") or "")
 
@@ -289,33 +327,54 @@ async def payment_status(request: Request):
 
 @app.post("/webhooks/yookassa")
 async def yookassa_payment_status(request: Request):
-    if not _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET"):
-        raise HTTPException(status_code=401, detail="Webhook authentication required")
+    # Standard YooKassa notifications do not include our custom Bearer header.
+    # Validate it when supplied; state changes still require authoritative provider reads.
+    _verify_webhook_secret(request, "YOOKASSA_WEBHOOK_SECRET")
     body = await _read_body(request)
-    event = str(body.get("event") or "").lower()
-    obj = body.get("object") or {}
+    event = str(body.get("event") or "").strip().lower()
+    obj = body.get("object")
+    if not isinstance(obj, dict):
+        raise HTTPException(status_code=400, detail="Invalid notification object")
+    if not (event.startswith("payment.") or event.startswith("refund.")):
+        raise HTTPException(status_code=400, detail="Unsupported notification event")
 
-    # Refund notifications contain the refund id in object.id and the original
-    # payment id in object.payment_id. Never treat the refund id as a payment id.
     is_refund = event.startswith("refund.")
-    payment_id = str((obj.get("payment_id") if is_refund else obj.get("id")) or "")
-    if not payment_id:
-        raise HTTPException(status_code=400, detail="Payment id is required")
-
-    # Query YooKassa directly so the webhook body cannot forge payment state.
-    payment = get_payment(payment_id)
-    provider_status = str(payment.get("status") or "").lower()
+    refund_id = ""
     if is_refund:
-        if event == "refund.succeeded":
+        refund_id = str(obj.get("id") or "").strip()
+        payment_id = str(obj.get("payment_id") or "").strip()
+        if not refund_id or not payment_id:
+            raise HTTPException(status_code=400, detail="Refund and payment ids are required")
+        refund = get_refund(refund_id)
+        if str(refund.get("id") or refund_id) != refund_id:
+            raise HTTPException(status_code=400, detail="Refund id mismatch")
+        if str(refund.get("payment_id") or "") != payment_id:
+            raise HTTPException(status_code=400, detail="Refund/payment mismatch")
+        refund_status = str(refund.get("status") or "").lower()
+        if refund_status == "succeeded":
             status = "refunded"
+        elif refund_status == "canceled":
+            status = "refund_canceled"
         else:
             status = "refund_pending"
+        payment = get_payment(payment_id)
+        provider_status = str(payment.get("status") or "").lower()
     else:
+        payment_id = str(obj.get("id") or "").strip()
+        if not payment_id:
+            raise HTTPException(status_code=400, detail="Payment id is required")
+        payment = get_payment(payment_id)
+        if str(payment.get("id") or payment_id) != payment_id:
+            raise HTTPException(status_code=400, detail="Payment id mismatch")
+        provider_status = str(payment.get("status") or "").lower()
         status = provider_status
 
     checkout = _checkout_by_provider_payment("yookassa", payment_id)
     if not checkout:
         raise HTTPException(status_code=404, detail="Checkout session not found")
+
+    if not is_refund and provider_status in ("succeeded", "confirmed"):
+        _verify_yookassa_payment_amount(payment, checkout)
 
     plan = str(checkout.get("plan") or "").lower()
     tenant = str(checkout.get("tenant_id") or "")
@@ -324,7 +383,8 @@ async def yookassa_payment_status(request: Request):
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
-    event_key = f"yookassa:{event or 'payment.status'}:{payment_id}:{status}"
+    event_object_id = refund_id if is_refund else payment_id
+    event_key = f"yookassa:{event}:{event_object_id}:{status}"
 
     try:
         result = _process_billing_event(
@@ -338,7 +398,7 @@ async def yookassa_payment_status(request: Request):
             payload=body,
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail="Billing state transition failed")
+        raise HTTPException(status_code=502, detail="Billing state transition failed") from exc
 
     return {
         "ok": True,
