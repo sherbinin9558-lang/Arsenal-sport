@@ -1,6 +1,9 @@
 name: Supabase backup and restore rehearsal
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/supabase-backup-restore-rehearsal.yml"
   workflow_dispatch:
     inputs:
       confirm_target:
@@ -16,13 +19,95 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-workflow:
+    if: \${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout workflow under test
+        uses: actions/checkout@v6
+
+      - name: Verify explicit dispatch gate and synthetic project URI cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          source = Path(".github/workflows/supabase-backup-restore-rehearsal.yml").read_text()
+          required = [
+              "if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}",
+              "SUPABASE_DB_URL: \${{ secrets.SUPABASE_DB_URL }}",
+              "BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}",
+              "uses: supabase/setup-cli@v3",
+              "uses: actions/upload-artifact@v7",
+          ]
+          missing = [line for line in required if line not in source]
+          if missing:
+              raise SystemExit("Required workflow safety marker missing: " + ", ".join(missing))
+          print("Dispatch guard, secret references, and action major versions verified.")
+          PY
+          python - <<'PY'
+          from urllib.parse import unquote, urlsplit
+
+          expected_ref = "lmdiwzkuvictysmdtuld"
+
+          def matches(raw):
+              uri = urlsplit(raw)
+              username = unquote(uri.username or "")
+              hostname = (uri.hostname or "").lower()
+              valid_scheme = uri.scheme in {"postgres", "postgresql"}
+              valid_database = uri.path.rstrip("/") == "/postgres"
+              valid_credentials = bool(username and uri.password)
+              valid_pooler = hostname.endswith(".pooler.supabase.com") and expected_ref in username.split(".")
+              valid_direct = hostname in {
+                  f"db.{expected_ref}.supabase.com",
+                  f"db.{expected_ref}.supabase.co",
+              }
+              return valid_scheme and valid_database and valid_credentials and (valid_pooler or valid_direct)
+
+          assert matches("postgresql://postgres.lmdiwzkuvictysmdtuld:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/postgres")
+          assert matches("postgresql://postgres:placeholder@db.lmdiwzkuvictysmdtuld.supabase.com:5432/postgres")
+          assert not matches("postgresql://postgres.other-project:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/postgres")
+          assert not matches("postgresql://postgres.lmdiwzkuvictysmdtuld:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/otherdb")
+          print("Synthetic URI positive/negative cases passed.")
+          PY
+
+      - name: Test encryption, checksum, HMAC, tamper rejection, and round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          export TEST_BACKUP_PASSPHRASE="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+          printf 'synthetic backup content only; no production data\n' > "$temp_dir/plain.txt"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
+            -in "$temp_dir/plain.txt" -out "$temp_dir/archive.enc" \
+            -pass env:TEST_BACKUP_PASSPHRASE
+          sha256sum "$temp_dir/archive.enc" > "$temp_dir/archive.sha256"
+          openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}' > "$temp_dir/archive.hmac"
+          sha256sum -c "$temp_dir/archive.sha256"
+          expected_hmac="$(cat "$temp_dir/archive.hmac")"
+          actual_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/archive.enc" | awk '{print $NF}')"
+          [[ "$actual_hmac" == "$expected_hmac" ]]
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in "$temp_dir/archive.enc" -out "$temp_dir/restored.txt" \
+            -pass env:TEST_BACKUP_PASSPHRASE
+          cmp "$temp_dir/plain.txt" "$temp_dir/restored.txt"
+          cp "$temp_dir/archive.enc" "$temp_dir/tampered.enc"
+          printf x >> "$temp_dir/tampered.enc"
+          tampered_hmac="$(openssl dgst -sha256 -hmac "$TEST_BACKUP_PASSPHRASE" "$temp_dir/tampered.enc" | awk '{print $NF}')"
+          [[ "$tampered_hmac" != "$expected_hmac" ]]
+          echo "Synthetic encryption round-trip and tamper rejection passed."
+
   backup-and-restore:
-    if: ${{ inputs.confirm_target == 'BACKUP_PRODUCTION' }}
+    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+      SUPABASE_DB_URL: \${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
       - name: Validate required secrets and target project
         shell: bash
@@ -30,7 +115,7 @@ jobs:
           set -euo pipefail
           test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DB_URL repository secret"; exit 1; }
           test -n "$BACKUP_ENCRYPTION_PASSPHRASE" || { echo "::error::Missing BACKUP_ENCRYPTION_PASSPHRASE repository secret"; exit 1; }
-          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || ${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
+          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || \${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
             echo "::error::Use a unique random backup passphrase of at least 24 characters"
             exit 1
           fi
@@ -47,15 +132,15 @@ jobs:
           valid_database = uri.path.rstrip("/") == "/postgres"
           valid_credentials = bool(username and uri.password)
           valid_pooler_target = hostname.endswith(".pooler.supabase.com") and expected_ref in username.split(".")
-          valid_direct_target = hostname == f"db.{expected_ref}.supabase.co"
+          valid_direct_target = hostname in {f"db.{expected_ref}.supabase.com", f"db.{expected_ref}.supabase.co"}
           if not (valid_scheme and valid_database and valid_credentials and (valid_pooler_target or valid_direct_target)):
-              print("::error::SUPABASE_DB_URL does not appear to target the expected Supabase project/database. Re-copy the connection URI from the project's Session Pooler settings; do not print it to logs.")
+              print("::error::SUPABASE_DB_URL does not appear to target the expected Supabase project/database. Re-copy the URI from the project's Session Pooler settings; do not print it to logs.")
               sys.exit(1)
           print("Connection URI structure and expected project target validated without printing credentials.")
           PY
 
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: latest
 
@@ -129,7 +214,7 @@ jobs:
         if: always() && hashFiles('supabase-backup-encrypted.tar.gz.enc') != ''
         uses: actions/upload-artifact@v7
         with:
-          name: supabase-encrypted-backup-${{ github.run_id }}
+          name: supabase-encrypted-backup-\${{ github.run_id }}
           path: |
             supabase-backup-encrypted.tar.gz.enc
             supabase-backup-encrypted.sha256
