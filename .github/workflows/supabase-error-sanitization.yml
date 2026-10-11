@@ -1,0 +1,26 @@
+name: Supabase error sanitization
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  error-sanitization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install application dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pytest
+      - name: Compile auth module
+        run: python -m py_compile saas_core.py
+      - name: Test sanitized error contracts
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_supabase_error_sanitization.py tests/test_auth_and_roles_contract.py
