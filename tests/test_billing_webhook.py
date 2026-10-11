@@ -70,9 +70,9 @@ class BillingWebhookTests(unittest.TestCase):
              patch.object(tbank_webhook, "_read_body", return_value=payload), \
              patch.object(tbank_webhook, "_token", return_value="valid-token"), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-sensitive-987", "plan": "pro"
+                 "tenant_id": "tenant-sensitive-987", "plan": "pro", "expected_amount": "990.00", "expected_currency": "RUB"
              }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \
              patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-DB-SECRET")):
             with self.assertRaises(HTTPException) as ctx:
                 import asyncio
@@ -92,9 +92,9 @@ class BillingWebhookTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"YOOKASSA_WEBHOOK_SECRET": "unit-yoo-secret"}, clear=False), \
              patch.object(tbank_webhook, "_read_body", return_value=payload), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_payment", return_value={"id": "payment-456", "status": "succeeded", "amount": {"value": "990.00", "currency": "RUB"}}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
-                 "tenant_id": "tenant-sensitive-654", "plan": "starter"
+                 "tenant_id": "tenant-sensitive-654", "plan": "starter", "expected_amount": "990.00", "expected_currency": "RUB"
              }), \
              patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
             with self.assertRaises(HTTPException) as ctx:
