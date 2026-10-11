@@ -34,3 +34,25 @@ def test_paged_request_sanitizes_backend_error_body(monkeypatch):
     assert exc.value.status_code == 500
     assert "PRIVATE_BACKEND_DETAIL" not in str(exc.value)
     assert "service_role_key" not in str(exc.value)
+
+
+def test_conflict_marker_is_kept_as_internal_code_not_user_message(monkeypatch):
+    payload = {"message": "DATA_CONFLICT: PRIVATE_BACKEND_DETAIL", "code": "P0001"}
+    monkeypatch.setattr(saas_core, "_supabase_config", lambda: ("https://example.supabase.co", "anon-test-key"))
+    monkeypatch.setattr(saas_core.requests, "request", lambda *args, **kwargs: FakeResponse(409, payload))
+    with pytest.raises(saas_core.SupabaseRequestError) as exc:
+        saas_core._request("POST", "/rest/v1/rpc/save_app_data_batch")
+    assert exc.value.error_code == "DATA_CONFLICT"
+    assert "DATA_CONFLICT" not in str(exc.value)
+    assert "PRIVATE_BACKEND_DETAIL" not in str(exc.value)
+
+
+def test_paged_request_preserves_conflict_marker_internally(monkeypatch):
+    payload = {"message": "RECORD_NOT_FOUND: PRIVATE_BACKEND_DETAIL"}
+    monkeypatch.setattr(saas_core, "_supabase_config", lambda: ("https://example.supabase.co", "anon-test-key"))
+    monkeypatch.setattr(saas_core.requests, "get", lambda *args, **kwargs: FakeResponse(409, payload))
+    with pytest.raises(saas_core.SupabaseRequestError) as exc:
+        saas_core._rest_get_paged("/rest/v1/app_data", "test-access-token")
+    assert exc.value.error_code == "RECORD_NOT_FOUND"
+    assert "RECORD_NOT_FOUND" not in str(exc.value)
+    assert "PRIVATE_BACKEND_DETAIL" not in str(exc.value)
