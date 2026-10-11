@@ -8,7 +8,7 @@ def test_delayed_success_cannot_reactivate_terminal_checkout():
     assert "lower(coalesce(checkout.status,''))" in migration
     assert "'refunded','reversed','canceled','cancelled','rejected','deadline_expired'" in migration
     assert "'ignored', true, 'reason', 'checkout_terminal'" in migration
-    guard = migration.index("-- Do not let a delayed success notification")
+    guard = migration.index("-- A terminal checkout is immutable:")
     activation = migration.index("perform public.activate_paid_subscription(")
     assert guard < activation
 
