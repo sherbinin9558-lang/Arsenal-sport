@@ -33,6 +33,7 @@ The production export job is guarded so it runs only for a manual dispatch on `m
 
 - This workflow exports the database, not the actual Storage object files, deployed Edge Functions, Auth provider settings, SMTP settings, or application/provider secrets. Storage objects and operational configuration need separate, secure backups.
 - The workflow creates an encrypted artifact retained for 7 days only. Copy it to approved encrypted off-site storage for durable recovery.
+- The disposable local restore target is pinned to PostgreSQL 17 to match the current Production database major version.
 - A successful restore rehearsal proves only that this database dump could be restored into the disposable target used by that run. It does not prove that Storage objects, external integrations, payments, or the complete SaaS deployment can be recovered.
 - It does not run the three pending billing migrations on Production.
 - Resetting the database password can break other direct PostgreSQL connections that still use the previous password. The app's main data/auth flows use Supabase HTTPS API keys, but check any external direct-database clients and update them if necessary.
