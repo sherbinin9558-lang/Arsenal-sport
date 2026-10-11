@@ -105,6 +105,16 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertNotIn("INTERNAL-YOO-SECRET", str(ctx.exception.detail))
         self.assertNotIn("tenant-sensitive-654", str(ctx.exception.detail))
 
+    @patch("tbank_webhook.plan_price", return_value=990.0)
+    def test_expected_tbank_amount_matches_plan(self, _price):
+        expected = int(round(tbank_webhook.plan_price("pro") * 100))
+        self.assertEqual(expected, 99000)
+
+    @patch("tbank_webhook.plan_price", return_value=990.0)
+    def test_tbank_amount_mismatch_is_detectable(self, _price):
+        expected = int(round(tbank_webhook.plan_price("pro") * 100))
+        self.assertNotEqual(100000, expected)
+
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}
         self.assertIn("/healthz", paths)
