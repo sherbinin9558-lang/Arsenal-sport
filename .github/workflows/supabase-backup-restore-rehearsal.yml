@@ -44,6 +44,7 @@ jobs:
               "uses: supabase/setup-cli@v3",
               "uses: actions/upload-artifact@v7",
               "(cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)",
+              "python - <<'PY' sets db.major_version = 17 before supabase start",
               "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
           ]
           missing = [line for line in required if line not in source]
@@ -243,6 +244,31 @@ jobs:
           mkdir -p "$RUNNER_TEMP/restore-target"
           cd "$RUNNER_TEMP/restore-target"
           supabase init
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          config = Path("supabase/config.toml")
+          if not config.is_file():
+              raise SystemExit("Generated Supabase config.toml not found; refusing to start an unverified restore target.")
+          lines = config.read_text(encoding="utf-8").splitlines()
+          db_start = next((i for i, line in enumerate(lines) if line.strip() == "[db]"), None)
+          if db_start is None:
+              raise SystemExit("Generated Supabase config has no [db] section; cannot pin the restore database version.")
+          db_end = next((i for i in range(db_start + 1, len(lines)) if re.match(r"^\s*\[", lines[i])), len(lines))
+          version_line = next((i for i in range(db_start + 1, db_end) if re.match(r"^\s*major_version\s*=", lines[i])), None)
+          if version_line is None:
+              lines.insert(db_start + 1, "major_version = 17")
+          else:
+              lines[version_line] = re.sub(r"^\s*major_version\s*=.*$", "major_version = 17", lines[version_line])
+          config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          updated = config.read_text(encoding="utf-8")
+          match = re.search(r"(?ms)^\[db\]\s*(.*?)(?=^\[|\Z)", updated)
+          if not match or not re.search(r"(?m)^\s*major_version\s*=\s*17\s*$", match.group(1)):
+              raise SystemExit("Failed to pin the local restore database to PostgreSQL 17.")
+          print("Disposable restore target pinned to PostgreSQL 17, matching Production.")
+          PY
           supabase start
 
       - name: Restore into isolated local Supabase database
