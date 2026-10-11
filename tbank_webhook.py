@@ -337,6 +337,10 @@ async def payment_status(request: Request):
 
     state = get_state(payment_id)
     status = str(state.get("Status") or "").upper()
+    # AUTHORIZED is an intermediate state. Never send it to the billing RPC:
+    # this also protects deployments where the DB migration has not applied yet.
+    if status == "AUTHORIZED":
+        return PlainTextResponse("OK")
     if status == "CONFIRMED":
         _verify_tbank_payment_amount(state, checkout)
     plan = str(checkout.get("plan") or "").lower()
