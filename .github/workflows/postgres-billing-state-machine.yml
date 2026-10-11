@@ -1,0 +1,149 @@
+name: PostgreSQL billing state-machine integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-billing-state-machine:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shopilot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shopilot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: shopilot_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 30); do
+            pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" && break
+            sleep 2
+          done
+          pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"
+      - name: Create minimal Supabase-compatible schema
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create extension if not exists pgcrypto;
+          do $$ begin
+            create role anon;
+          exception when duplicate_object then null; end $$;
+          do $$ begin
+            create role authenticated;
+          exception when duplicate_object then null; end $$;
+          do $$ begin
+            create role service_role;
+          exception when duplicate_object then null; end $$;
+          create table public.billing_checkout_sessions (
+            id uuid primary key default gen_random_uuid(),
+            tenant_id uuid not null,
+            provider text not null,
+            provider_order_id text,
+            provider_payment_id text not null,
+            plan text not null,
+            status text not null default 'created',
+            updated_at timestamptz not null default now(),
+            unique(provider, provider_payment_id, tenant_id)
+          );
+          create table public.billing_webhook_events (
+            id uuid primary key default gen_random_uuid(),
+            provider text not null,
+            event_key text not null,
+            provider_payment_id text not null,
+            status text not null,
+            payload_hash text,
+            processed_at timestamptz,
+            unique(provider, event_key)
+          );
+          create table public.billing_test_activations (
+            tenant_id uuid not null,
+            plan text not null,
+            provider text not null,
+            payment_id text not null
+          );
+          create function public.activate_paid_subscription(
+            uuid, text, text, text, text default null
+          ) returns void language sql as $$
+            insert into public.billing_test_activations(tenant_id, plan, provider, payment_id)
+            values ($1, $2, $3, $4);
+          $$;
+          create function public.deactivate_paid_subscription(uuid, text, text, text)
+          returns boolean language sql as $$ select true; $$;
+          SQL
+      - name: Apply billing migrations to disposable PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009170000_require_captured_payment_for_activation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009190000_billing_checkout_amount_validation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009193000_prevent_reactivation_after_refund.sql
+      - name: Verify real SQL state transitions
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            tenant constant uuid := '11111111-1111-4111-8111-111111111111';
+            result jsonb;
+            activation_count integer;
+            current_status text;
+          begin
+            insert into public.billing_checkout_sessions
+              (tenant_id, provider, provider_payment_id, plan, status, expected_amount, expected_currency)
+            values
+              (tenant, 'tbank', 'auth-payment', 'pro', 'created', 990.00, 'RUB'),
+              (tenant, 'tbank', 'success-payment', 'pro', 'created', 990.00, 'RUB'),
+              (tenant, 'tbank', 'refunded-payment', 'pro', 'refunded', 990.00, 'RUB');
+
+            result := public.process_billing_payment_event(
+              'tbank', 'evt-auth', 'auth-payment', 'AUTHORIZED', tenant, 'pro', null, null
+            );
+            select count(*) into activation_count from public.billing_test_activations;
+            if activation_count <> 0 then
+              raise exception 'AUTHORIZED unexpectedly activated a subscription';
+            end if;
+
+            result := public.process_billing_payment_event(
+              'tbank', 'evt-success', 'success-payment', 'CONFIRMED', tenant, 'pro', null, null
+            );
+            select count(*) into activation_count from public.billing_test_activations;
+            if activation_count <> 1 then
+              raise exception 'CONFIRMED should activate exactly one subscription; count=%', activation_count;
+            end if;
+
+            result := public.process_billing_payment_event(
+              'tbank', 'evt-late-success', 'refunded-payment', 'succeeded', tenant, 'pro', null, null
+            );
+            if coalesce((result->>'ignored')::boolean, false) is not true
+               or result->>'reason' <> 'checkout_terminal' then
+              raise exception 'Late success was not ignored for terminal checkout: %', result;
+            end if;
+            select status into current_status from public.billing_checkout_sessions
+              where provider_payment_id = 'refunded-payment';
+            if current_status <> 'refunded' then
+              raise exception 'Terminal checkout status changed unexpectedly: %', current_status;
+            end if;
+            select count(*) into activation_count from public.billing_test_activations;
+            if activation_count <> 1 then
+              raise exception 'Late success reactivated a terminal checkout';
+            end if;
+          end $$;
+          select 'PostgreSQL billing state-machine integration passed' as result;
+          SQL
