@@ -85,10 +85,10 @@ class WebhookSecurityTests(unittest.TestCase):
         request = self._request(headers={"authorization": "Bearer unit-test-secret"})
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
+                 "tenant_id": "tenant-1", "plan": "starter",
+                 "expected_amount": "990.00", "expected_currency": "RUB",
              }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
             response = asyncio.run(tbank_webhook.payment_status(request))
         self.assertEqual(response.body, b"OK")
@@ -101,10 +101,10 @@ class WebhookSecurityTests(unittest.TestCase):
         with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
              patch.object(tbank_webhook, "_token", return_value="signed"), \
              patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
+                 "tenant_id": "tenant-1", "plan": "starter",
+                 "expected_amount": "990.00", "expected_currency": "RUB",
              }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
+             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED", "Amount": 99000}), \
              patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
             response = asyncio.run(tbank_webhook.payment_status(request))
         self.assertEqual(response.body, b"OK")
@@ -151,8 +151,8 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(result["yookassa"], "disabled")
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
-    def test_yookassa_requires_configured_bearer(self):
-        request = self._request(headers={})
+    def test_yookassa_rejects_wrong_optional_bearer(self):
+        request = self._request(headers={"authorization": "Bearer wrong-secret"})
         with self.assertRaises(Exception) as ctx:
             asyncio.run(tbank_webhook.yookassa_payment_status(request))
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
@@ -247,7 +247,8 @@ class WebhookSecurityTests(unittest.TestCase):
             "object": {"id": "refund-1", "payment_id": "payment-1"},
         }
         with patch.object(tbank_webhook, "_read_body", return_value=body), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_refund", return_value={"id": "refund-1", "payment_id": "payment-1", "status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_payment", return_value={"id": "payment-1", "status": "succeeded"}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-1", "plan": "starter"
              }), \
