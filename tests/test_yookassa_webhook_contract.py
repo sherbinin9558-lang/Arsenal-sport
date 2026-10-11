@@ -92,9 +92,9 @@ def test_wrong_optional_bearer_is_rejected(monkeypatch):
 
 def test_refund_notification_fetches_refund_and_uses_refund_id_for_idempotency(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', 'optional-extra-secret')
-    refund_fetch = Mock(return_value={'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded'})
+    refund_fetch = Mock(return_value={'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '990.00', 'currency': 'RUB'}})
     monkeypatch.setattr(tbank_webhook, 'get_refund', refund_fetch)
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '990.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '990.00', 'currency': 'RUB'}, 'refunded_amount': {'value': '990.00', 'currency': 'RUB'}})
     monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '990.00', 'expected_currency': 'RUB'})
     captured = {}
     monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
@@ -109,9 +109,12 @@ def test_legacy_refund_without_expected_amount_still_processes_verified_refund(m
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
     monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: {
         'id': 'refund-old', 'payment_id': 'pay-old', 'status': 'succeeded',
+        'amount': {'value': '990.00', 'currency': 'RUB'},
     })
     monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {
         'id': 'pay-old', 'status': 'succeeded',
+        'amount': {'value': '990.00', 'currency': 'RUB'},
+        'refunded_amount': {'value': '990.00', 'currency': 'RUB'},
     })
     monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
         'tenant_id': 'tenant-a', 'plan': 'pro',
