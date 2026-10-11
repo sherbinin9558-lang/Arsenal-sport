@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   validate-workflow:
-    if: \${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -36,10 +36,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           source = Path(".github/workflows/supabase-backup-restore-rehearsal.yml").read_text()
+          dispatch_expr = "$" + "{{"
           required = [
-              "if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}",
-              "SUPABASE_DB_URL: \${{ secrets.SUPABASE_DB_URL }}",
-              "BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}",
+              "if: " + dispatch_expr + " github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}",
+              "SUPABASE_DB_URL: " + dispatch_expr + " secrets.SUPABASE_DB_URL }}",
+              "BACKUP_ENCRYPTION_PASSPHRASE: " + dispatch_expr + " secrets.BACKUP_ENCRYPTION_PASSPHRASE }}",
               "uses: supabase/setup-cli@v3",
               "uses: actions/upload-artifact@v7",
           ]
@@ -102,12 +103,12 @@ jobs:
           echo "Synthetic encryption round-trip and tamper rejection passed."
 
   backup-and-restore:
-    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SUPABASE_DB_URL: \${{ secrets.SUPABASE_DB_URL }}
-      BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
       - name: Validate required secrets and target project
         shell: bash
@@ -115,7 +116,7 @@ jobs:
           set -euo pipefail
           test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DB_URL repository secret"; exit 1; }
           test -n "$BACKUP_ENCRYPTION_PASSPHRASE" || { echo "::error::Missing BACKUP_ENCRYPTION_PASSPHRASE repository secret"; exit 1; }
-          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || \${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
+          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || ${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
             echo "::error::Use a unique random backup passphrase of at least 24 characters"
             exit 1
           fi
@@ -214,7 +215,7 @@ jobs:
         if: always() && hashFiles('supabase-backup-encrypted.tar.gz.enc') != ''
         uses: actions/upload-artifact@v7
         with:
-          name: supabase-encrypted-backup-\${{ github.run_id }}
+          name: supabase-encrypted-backup-${{ github.run_id }}
           path: |
             supabase-backup-encrypted.tar.gz.enc
             supabase-backup-encrypted.sha256
