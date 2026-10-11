@@ -44,7 +44,8 @@ jobs:
               "uses: supabase/setup-cli@v3",
               "uses: actions/upload-artifact@v7",
               "(cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)",
-              "python - <<'PY' sets db.major_version = 17 before supabase start",
+              'lines.insert(db_start + 1, "major_version = 17")',
+              're.sub(r"^\\s*major_version\\s*=.*$", "major_version = 17", lines[version_line])',
               "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
           ]
           missing = [line for line in required if line not in source]
