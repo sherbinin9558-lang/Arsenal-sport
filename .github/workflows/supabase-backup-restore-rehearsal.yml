@@ -47,6 +47,8 @@ jobs:
               "uses: actions/upload-artifact@v7",
               "(cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)",
               "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
+              "Critical restored business tables are empty",
+              "relrowsecurity",
           ]
           missing = [line for line in required if line not in source]
           if missing:
@@ -287,8 +289,42 @@ jobs:
               --file /backup/data.sql
           docker run --rm --network host postgres:17-alpine \
             psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-              --set ON_ERROR_STOP=1 \
-              --command "SELECT count(*) AS restored_public_tables FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
+              --set ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            missing_tables text[];
+            tables_without_rls text[];
+          BEGIN
+            SELECT array_agg(required.name ORDER BY required.name)
+              INTO missing_tables
+              FROM unnest(ARRAY['tenants', 'memberships', 'subscriptions', 'app_data', 'invitations', 'billing_checkout_sessions', 'billing_webhook_events', 'account_deletion_requests', 'ai_usage_events']) AS required(name)
+             WHERE to_regclass(format('public.%I', required.name)) IS NULL;
+
+            IF missing_tables IS NOT NULL THEN
+              RAISE EXCEPTION 'Restore missing required public tables: %', missing_tables;
+            END IF;
+
+            SELECT array_agg(required.name ORDER BY required.name)
+              INTO tables_without_rls
+              FROM unnest(ARRAY['tenants', 'memberships', 'subscriptions', 'app_data', 'invitations', 'billing_checkout_sessions', 'billing_webhook_events', 'account_deletion_requests', 'ai_usage_events']) AS required(name)
+              JOIN pg_class c ON c.oid = to_regclass(format('public.%I', required.name))
+             WHERE NOT c.relrowsecurity;
+
+            IF tables_without_rls IS NOT NULL THEN
+              RAISE EXCEPTION 'RLS not enabled on restored tables: %', tables_without_rls;
+            END IF;
+
+            IF (SELECT count(*) FROM public.tenants) = 0
+               OR (SELECT count(*) FROM public.memberships) = 0
+               OR (SELECT count(*) FROM public.subscriptions) = 0
+               OR (SELECT count(*) FROM public.app_data) = 0
+               OR (SELECT count(*) FROM public.ai_usage_events) = 0 THEN
+              RAISE EXCEPTION 'Critical restored business tables are empty';
+            END IF;
+          END
+          $;
+          SELECT 'Restore integrity checks passed: required tables, RLS, and representative business data.';
+          SQL
           echo "Restore rehearsal completed against a disposable local Supabase stack."
 
       - name: Upload encrypted backup only
