@@ -1,0 +1,352 @@
+name: Supabase backup and restore rehearsal
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/supabase-backup-restore-rehearsal.yml"
+      - "scripts/ci/pin_supabase_db_major_version.py"
+      - "tests/ci/test_pin_supabase_db_major_version.py"
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: "Type BACKUP_PRODUCTION to confirm read-only export from the configured Supabase project"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backup-restore-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  validate-workflow:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout workflow under test
+        uses: actions/checkout@v6
+
+      - name: Verify explicit dispatch gate and synthetic project URI cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          source = Path(".github/workflows/supabase-backup-restore-rehearsal.yml").read_text()
+          dispatch_expr = "$" + "{{"
+          required = [
+              "if: " + dispatch_expr + " github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}",
+              "SUPABASE_DB_URL: " + dispatch_expr + " secrets.SUPABASE_DB_URL }}",
+              "BACKUP_ENCRYPTION_PASSPHRASE: " + dispatch_expr + " secrets.BACKUP_ENCRYPTION_PASSPHRASE }}",
+              "uses: supabase/setup-cli@v3",
+              "uses: actions/upload-artifact@v7",
+              "(cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)",
+              "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
+              "Critical restored business tables are empty",
+              "relrowsecurity",
+              "DO $restore$",
+              "$restore$;",
+          ]
+          missing = [line for line in required if line not in source]
+          if missing:
+              raise SystemExit("Required workflow safety marker missing: " + ", ".join(missing))
+          print("Dispatch guard, secret references, and action major versions verified.")
+          PY
+          python -m unittest discover -s tests/ci -p 'test_pin_supabase_db_major_version.py' -v
+          python - <<'PY'
+          from urllib.parse import unquote, urlsplit
+
+          expected_ref = "lmdiwzkuvictysmdtuld"
+
+          def matches(raw):
+              uri = urlsplit(raw)
+              username = unquote(uri.username or "")
+              hostname = (uri.hostname or "").lower()
+              valid_scheme = uri.scheme in {"postgres", "postgresql"}
+              valid_database = uri.path.rstrip("/") == "/postgres"
+              valid_credentials = bool(username and uri.password)
+              valid_pooler = hostname.endswith(".pooler.supabase.com") and expected_ref in username.split(".")
+              valid_direct = hostname in {
+                  f"db.{expected_ref}.supabase.com",
+                  f"db.{expected_ref}.supabase.co",
+              }
+              return valid_scheme and valid_database and valid_credentials and (valid_pooler or valid_direct)
+
+          assert matches("postgresql://postgres.lmdiwzkuvictysmdtuld:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/postgres")
+          assert matches("postgresql://postgres:placeholder@db.lmdiwzkuvictysmdtuld.supabase.com:5432/postgres")
+          assert not matches("postgresql://postgres.other-project:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/postgres")
+          assert not matches("postgresql://postgres.lmdiwzkuvictysmdtuld:placeholder@aws-0-eu-west-1.pooler.supabase.com:5432/otherdb")
+          print("Synthetic URI positive/negative cases passed.")
+          PY
+
+      - name: Test encryption, checksum, HMAC, tamper rejection, and round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          export TEST_BACKUP_PASSPHRASE="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+          mkdir -p "$temp_dir/package" "$temp_dir/unpacked"
+          printf 'synthetic SQL content only; no production data\n' > "$temp_dir/package/data.sql"
+          printf 'synthetic schema content only; no production data\n' > "$temp_dir/package/schema.sql"
+          (cd "$temp_dir/package" && sha256sum data.sql schema.sql > SHA256SUMS)
+          tar -czf "$temp_dir/backup.tar.gz" -C "$temp_dir/package" data.sql schema.sql SHA256SUMS
+          openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
+            -in "$temp_dir/backup.tar.gz" -out "$temp_dir/archive.enc" \
+            -pass env:TEST_BACKUP_PASSPHRASE
+          sha256sum "$temp_dir/archive.enc" > "$temp_dir/archive.sha256"
+          python - "$temp_dir/archive.enc" "$temp_dir/archive.hmac" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              digest = hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest()
+          with open(sys.argv[2], "w", encoding="ascii") as out:
+              out.write(digest + "\n")
+          PY
+          sha256sum -c "$temp_dir/archive.sha256"
+          expected_hmac="$(cat "$temp_dir/archive.hmac")"
+          actual_hmac="$(python - "$temp_dir/archive.enc" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
+          [[ "$actual_hmac" == "$expected_hmac" ]]
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in "$temp_dir/archive.enc" -out "$temp_dir/restored.tar.gz" \
+            -pass env:TEST_BACKUP_PASSPHRASE
+          tar -xzf "$temp_dir/restored.tar.gz" -C "$temp_dir/unpacked"
+          (cd "$temp_dir/unpacked" && sha256sum -c SHA256SUMS)
+          cmp "$temp_dir/package/data.sql" "$temp_dir/unpacked/data.sql"
+          cmp "$temp_dir/package/schema.sql" "$temp_dir/unpacked/schema.sql"
+          cp "$temp_dir/archive.enc" "$temp_dir/tampered.enc"
+          printf x >> "$temp_dir/tampered.enc"
+          tampered_hmac="$(python - "$temp_dir/tampered.enc" <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["TEST_BACKUP_PASSPHRASE"].encode("ascii"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
+          [[ "$tampered_hmac" != "$expected_hmac" ]]
+          echo "Synthetic package checksum, encryption round-trip, and tamper rejection passed."
+
+  backup-and-restore:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'BACKUP_PRODUCTION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Checkout repository for restore helper
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets and target project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DB_URL repository secret"; exit 1; }
+          test -n "$BACKUP_ENCRYPTION_PASSPHRASE" || { echo "::error::Missing BACKUP_ENCRYPTION_PASSPHRASE repository secret"; exit 1; }
+          if [[ "$BACKUP_ENCRYPTION_PASSPHRASE" == "change-me" || ${#BACKUP_ENCRYPTION_PASSPHRASE} -lt 24 ]]; then
+            echo "::error::Use a unique random backup passphrase of at least 24 characters"
+            exit 1
+          fi
+          python - <<'PY'
+          import os
+          import sys
+          from urllib.parse import unquote, urlsplit
+
+          expected_ref = "lmdiwzkuvictysmdtuld"
+          uri = urlsplit(os.environ["SUPABASE_DB_URL"])
+          username = unquote(uri.username or "")
+          hostname = (uri.hostname or "").lower()
+          valid_scheme = uri.scheme in {"postgres", "postgresql"}
+          valid_database = uri.path.rstrip("/") == "/postgres"
+          valid_credentials = bool(username and uri.password)
+          valid_pooler_target = hostname.endswith(".pooler.supabase.com") and expected_ref in username.split(".")
+          valid_direct_target = hostname in {f"db.{expected_ref}.supabase.com", f"db.{expected_ref}.supabase.co"}
+          if not (valid_scheme and valid_database and valid_credentials and (valid_pooler_target or valid_direct_target)):
+              print("::error::SUPABASE_DB_URL does not appear to target the expected Supabase project/database. Re-copy the URI from the project's Session Pooler settings; do not print it to logs.")
+              sys.exit(1)
+          print("Connection URI structure and expected project target validated without printing credentials.")
+          PY
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
+      - name: Export database using Supabase-aware dumps
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p backup-work
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup-work/data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          test -s backup-work/roles.sql
+          test -s backup-work/schema.sql
+          test -s backup-work/data.sql
+          {
+            echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "supabase_project_ref=lmdiwzkuvictysmdtuld"
+            echo "dump_tool=supabase-cli"
+            echo "postgres_target=17"
+          } > backup-work/manifest.txt
+          (cd backup-work && sha256sum roles.sql schema.sql data.sql manifest.txt > SHA256SUMS)
+          tar -czf backup-work.tar.gz -C backup-work roles.sql schema.sql data.sql manifest.txt SHA256SUMS
+          openssl enc -aes-256-cbc -pbkdf2 -salt -iter 600000 \
+            -in backup-work.tar.gz -out supabase-backup-encrypted.tar.gz.enc \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+          test -s supabase-backup-encrypted.tar.gz.enc
+          sha256sum supabase-backup-encrypted.tar.gz.enc > supabase-backup-encrypted.sha256
+          python - supabase-backup-encrypted.tar.gz.enc supabase-backup-encrypted.hmac <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              digest = hmac.new(
+                  os.environ["BACKUP_ENCRYPTION_PASSPHRASE"].encode("utf-8"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest()
+          with open(sys.argv[2], "w", encoding="ascii") as out:
+              out.write(digest + "\n")
+          PY
+          rm -f backup-work.tar.gz
+
+      - name: Install local Supabase stack for isolated restore test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/restore-target"
+          cd "$RUNNER_TEMP/restore-target"
+          supabase init
+          python "$GITHUB_WORKSPACE/scripts/ci/pin_supabase_db_major_version.py" supabase/config.toml --major-version 17
+          supabase start
+
+      - name: Restore into isolated local Supabase database
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c supabase-backup-encrypted.sha256
+          expected_hmac="$(cat supabase-backup-encrypted.hmac)"
+          actual_hmac="$(python - supabase-backup-encrypted.tar.gz.enc <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as archive:
+              print(hmac.new(
+                  os.environ["BACKUP_ENCRYPTION_PASSPHRASE"].encode("utf-8"),
+                  archive.read(),
+                  hashlib.sha256,
+              ).hexdigest())
+          PY
+          )"
+          [[ "$actual_hmac" == "$expected_hmac" ]] || { echo "::error::Encrypted backup authentication check failed"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in supabase-backup-encrypted.tar.gz.enc -out "$RUNNER_TEMP/backup.tar.gz" \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+          mkdir -p "$RUNNER_TEMP/backup-unpacked"
+          tar -xzf "$RUNNER_TEMP/backup.tar.gz" -C "$RUNNER_TEMP/backup-unpacked"
+          (cd "$RUNNER_TEMP/backup-unpacked" && sha256sum -c SHA256SUMS)
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
+            postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --single-transaction --set ON_ERROR_STOP=1 \
+              --file /backup/roles.sql \
+              --file /backup/schema.sql \
+              --command 'SET session_replication_role = replica' \
+              --file /backup/data.sql
+          docker run --rm --network host postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --set ON_ERROR_STOP=1 <<'SQL'
+          DO $restore$
+          DECLARE
+            missing_tables text[];
+            tables_without_rls text[];
+          BEGIN
+            SELECT array_agg(required.name ORDER BY required.name)
+              INTO missing_tables
+              FROM unnest(ARRAY['tenants', 'memberships', 'subscriptions', 'app_data', 'invitations', 'billing_checkout_sessions', 'billing_webhook_events', 'account_deletion_requests', 'ai_usage_events']) AS required(name)
+             WHERE to_regclass(format('public.%I', required.name)) IS NULL;
+
+            IF missing_tables IS NOT NULL THEN
+              RAISE EXCEPTION 'Restore missing required public tables: %', missing_tables;
+            END IF;
+
+            SELECT array_agg(required.name ORDER BY required.name)
+              INTO tables_without_rls
+              FROM unnest(ARRAY['tenants', 'memberships', 'subscriptions', 'app_data', 'invitations', 'billing_checkout_sessions', 'billing_webhook_events', 'account_deletion_requests', 'ai_usage_events']) AS required(name)
+              JOIN pg_class c ON c.oid = to_regclass(format('public.%I', required.name))
+             WHERE NOT c.relrowsecurity;
+
+            IF tables_without_rls IS NOT NULL THEN
+              RAISE EXCEPTION 'RLS not enabled on restored tables: %', tables_without_rls;
+            END IF;
+
+            IF (SELECT count(*) FROM public.tenants) = 0
+               OR (SELECT count(*) FROM public.memberships) = 0
+               OR (SELECT count(*) FROM public.subscriptions) = 0
+               OR (SELECT count(*) FROM public.app_data) = 0
+               OR (SELECT count(*) FROM public.ai_usage_events) = 0 THEN
+              RAISE EXCEPTION 'Critical restored business tables are empty';
+            END IF;
+          END
+          $restore$;
+          SELECT 'Restore integrity checks passed: required tables, RLS, and representative business data.';
+          SQL
+          echo "Restore rehearsal completed against a disposable local Supabase stack."
+
+      - name: Upload encrypted backup only
+        if: always() && hashFiles('supabase-backup-encrypted.tar.gz.enc') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: supabase-encrypted-backup-${{ github.run_id }}
+          path: |
+            supabase-backup-encrypted.tar.gz.enc
+            supabase-backup-encrypted.sha256
+            supabase-backup-encrypted.hmac
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Cleanup plaintext and local database
+        if: always()
+        shell: bash
+        run: |
+          rm -rf backup-work backup-work.tar.gz "$RUNNER_TEMP/backup.tar.gz" "$RUNNER_TEMP/backup-unpacked" "$RUNNER_TEMP/restore-target"
+          docker rm -f $(docker ps -aq --filter "name=supabase_") >/dev/null 2>&1 || true
