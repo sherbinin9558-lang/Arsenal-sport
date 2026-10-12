@@ -67,6 +67,7 @@ begin
     );
   end if;
 
+  -- AUTHORIZED is intentionally not treated as a captured payment.
   if normalized_status in ('succeeded','confirmed') then
     perform public.activate_paid_subscription(
       p_tenant_id, p_plan, p_provider, p_provider_payment_id, p_provider_payment_method_id
