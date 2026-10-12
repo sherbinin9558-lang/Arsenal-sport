@@ -70,6 +70,37 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertIn("/webhooks/yookassa", paths)
         self.assertNotIn("/webhooks/tbank/payment-status", paths)
 
+    @patch("tbank_webhook._checkout_by_provider_payment", return_value={"tenant_id": "tenant-1", "plan": "pro"})
+    @patch("tbank_webhook._save_checkout")
+    def test_recovery_uses_provider_metadata_and_persists_checkout(self, save_checkout, lookup):
+        payment = {
+            "id": "payment-recovery",
+            "status": "succeeded",
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        result = tbank_webhook._recover_checkout_from_provider(payment)
+        save_checkout.assert_called_once_with("tenant-1", "checkout-1", "payment-recovery", "pro", "990.00", "RUB")
+        self.assertEqual(result["tenant_id"], "tenant-1")
+
+    @patch("tbank_webhook._save_checkout")
+    def test_recovery_rejects_provider_amount_mismatch(self, save_checkout):
+        payment = {
+            "id": "payment-mismatch", "status": "succeeded",
+            "amount": {"value": "1.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        with self.assertRaises(tbank_webhook.HTTPException) as raised:
+            tbank_webhook._recover_checkout_from_provider(payment)
+        self.assertEqual(raised.exception.status_code, 422)
+        save_checkout.assert_not_called()
+
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}
         self.assertIn("/healthz", paths)
