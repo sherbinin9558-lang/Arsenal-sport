@@ -283,6 +283,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/backup-unpacked"
           tar -xzf "$RUNNER_TEMP/backup.tar.gz" -C "$RUNNER_TEMP/backup-unpacked"
           (cd "$RUNNER_TEMP/backup-unpacked" && sha256sum -c SHA256SUMS)
+          # Supabase-managed dumps may include session settings the local restore role cannot change.
+          sed -i -E '/^SET log_min_messages[[:space:]]*=/Id' "$RUNNER_TEMP/backup-unpacked/schema.sql"
           docker run --rm --network host \
             -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
             postgres:17-alpine \
