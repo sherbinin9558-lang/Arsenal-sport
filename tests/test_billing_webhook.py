@@ -21,13 +21,13 @@ class BillingWebhookTests(unittest.TestCase):
     @patch("tbank_webhook.requests.post")
     def test_process_billing_event_uses_atomic_rpc_and_payload_hash(self, post, _supabase):
         post.return_value = FakeResponse({"ok": True, "duplicate": False})
-        payload = {"PaymentId": "123", "Status": "CONFIRMED"}
+        payload = {"id": "123", "status": "succeeded"}
 
         result = tbank_webhook._process_billing_event(
-            "tbank",
-            "tbank:123:confirmed",
+            "yookassa",
+            "yookassa:payment.succeeded:123:succeeded",
             "123",
-            "CONFIRMED",
+            "succeeded",
             "tenant-1",
             "pro",
             payload=payload,
@@ -40,7 +40,7 @@ class BillingWebhookTests(unittest.TestCase):
         expected_hash = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         ).hexdigest()
-        self.assertEqual(body["p_event_key"], "tbank:123:confirmed")
+        self.assertEqual(body["p_event_key"], "yookassa:payment.succeeded:123:succeeded")
         self.assertEqual(body["p_payload_hash"], expected_hash)
         self.assertEqual(body["p_tenant_id"], "tenant-1")
         self.assertEqual(body["p_plan"], "pro")
