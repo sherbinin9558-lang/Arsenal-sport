@@ -65,6 +65,11 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertNotIn('detail=f"Billing state transition failed: {exc}"', source)
         self.assertNotIn('        "tenant_id": tenant,', source)
 
+    def test_only_yookassa_payment_webhook_route_is_registered(self):
+        paths = {route.path for route in tbank_webhook.app.routes}
+        self.assertIn("/webhooks/yookassa", paths)
+        self.assertNotIn("/webhooks/tbank/payment-status", paths)
+
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}
         self.assertIn("/healthz", paths)
