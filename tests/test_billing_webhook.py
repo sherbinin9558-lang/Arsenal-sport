@@ -101,6 +101,22 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         save_checkout.assert_not_called()
 
+    @patch("tbank_webhook._checkout_by_provider_payment", return_value=None)
+    @patch("tbank_webhook._save_checkout", side_effect=RuntimeError("storage unavailable"))
+    def test_recovery_returns_503_if_checkout_cannot_be_saved(self, save_checkout, lookup):
+        payment = {
+            "id": "payment-storage-failure", "status": "succeeded",
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        with self.assertRaises(tbank_webhook.HTTPException) as raised:
+            tbank_webhook._recover_checkout_from_provider(payment)
+        self.assertEqual(raised.exception.status_code, 503)
+        lookup.assert_called_once_with("yookassa", "payment-storage-failure")
+
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}
         self.assertIn("/healthz", paths)
