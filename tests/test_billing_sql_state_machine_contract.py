@@ -24,8 +24,9 @@ def test_browser_payment_return_never_activates_subscription():
     end = app.index("\n\nwith st.sidebar:", start)
     return_flow = app[start:end]
     assert "activate_paid_subscription(" not in return_flow
-    assert 'status == "AUTHORIZED"' in return_flow
-    assert "Тариф пока не активирован" in return_flow
+    assert "tbank_return" not in return_flow
+    assert "tbank_billing" not in return_flow
+    assert "billing_return == \"return\"" in return_flow
     assert "проверки суммы, валюты и платёжного уведомления" in return_flow
 
 def test_checkout_amount_migration_adds_server_expected_amount_and_currency():
