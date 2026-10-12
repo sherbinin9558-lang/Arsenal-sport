@@ -1,9 +1,7 @@
-"""T-Bank payment webhook.
+"""YooKassa billing webhook for SaaS subscriptions.
 
-The webhook never trusts a tenant or plan supplied by the browser. It resolves
-the payment to the checkout session stored in Supabase, verifies the current
-payment state with T-Bank, and only then activates the subscription.
-"""
+The webhook verifies payment/refund state with YooKassa and uses the database
+state machine for idempotent subscription changes."""
 
 import hashlib
 import hmac
