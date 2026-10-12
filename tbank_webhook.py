@@ -14,7 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 
-from billing import get_payment, get_refund
+from billing import get_payment, get_refund, _save_checkout
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
 
@@ -160,6 +160,46 @@ def _verify_yookassa_payment_amount(payment, checkout):
     if not expected_currency or actual_currency != expected_currency:
         raise HTTPException(status_code=422, detail="Checkout currency verification failed")
 
+def _recover_checkout_from_provider(payment):
+    """Recreate a missing checkout row only from verified, settled provider metadata.
+
+    This is the recovery path for the case where YooKassa created a payment but
+    Supabase failed to persist the initial checkout record. The caller must have
+    fetched this payment directly from YooKassa before calling this function.
+    """
+    if not isinstance(payment, dict) or str(payment.get("status") or "").lower() not in ("succeeded", "confirmed"):
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+    metadata = payment.get("metadata")
+    if not isinstance(metadata, dict):
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+    checkout_id = str(metadata.get("checkout_id") or "").strip()
+    tenant_id = str(metadata.get("tenant_id") or "").strip()
+    plan = str(metadata.get("plan") or "").lower().strip()
+    expected_amount = metadata.get("expected_amount")
+    expected_currency = str(metadata.get("expected_currency") or "").upper().strip()
+    payment_id = str(payment.get("id") or "").strip()
+    if not checkout_id or not tenant_id or not payment_id or plan not in ("starter", "pro", "business"):
+        raise HTTPException(status_code=422, detail="Invalid provider checkout metadata")
+    if expected_currency != "RUB":
+        raise HTTPException(status_code=422, detail="Checkout currency verification failed")
+    recovery_checkout = {"expected_amount": expected_amount, "expected_currency": expected_currency}
+    _verify_yookassa_payment_amount(payment, recovery_checkout)
+    try:
+        _save_checkout(tenant_id, checkout_id, payment_id, plan, expected_amount, expected_currency)
+    except Exception:
+        # A concurrent webhook may already have restored the same row. Only
+        # continue if the durable row is now present; otherwise ask YooKassa
+        # to retry rather than acknowledging an unrecorded payment.
+        existing = _checkout_by_provider_payment("yookassa", payment_id)
+        if not existing:
+            raise HTTPException(status_code=503, detail="Checkout recovery is temporarily unavailable")
+        return existing
+    recovered = _checkout_by_provider_payment("yookassa", payment_id)
+    if not recovered:
+        raise HTTPException(status_code=503, detail="Checkout recovery is temporarily unavailable")
+    return recovered
+
+
 
 def _process_billing_event(provider, event_key, payment_id, status, tenant_id, plan, payment_method_id=None, payload=None):
     url, _ = _supabase()
@@ -255,7 +295,7 @@ async def yookassa_payment_status(request: Request):
 
     checkout = _checkout_by_provider_payment("yookassa", payment_id)
     if not checkout:
-        raise HTTPException(status_code=404, detail="Checkout session not found")
+        checkout = _recover_checkout_from_provider(payment)
 
     if not is_refund and provider_status in ("succeeded", "confirmed"):
         _verify_yookassa_payment_amount(payment, checkout)
