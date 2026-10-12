@@ -21,13 +21,13 @@ class BillingWebhookTests(unittest.TestCase):
     @patch("tbank_webhook.requests.post")
     def test_process_billing_event_uses_atomic_rpc_and_payload_hash(self, post, _supabase):
         post.return_value = FakeResponse({"ok": True, "duplicate": False})
-        payload = {"PaymentId": "123", "Status": "CONFIRMED"}
+        payload = {"id": "123", "status": "succeeded"}
 
         result = tbank_webhook._process_billing_event(
-            "tbank",
-            "tbank:123:confirmed",
+            "yookassa",
+            "yookassa:payment.succeeded:123:succeeded",
             "123",
-            "CONFIRMED",
+            "succeeded",
             "tenant-1",
             "pro",
             payload=payload,
@@ -40,7 +40,7 @@ class BillingWebhookTests(unittest.TestCase):
         expected_hash = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         ).hexdigest()
-        self.assertEqual(body["p_event_key"], "tbank:123:confirmed")
+        self.assertEqual(body["p_event_key"], "yookassa:payment.succeeded:123:succeeded")
         self.assertEqual(body["p_payload_hash"], expected_hash)
         self.assertEqual(body["p_tenant_id"], "tenant-1")
         self.assertEqual(body["p_plan"], "pro")
@@ -64,6 +64,58 @@ class BillingWebhookTests(unittest.TestCase):
         source = open("tbank_webhook.py", encoding="utf-8").read()
         self.assertNotIn('detail=f"Billing state transition failed: {exc}"', source)
         self.assertNotIn('        "tenant_id": tenant,', source)
+
+    def test_only_yookassa_payment_webhook_route_is_registered(self):
+        paths = {route.path for route in tbank_webhook.app.routes}
+        self.assertIn("/webhooks/yookassa", paths)
+        self.assertNotIn("/webhooks/tbank/payment-status", paths)
+
+    @patch("tbank_webhook._checkout_by_provider_payment", return_value={"tenant_id": "tenant-1", "plan": "pro"})
+    @patch("tbank_webhook._save_checkout")
+    def test_recovery_uses_provider_metadata_and_persists_checkout(self, save_checkout, lookup):
+        payment = {
+            "id": "payment-recovery",
+            "status": "succeeded",
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        result = tbank_webhook._recover_checkout_from_provider(payment)
+        save_checkout.assert_called_once_with("tenant-1", "checkout-1", "payment-recovery", "pro", "990.00", "RUB")
+        self.assertEqual(result["tenant_id"], "tenant-1")
+
+    @patch("tbank_webhook._save_checkout")
+    def test_recovery_rejects_provider_amount_mismatch(self, save_checkout):
+        payment = {
+            "id": "payment-mismatch", "status": "succeeded",
+            "amount": {"value": "1.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        with self.assertRaises(tbank_webhook.HTTPException) as raised:
+            tbank_webhook._recover_checkout_from_provider(payment)
+        self.assertEqual(raised.exception.status_code, 422)
+        save_checkout.assert_not_called()
+
+    @patch("tbank_webhook._checkout_by_provider_payment", return_value=None)
+    @patch("tbank_webhook._save_checkout", side_effect=RuntimeError("storage unavailable"))
+    def test_recovery_returns_503_if_checkout_cannot_be_saved(self, save_checkout, lookup):
+        payment = {
+            "id": "payment-storage-failure", "status": "succeeded",
+            "amount": {"value": "990.00", "currency": "RUB"},
+            "metadata": {
+                "tenant_id": "tenant-1", "plan": "pro", "checkout_id": "checkout-1",
+                "expected_amount": "990.00", "expected_currency": "RUB",
+            },
+        }
+        with self.assertRaises(tbank_webhook.HTTPException) as raised:
+            tbank_webhook._recover_checkout_from_provider(payment)
+        self.assertEqual(raised.exception.status_code, 503)
+        lookup.assert_called_once_with("yookassa", "payment-storage-failure")
 
     def test_health_endpoint_is_present(self):
         paths = {route.path for route in tbank_webhook.app.routes}

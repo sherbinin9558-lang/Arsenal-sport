@@ -109,7 +109,7 @@ def create_checkout(plan, tenant_id, payment_method="all"):
         "save_payment_method":False,
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
-        "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
+        "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id,"expected_amount":f"{price:.2f}","expected_currency":"RUB"},
     }
     if payment_method == "sbp":
         payload["payment_method_data"] = {"type": "sbp"}

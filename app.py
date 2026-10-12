@@ -549,23 +549,7 @@ try:
     checkout_id = st.query_params.get("checkout_id")
     billing_return = st.query_params.get("billing")
 
-    if billing_return == "tbank_return":
-        from tbank_billing import get_state, get_checkout_by_order
-
-        order_id = st.query_params.get("order_id")
-        tenant_id = str(st.session_state.get("saas_tenant_id") or "")
-        checkout = get_checkout_by_order(str(order_id), tenant_id) if order_id and tenant_id else None
-        pid = str((checkout or {}).get("provider_payment_id") or "")
-        payment = get_state(pid) if pid else {}
-        status = str(payment.get("Status") or "").upper()
-
-        if status == "AUTHORIZED":
-            st.warning("Платёж авторизован, но ещё не подтверждён окончательно. Тариф пока не активирован.")
-        elif status == "CONFIRMED":
-            st.info("Платёж подтверждён провайдером. Ожидается серверная обработка уведомления; возврат в браузер сам по себе тариф не активирует.")
-        elif status:
-            st.info(f"Текущий статус платежа Т‑Банк: {status}. Тариф будет изменён после серверной проверки события.")
-    elif (payment_id or checkout_id) and billing_return == "return":
+    if (payment_id or checkout_id) and billing_return == "return":
         from billing import get_checkout_by_order, get_payment
 
         if checkout_id:

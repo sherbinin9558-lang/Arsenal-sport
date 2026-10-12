@@ -31,75 +31,29 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_configured_bearer_secret(self):
-        request = self._request(headers={"authorization": "Bearer unit-test-secret"})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
-             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
-             }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
-            response = asyncio.run(tbank_webhook.payment_status(request))
-        self.assertEqual(response.body, b"OK")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.media_type, "text/plain")
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_provider_token_without_optional_bearer(self):
-        request = self._request(headers={})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
-             patch.object(tbank_webhook, "_token", return_value="signed"), \
-             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
-             }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
-            response = asyncio.run(tbank_webhook.payment_status(request))
-        self.assertEqual(response.body, b"OK")
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_rejects_invalid_optional_bearer(self):
-        request = self._request(headers={"authorization": "Bearer wrong"})
-        with self.assertRaises(Exception) as ctx:
-            tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
-        self.assertIn("Unauthorized", str(ctx.exception))
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_rejects_missing_provider_auth_when_token_absent(self):
-        request = self._request(headers={})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}):
-            with self.assertRaises(Exception) as ctx:
-                asyncio.run(tbank_webhook.payment_status(request))
-        self.assertIn("Webhook authentication required", str(ctx.exception))
-
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "",
-        "TBANK_PASSWORD": "",
-        "YOOKASSA_WEBHOOK_SECRET": "",
+        "YOO_KASSA_SHOP_ID": "",
+        "YOO_KASSA_SECRET_KEY": "",
     }, clear=False)
     def test_ready_requires_provider_configuration(self):
         with self.assertRaises(Exception) as ctx:
             asyncio.run(tbank_webhook.readyz())
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("provider authentication", str(ctx.exception))
+        self.assertIn("YooKassa provider configuration", str(ctx.exception))
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
-        "TBANK_WEBHOOK_SECRET": "",
+        "YOO_KASSA_SHOP_ID": "shop",
+        "YOO_KASSA_SECRET_KEY": "secret",
     }, clear=False)
-    def test_ready_accepts_tbank_provider_configuration(self):
+    def test_ready_accepts_yookassa_configuration(self):
         result = asyncio.run(tbank_webhook.readyz())
         self.assertTrue(result["ok"])
-        self.assertEqual(result["tbank"], "configured")
-        self.assertEqual(result["yookassa"], "disabled")
+        self.assertEqual(result["yookassa"], "configured")
+        self.assertNotIn("tbank", result)
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
     def test_yookassa_rejects_wrong_optional_bearer(self):
