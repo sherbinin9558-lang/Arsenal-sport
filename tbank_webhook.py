@@ -13,9 +13,9 @@ from decimal import Decimal, InvalidOperation
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import JSONResponse
 
-from tbank_billing import get_state, _token
+
 from billing import get_payment, get_refund
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
@@ -98,18 +98,15 @@ async def readyz():
     url, key = _supabase()
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
-    tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
-    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
-    if not tbank_ready and not yookassa_ready:
-        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+    yookassa_ready = bool(_env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY"))
+    if not yookassa_ready:
+        raise HTTPException(status_code=503, detail="YooKassa provider configuration is missing")
     return {
         "ok": True,
         "service": "billing-webhook",
         "supabase": "configured",
-        "tbank": "configured" if tbank_ready else "disabled",
-        "yookassa": "configured" if yookassa_ready else "disabled",
+        "yookassa": "configured",
     }
-
 
 def _env(name, default=""):
     return str(os.getenv(name, default) or "").strip()
@@ -166,38 +163,6 @@ def _verify_yookassa_payment_amount(payment, checkout):
         raise HTTPException(status_code=422, detail="Checkout currency verification failed")
 
 
-def _checkout_by_payment(payment_id):
-    url, _ = _supabase()
-    rows = requests.get(
-        f"{url}/rest/v1/billing_checkout_sessions",
-        headers=_headers(),
-        params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
-            "provider": "eq.tbank",
-            "provider_payment_id": f"eq.{payment_id}",
-            "limit": "1",
-        },
-        timeout=15,
-    )
-    rows.raise_for_status()
-    data = rows.json()
-    return data[0] if data else None
-
-
-def _update_checkout_provider_payment(provider, payment_id, status):
-    url, _ = _supabase()
-    response = requests.patch(
-        f"{url}/rest/v1/billing_checkout_sessions",
-        headers=_headers(),
-        params={
-            "provider": f"eq.{provider}",
-            "provider_payment_id": f"eq.{payment_id}",
-        },
-        json={"status": status},
-        timeout=15,
-    )
-    response.raise_for_status()
-
 def _process_billing_event(provider, event_key, payment_id, status, tenant_id, plan, payment_method_id=None, payload=None):
     url, _ = _supabase()
     payload_hash = hashlib.sha256(
@@ -224,13 +189,7 @@ def _process_billing_event(provider, event_key, payment_id, status, tenant_id, p
 
 
 def _verify_webhook_secret(request: Request, env_name):
-    """Validate an optional configured Bearer layer.
-
-    T-Bank notifications have their own signed Token. If a Bearer secret is
-    configured for the T-Bank webhook API, a supplied Bearer header is checked;
-    its absence is not rejected because the provider Token is independently
-    verified below.
-    """
+    """Validate an optional additional Bearer secret for provider notifications."""
     expected = _env(env_name)
     if not expected:
         return False
@@ -250,57 +209,6 @@ async def _read_body(request: Request):
         return await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@app.post("/webhooks/tbank/payment-status")
-async def payment_status(request: Request):
-    secret_verified = _verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
-    body = await _read_body(request)
-
-    payment_id = body.get("PaymentId") or body.get("PaymentID")
-    if not payment_id:
-        raise HTTPException(status_code=400, detail="PaymentId is required")
-
-    # If T-Bank provides its notification Token, verify it as well.
-    supplied_token = body.get("Token")
-    if supplied_token:
-        try:
-            expected_token = _token(body)
-        except Exception:
-            expected_token = ""
-        if not expected_token or not hmac.compare_digest(str(supplied_token), str(expected_token)):
-            raise HTTPException(status_code=401, detail="Invalid webhook token")
-    elif not secret_verified:
-        raise HTTPException(status_code=401, detail="Webhook authentication required")
-
-    payment_id = str(payment_id)
-    checkout = _checkout_by_payment(payment_id)
-    if not checkout:
-        raise HTTPException(status_code=404, detail="Checkout session not found")
-
-    state = get_state(payment_id)
-    status = str(state.get("Status") or "").upper()
-    plan = str(checkout.get("plan") or "").lower()
-    tenant = str(checkout.get("tenant_id") or "")
-
-    if plan not in ("starter", "pro", "business") or not tenant:
-        raise HTTPException(status_code=422, detail="Invalid checkout session")
-
-    event_key = f"tbank:{payment_id}:{status.lower()}"
-    try:
-        result = _process_billing_event(
-            "tbank",
-            event_key,
-            payment_id,
-            status,
-            tenant,
-            plan,
-            payload=body,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="Billing state transition failed")
-
-    return PlainTextResponse("OK")
 
 
 @app.post("/webhooks/yookassa")
