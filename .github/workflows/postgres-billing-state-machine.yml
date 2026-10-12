@@ -105,6 +105,23 @@ jobs:
             activation_count integer;
             current_status text;
           begin
+            if has_function_privilege('anon',
+                 'public.process_billing_payment_event(text,text,text,text,uuid,text,text,text)', 'EXECUTE')
+               or has_function_privilege('authenticated',
+                 'public.process_billing_payment_event(text,text,text,text,uuid,text,text,text)', 'EXECUTE') then
+              raise exception 'Untrusted roles must not execute the billing event RPC';
+            end if;
+            if not has_function_privilege('service_role',
+                 'public.process_billing_payment_event(text,text,text,text,uuid,text,text,text)', 'EXECUTE') then
+              raise exception 'service_role must execute the billing event RPC';
+            end if;
+            if (select count(*) from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = 'billing_checkout_sessions'
+                  and column_name in ('expected_amount','expected_currency')) <> 2 then
+              raise exception 'Expected amount/currency columns were not installed';
+            end if;
+
             insert into public.billing_checkout_sessions
               (tenant_id, provider, provider_payment_id, plan, status, expected_amount, expected_currency)
             values
