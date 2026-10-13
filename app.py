@@ -627,6 +627,38 @@ with st.sidebar:
 
     render_account_bar()
 
+    # Subscription checkout is optional until the merchant configures YooKassa.
+    with st.expander("💳 Подписка и оплата", expanded=False):
+        current_plan = str(st.session_state.get("saas_plan", "trial")).upper()
+        st.caption(f"Текущий тариф: {current_plan}")
+        payment_plan = st.selectbox(
+            "Выберите тариф",
+            ["starter", "pro", "business"],
+            format_func=lambda value: {"starter": "STARTER", "pro": "PRO", "business": "BUSINESS"}[value],
+            key="sidebar_payment_plan",
+        )
+        if st.button("Оплатить через СБП", use_container_width=True, key="sidebar_pay_sbp"):
+            tenant_id = str(st.session_state.get("saas_tenant_id") or "")
+            if not tenant_id:
+                st.error("Сначала войдите в аккаунт магазина.")
+            else:
+                try:
+                    from billing import create_checkout
+                    checkout = create_checkout(payment_plan, tenant_id, payment_method="sbp")
+                    checkout_url = str((checkout.get("confirmation") or {}).get("confirmation_url") or "")
+                    if not checkout_url.startswith("https://"):
+                        raise RuntimeError("Payment provider did not return a secure checkout URL.")
+                    st.session_state["saas_sbp_checkout_url"] = checkout_url
+                    st.session_state["saas_sbp_checkout_plan"] = payment_plan
+                except Exception:
+                    st.session_state.pop("saas_sbp_checkout_url", None)
+                    st.error("Не удалось создать оплату через СБП. Проверьте настройки ЮKassa и повторите попытку.")
+        checkout_url = str(st.session_state.get("saas_sbp_checkout_url") or "")
+        if checkout_url.startswith("https://"):
+            st.link_button("Перейти к оплате через СБП", checkout_url, use_container_width=True)
+            st.caption("На телефоне откроется страница выбора банка/платёжного приложения. На компьютере провайдер может показать QR-код.")
+
+
 if dark_mode:
     bg_css = "body {background:#0b0e13;}"
     theme_css = """
