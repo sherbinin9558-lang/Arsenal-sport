@@ -98,6 +98,7 @@ jobs:
           SQL
       - name: Apply production billing migrations to disposable PostgreSQL
         run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261005010000_billing_webhook_state_machine.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261006090000_billing_refund_lifecycle.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009170000_require_captured_payment_for_activation.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009190000_billing_checkout_amount_validation.sql
