@@ -11,7 +11,9 @@ SAAS_BUSINESS_PRICE
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
 """
+import math
 import os, time, uuid, requests
+from urllib.parse import quote
 import streamlit as st
 
 PLANS = {
@@ -31,7 +33,7 @@ SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
 SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 
-def _save_checkout(tenant_id, checkout_id, payment_id, plan):
+def _save_checkout(tenant_id, checkout_id, payment_id, plan, expected_amount, expected_currency="RUB"):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -52,11 +54,13 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
             "provider_payment_id": str(payment_id),
             "plan": plan,
             "status": "created",
+            "expected_amount": f"{float(expected_amount):.2f}",
+            "expected_currency": str(expected_currency).upper(),
         },
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в Supabase.")
 
 def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
@@ -71,7 +75,7 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из Supabase.")
     rows=r.json()
     return rows[0] if rows else None
 
@@ -85,7 +89,9 @@ def plan_price(plan):
     try:
         value=float(raw.replace(",", "."))
     except Exception:
-        value=0.0
+        return 0.0
+    if not math.isfinite(value) or value <= 0:
+        return 0.0
     return value
 
 def create_checkout(plan, tenant_id):
@@ -100,7 +106,7 @@ def create_checkout(plan, tenant_id):
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
-        "save_payment_method":True,
+        "save_payment_method":False,
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
         "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
@@ -112,10 +118,16 @@ def create_checkout(plan, tenant_id):
         json=payload,
         timeout=20,
     )
-    try: data=r.json()
-    except Exception: data={"description":r.text}
+    try:
+        data = r.json()
+    except Exception as exc:
+        if not r.ok:
+            raise RuntimeError("Не удалось создать платёж в ЮKassa.") from exc
+        raise RuntimeError("ЮKassa вернула некорректный ответ при создании платежа.") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("ЮKassa вернула некорректный ответ при создании платежа.")
     if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+        raise RuntimeError("Не удалось создать платёж в ЮKassa.")
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
@@ -125,7 +137,7 @@ def create_checkout(plan, tenant_id):
     save_error = None
     for attempt in range(3):
         try:
-            _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
+            _save_checkout(tenant_id, checkout_id, data.get("id"), plan, price, "RUB")
             save_error = None
             break
         except Exception as exc:
@@ -143,13 +155,43 @@ def create_checkout(plan, tenant_id):
 def get_payment(payment_id):
     if not configured():
         raise RuntimeError("ЮKassa не настроена.")
-    r=requests.get(
-        f"https://api.yookassa.ru/v3/payments/{payment_id}",
-        auth=(SHOP_ID,SECRET_KEY),
+    safe_id = quote(str(payment_id or "").strip(), safe="")
+    if not safe_id:
+        raise ValueError("Идентификатор платежа обязателен.")
+    response = requests.get(
+        f"https://api.yookassa.ru/v3/payments/{safe_id}",
+        auth=(SHOP_ID, SECRET_KEY),
         timeout=20,
     )
-    try: data=r.json()
-    except Exception: data={"description":r.text}
-    if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+    if not response.ok:
+        raise RuntimeError("Не удалось проверить платёж в ЮKassa.")
+    try:
+        data = response.json()
+    except Exception as exc:
+        raise RuntimeError("ЮKassa вернула некорректный ответ по платежу.") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("ЮKassa вернула некорректный ответ по платежу.")
+    return data
+
+
+def get_refund(refund_id):
+    """Fetch authoritative refund state; never trust a webhook refund status alone."""
+    if not configured():
+        raise RuntimeError("ЮKassa не настроена.")
+    safe_id = quote(str(refund_id or "").strip(), safe="")
+    if not safe_id:
+        raise ValueError("Идентификатор возврата обязателен.")
+    response = requests.get(
+        f"https://api.yookassa.ru/v3/refunds/{safe_id}",
+        auth=(SHOP_ID, SECRET_KEY),
+        timeout=20,
+    )
+    if not response.ok:
+        raise RuntimeError("Не удалось проверить возврат в ЮKassa.")
+    try:
+        data = response.json()
+    except Exception as exc:
+        raise RuntimeError("ЮKassa вернула некорректный ответ по возврату.") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("ЮKassa вернула некорректный ответ по возврату.")
     return data
