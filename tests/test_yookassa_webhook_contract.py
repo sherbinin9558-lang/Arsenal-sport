@@ -18,8 +18,8 @@ def invoke_webhook(monkeypatch, payload, headers=None):
 
 def test_payment_notification_without_bearer_uses_authoritative_provider_status(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', 'optional-extra-secret')
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded'})
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro'})
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '990.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '990.00', 'expected_currency': 'RUB'})
     captured = {}
     monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
     result = invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-1', 'status': 'canceled'}})
