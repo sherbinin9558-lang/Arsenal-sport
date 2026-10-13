@@ -25,7 +25,7 @@ class YooKassaSBPCheckoutTests(unittest.TestCase):
 
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["payment_method_data"], {"type": "sbp"})
-        self.assertTrue(payload["save_payment_method"])
+        self.assertFalse(payload["save_payment_method"])
         self.assertEqual(payload["metadata"]["tenant_id"], "tenant-1")
         self.assertEqual(result["id"], "payment-123")
         save_checkout.assert_called_once_with("tenant-1", payload["metadata"]["checkout_id"], "payment-123", "pro")
@@ -50,7 +50,7 @@ class YooKassaSBPCheckoutTests(unittest.TestCase):
 
         payload = post.call_args.kwargs["json"]
         self.assertNotIn("payment_method_data", payload)
-        self.assertFalse(payload["save_payment_method"])
+        self.assertTrue(payload["save_payment_method"])
 
     def test_rejects_unknown_payment_method(self):
         with self.assertRaises(ValueError):
