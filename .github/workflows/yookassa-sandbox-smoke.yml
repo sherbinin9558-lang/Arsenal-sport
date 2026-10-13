@@ -33,11 +33,29 @@ jobs:
           fi
 
   sandbox-api-smoke:
-    if: ${{ github.event_name == 'workflow_dispatch' && secrets.YOOKASSA_TEST_SHOP_ID != '' && secrets.YOOKASSA_TEST_SECRET_KEY != '' && secrets.YOOKASSA_TEST_RETURN_URL != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Gate API smoke on all required sandbox secrets
+        id: gate
+        env:
+          YOOKASSA_TEST_SHOP_ID: ${{ secrets.YOOKASSA_TEST_SHOP_ID }}
+          YOOKASSA_TEST_SECRET_KEY: ${{ secrets.YOOKASSA_TEST_SECRET_KEY }}
+          YOOKASSA_TEST_RETURN_URL: ${{ secrets.YOOKASSA_TEST_RETURN_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$YOOKASSA_TEST_SHOP_ID" && -n "$YOOKASSA_TEST_SECRET_KEY" && -n "$YOOKASSA_TEST_RETURN_URL" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "All required sandbox secrets are present; API smoke will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sandbox API smoke skipped: one or more required test secrets are absent. Secret values are never printed."
+          fi
+
       - name: Create and cancel an uncaptured sandbox payment
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         env:
           YOOKASSA_TEST_SHOP_ID: ${{ secrets.YOOKASSA_TEST_SHOP_ID }}
           YOOKASSA_TEST_SECRET_KEY: ${{ secrets.YOOKASSA_TEST_SECRET_KEY }}
@@ -46,7 +64,6 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
           import os
           import sys
           import uuid
@@ -59,7 +76,6 @@ jobs:
               raise SystemExit("Required sandbox configuration is missing or return URL is not HTTPS.")
 
           base = "https://api.yookassa.ru/v3"
-          payment_id = None
           headers = {
               "Idempotence-Key": str(uuid.uuid4()),
               "Content-Type": "application/json",
@@ -72,40 +88,35 @@ jobs:
               "metadata": {"purpose": "automated_sandbox_smoke", "run_id": os.getenv("GITHUB_RUN_ID", "local")},
           }
 
-          try:
-              response = requests.post(
-                  f"{base}/payments", auth=(shop, key), headers=headers,
-                  json=payload, timeout=20,
-              )
-              if response.status_code not in (200, 201):
-                  print(f"YooKassa sandbox payment creation failed: HTTP {response.status_code}; response body withheld.")
-                  raise SystemExit(1)
-              data = response.json()
-              payment_id = data.get("id")
-              if not payment_id:
-                  print("YooKassa response did not contain a payment ID.")
-                  raise SystemExit(1)
-              print(f"Sandbox payment creation succeeded; status={data.get('status', 'unknown')}. No capture requested.")
-              if data.get("paid") is True:
-                  print("Unexpected paid=true for a non-capturing sandbox smoke payment.")
-                  raise SystemExit(1)
+          response = requests.post(
+              f"{base}/payments", auth=(shop, key), headers=headers,
+              json=payload, timeout=20,
+          )
+          if response.status_code not in (200, 201):
+              print(f"YooKassa sandbox payment creation failed: HTTP {response.status_code}; response body withheld.")
+              raise SystemExit(1)
+          data = response.json()
+          payment_id = data.get("id")
+          if not payment_id:
+              print("YooKassa response did not contain a payment ID.")
+              raise SystemExit(1)
+          print(f"Sandbox payment creation succeeded; status={data.get('status', 'unknown')}. No capture requested.")
+          if data.get("paid") is True:
+              print("Unexpected paid=true for a non-capturing sandbox smoke payment.")
+              raise SystemExit(1)
 
-              cancel = requests.post(
-                  f"{base}/payments/{payment_id}/cancel",
-                  auth=(shop, key),
-                  headers={"Idempotence-Key": str(uuid.uuid4()), "Content-Type": "application/json"},
-                  timeout=20,
-              )
-              if cancel.status_code not in (200, 201):
-                  print(f"Sandbox payment cancellation failed: HTTP {cancel.status_code}; payment was not captured; response body withheld.")
-                  raise SystemExit(1)
-              final = cancel.json()
-              if final.get("status") != "canceled":
-                  print(f"Sandbox payment cancellation returned unexpected status={final.get('status', 'unknown')}.")
-                  raise SystemExit(1)
-              print("YooKassa sandbox API smoke passed: authenticated create, no capture, cancellation confirmed.")
-          finally:
-              # No payment is captured by this workflow. If the API created a payment
-              # but cancellation failed, the log reports that manual sandbox cleanup may be needed.
-              pass
+          cancel = requests.post(
+              f"{base}/payments/{payment_id}/cancel",
+              auth=(shop, key),
+              headers={"Idempotence-Key": str(uuid.uuid4()), "Content-Type": "application/json"},
+              timeout=20,
+          )
+          if cancel.status_code not in (200, 201):
+              print(f"Sandbox payment cancellation failed: HTTP {cancel.status_code}; payment was not captured; response body withheld.")
+              raise SystemExit(1)
+          final = cancel.json()
+          if final.get("status") != "canceled":
+              print(f"Sandbox payment cancellation returned unexpected status={final.get('status', 'unknown')}.")
+              raise SystemExit(1)
+          print("YooKassa sandbox API smoke passed: authenticated create, no capture, cancellation confirmed.")
           PY
