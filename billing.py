@@ -11,7 +11,7 @@ SAAS_BUSINESS_PRICE
 The app creates a redirect checkout. Subscription activation is performed only
 after YooKassa reports a successful payment.
 """
-import os, time, uuid, requests
+import math, os, time, uuid, requests
 import streamlit as st
 
 PLANS = {
@@ -56,7 +56,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в хранилище.")
 
 def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
@@ -71,7 +71,7 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из хранилища.")
     rows=r.json()
     return rows[0] if rows else None
 
@@ -83,9 +83,11 @@ def plan_price(plan):
         raise ValueError("Недопустимый тариф.")
     raw=_cfg(PLANS[plan]["secret"])
     try:
-        value=float(raw.replace(",", "."))
-    except Exception:
-        value=0.0
+        value = float(raw.replace(",", "."))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    if not math.isfinite(value) or value <= 0:
+        return 0.0
     return value
 
 def create_checkout(plan, tenant_id):
@@ -100,7 +102,7 @@ def create_checkout(plan, tenant_id):
     payload={
         "amount":{"value":f"{price:.2f}","currency":"RUB"},
         "capture":True,
-        "save_payment_method":True,
+        "save_payment_method":False,  # Recurring charges are not implemented; do not store payment methods yet.
         "confirmation":{"type":"redirect","return_url":f"{PUBLIC_URL}/?billing=return&checkout_id={checkout_id}"},
         "description":f"Подписка AI Agent Content Manager · {PLANS[plan]['name']}",
         "metadata":{"tenant_id":tenant_id,"plan":plan,"checkout_id":checkout_id},
@@ -115,7 +117,9 @@ def create_checkout(plan, tenant_id):
     try: data=r.json()
     except Exception: data={"description":r.text}
     if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+        # Provider response bodies may contain account/configuration details.
+        # Keep user-facing errors stable; inspect provider diagnostics in its dashboard.
+        raise RuntimeError("ЮKassa не смогла создать платёж. Проверьте настройки и статус провайдера.")
     confirmation=(data.get("confirmation") or {}).get("confirmation_url")
     if not confirmation:
         raise RuntimeError("ЮKassa не вернула ссылку на оплату.")
@@ -151,5 +155,5 @@ def get_payment(payment_id):
     try: data=r.json()
     except Exception: data={"description":r.text}
     if not r.ok:
-        raise RuntimeError(data.get("description") or data.get("message") or str(data))
+        raise RuntimeError("Не удалось получить статус платежа от ЮKassa.")
     return data

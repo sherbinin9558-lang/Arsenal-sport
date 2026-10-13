@@ -1,5 +1,5 @@
 """T-Bank (formerly Tinkoff) Internet Acquiring checkout."""
-import hashlib, os, time, uuid, requests
+import hashlib, math, os, time, uuid, requests
 import streamlit as st
 
 def _cfg(name, default=""):
@@ -26,7 +26,7 @@ def _save_checkout(tenant_id, order_id, payment_id, plan):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в хранилище.")
 
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
@@ -38,9 +38,16 @@ def _token(data):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 def plan_price(plan):
-    raw=_cfg(f"SAAS_{plan.upper()}_PRICE")
-    try: return float(raw.replace(",", "."))
-    except Exception: return 0.0
+    if plan not in ("starter", "pro", "business"):
+        raise ValueError("Недопустимый тариф.")
+    raw = _cfg(f"SAAS_{plan.upper()}_PRICE")
+    try:
+        value = float(raw.replace(",", "."))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    if not math.isfinite(value) or value <= 0:
+        return 0.0
+    return value
 
 def _receipt_for_checkout(plan, amount_kopecks):
     """Build a compliant receipt only when the merchant explicitly enables it."""
@@ -82,7 +89,7 @@ def _receipt_for_checkout(plan, amount_kopecks):
 
 def create_checkout(plan, tenant_id):
     price=plan_price(plan)
-    if price <= 0: raise RuntimeError("Цена тарифа не настроена в Secrets.")
+    if not math.isfinite(price) or price <= 0: raise RuntimeError("Цена тарифа не настроена в Secrets.")
     if not configured(): raise RuntimeError("Т-Банк не настроен: нужны TBANK_TERMINAL_KEY, TBANK_PASSWORD и SAAS_PUBLIC_URL.")
     order_id=f"{str(tenant_id)[:12]}-{uuid.uuid4().hex[:16]}"
     payload={
@@ -107,7 +114,7 @@ def create_checkout(plan, tenant_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Т-Банк не смог создать платёж. Проверьте настройки и журнал провайдера.")
     # The provider payment is already created at this point. Persist the
     # checkout record with bounded retries so a transient Supabase outage does
     # not strand a real payment without a durable application reference.
@@ -137,7 +144,7 @@ def get_state(payment_id):
     try: data=r.json()
     except Exception: data={"Message":r.text}
     if not r.ok or not data.get("Success"):
-        raise RuntimeError(data.get("Message") or data.get("Details") or str(data))
+        raise RuntimeError("Не удалось проверить состояние платежа в Т-Банке.")
     return data
 
 
@@ -152,6 +159,6 @@ def get_checkout_by_order(order_id, tenant_id):
         params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.tbank",
                 "provider_order_id":f"eq.{order_id}","tenant_id":f"eq.{tenant_id}","limit":"1"}, timeout=15)
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из хранилища.")
     rows=r.json()
     return rows[0] if rows else None
