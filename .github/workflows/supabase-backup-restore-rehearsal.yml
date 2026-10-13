@@ -57,6 +57,15 @@ jobs:
               raise SystemExit("Required workflow safety marker missing: " + ", ".join(missing))
           print("Dispatch guard, secret references, and action major versions verified.")
           PY
+          # Exercise the exact dump filter against synthetic SQL, without secrets or production data.
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          printf 'SET log_min_messages = warning;\n  SET log_min_messages = error;\n\tSET log_min_messages = notice;\nSET search_path = public;\nSELECT 1;\n' > "$temp_dir/roles.sql"
+          sed -i -E '/^[[:space:]]*SET[[:space:]]+log_min_messages[[:space:]]*=/Id' "$temp_dir/roles.sql"
+          expected="$(printf 'SET search_path = public;\nSELECT 1;')"
+          actual="$(cat "$temp_dir/roles.sql")"
+          [[ "$actual" == "$expected" ]] || { echo "::error::log_min_messages filter did not preserve unrelated SQL"; diff -u <(printf '%s\n' "$expected") "$temp_dir/roles.sql"; exit 1; }
+          echo "Synthetic log_min_messages filter cases passed."
           python -m unittest discover -s tests/ci -p 'test_pin_supabase_db_major_version.py' -v
           python - <<'PY'
           from urllib.parse import unquote, urlsplit
