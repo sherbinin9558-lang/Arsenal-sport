@@ -105,4 +105,4 @@ jobs:
           END $$;
           SELECT 'Isolated PostgreSQL backup/restore rehearsal passed' AS result;
           SQL
-          docker exec postgres "$PG_CONTAINER" rm -f /tmp/rehearsal.dump || docker exec "$PG_CONTAINER" rm -f /tmp/rehearsal.dump
+          docker exec "$PG_CONTAINER" rm -f /tmp/rehearsal.dump
