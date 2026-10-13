@@ -253,7 +253,8 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("Сессию не удалось восстановить автоматически. Войдите снова.", source)
         self.assertIn("Не удалось подтвердить текущую сессию. Войдите снова.", source)
         self.assertIn('st.info(notice)', source)
-        self.assertIn('st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")', source)
+        self.assertIn("if CookieController is not None and probes <= 1:", source)
+        self.assertNotIn("ok, message = supabase_health()", source)
         self.assertNotIn('st.error("Не удалось восстановить сессию.', source)
         self.assertNotIn('st.error("Сервер аккаунтов временно недоступен.', source)
 
