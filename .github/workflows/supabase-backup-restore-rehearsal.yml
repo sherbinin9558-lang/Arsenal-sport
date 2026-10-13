@@ -49,6 +49,11 @@ jobs:
               "(cd \"$RUNNER_TEMP/backup-unpacked\" && sha256sum -c SHA256SUMS)",
               "Critical restored business tables are empty",
               "relrowsecurity",
+              "--set ON_ERROR_STOP=1 --file /backup/roles.sql",
+              "--set ON_ERROR_STOP=1 --file /backup/schema.sql",
+              "--single-transaction --set ON_ERROR_STOP=1",
+              "--command 'SET session_replication_role = replica'",
+              "--file /backup/data.sql",
               "DO $restore$",
               "$restore$;",
           ]
@@ -57,6 +62,15 @@ jobs:
               raise SystemExit("Required workflow safety marker missing: " + ", ".join(missing))
           print("Dispatch guard, secret references, and action major versions verified.")
           PY
+          # Exercise the exact dump filter against synthetic SQL, without secrets or production data.
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          printf "SET log_min_messages = warning;\n  SET log_min_messages = error;\n\tSET log_min_messages = notice;\nSELECT pg_catalog.set_config('log_min_messages', 'warning', false);\nSET search_path = public;\nSELECT 1;\n" > "$temp_dir/roles.sql"
+          sed -i -E '/log_min_messages/Id' "$temp_dir/roles.sql"
+          expected="$(printf 'SET search_path = public;\nSELECT 1;')"
+          actual="$(cat "$temp_dir/roles.sql")"
+          [[ "$actual" == "$expected" ]] || { echo "::error::log_min_messages filter did not preserve unrelated SQL"; diff -u <(printf '%s\n' "$expected") "$temp_dir/roles.sql"; exit 1; }
+          echo "Synthetic log_min_messages filter cases passed."
           python -m unittest discover -s tests/ci -p 'test_pin_supabase_db_major_version.py' -v
           python - <<'PY'
           from urllib.parse import unquote, urlsplit
@@ -283,13 +297,29 @@ jobs:
           mkdir -p "$RUNNER_TEMP/backup-unpacked"
           tar -xzf "$RUNNER_TEMP/backup.tar.gz" -C "$RUNNER_TEMP/backup-unpacked"
           (cd "$RUNNER_TEMP/backup-unpacked" && sha256sum -c SHA256SUMS)
+          # Supabase-managed dumps may emit log_min_messages as SET or set_config().
+          # This session-only setting is unnecessary for restore; filter it from both dumps.
+          for dump_file in roles.sql schema.sql; do
+            sed -i -E '/log_min_messages/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
+          done
+          # Role creation cannot run inside a transaction block; restore roles first.
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
+            postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --set ON_ERROR_STOP=1 --file /backup/roles.sql
+          # Restore schema outside a single transaction so extension/DDL requirements are respected.
+          docker run --rm --network host \
+            -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
+            postgres:17-alpine \
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+              --set ON_ERROR_STOP=1 --file /backup/schema.sql
+          # Keep the data import atomic; disable triggers only in this psql session.
           docker run --rm --network host \
             -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
             postgres:17-alpine \
             psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
               --single-transaction --set ON_ERROR_STOP=1 \
-              --file /backup/roles.sql \
-              --file /backup/schema.sql \
               --command 'SET session_replication_role = replica' \
               --file /backup/data.sql
           docker run --rm --network host postgres:17-alpine \
