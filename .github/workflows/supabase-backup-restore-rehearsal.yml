@@ -286,7 +286,7 @@ jobs:
           # Supabase-managed dumps may include session settings the local restore role cannot change.
           # Filter both role and schema dumps; either can contain SET log_min_messages.
           for dump_file in roles.sql schema.sql; do
-            sed -i -E '/^SET log_min_messages[[:space:]]*=/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
+            sed -i -E '/^[[:space:]]*SET[[:space:]]+log_min_messages[[:space:]]*=/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
           done
           docker run --rm --network host \
             -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
