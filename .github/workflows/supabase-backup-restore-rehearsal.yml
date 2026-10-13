@@ -60,8 +60,8 @@ jobs:
           # Exercise the exact dump filter against synthetic SQL, without secrets or production data.
           temp_dir="$(mktemp -d)"
           trap 'rm -rf "$temp_dir"' EXIT
-          printf 'SET log_min_messages = warning;\n  SET log_min_messages = error;\n\tSET log_min_messages = notice;\nSET search_path = public;\nSELECT 1;\n' > "$temp_dir/roles.sql"
-          sed -i -E '/^[[:space:]]*SET[[:space:]]+log_min_messages[[:space:]]*=/Id' "$temp_dir/roles.sql"
+          printf "SET log_min_messages = warning;\n  SET log_min_messages = error;\n\tSET log_min_messages = notice;\nSELECT pg_catalog.set_config('log_min_messages', 'warning', false);\nSET search_path = public;\nSELECT 1;\n" > "$temp_dir/roles.sql"
+            sed -i -E '/log_min_messages/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
           expected="$(printf 'SET search_path = public;\nSELECT 1;')"
           actual="$(cat "$temp_dir/roles.sql")"
           [[ "$actual" == "$expected" ]] || { echo "::error::log_min_messages filter did not preserve unrelated SQL"; diff -u <(printf '%s\n' "$expected") "$temp_dir/roles.sql"; exit 1; }
@@ -292,10 +292,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/backup-unpacked"
           tar -xzf "$RUNNER_TEMP/backup.tar.gz" -C "$RUNNER_TEMP/backup-unpacked"
           (cd "$RUNNER_TEMP/backup-unpacked" && sha256sum -c SHA256SUMS)
-          # Supabase-managed dumps may include session settings the local restore role cannot change.
-          # Filter both role and schema dumps; either can contain SET log_min_messages.
+          # Supabase-managed dumps may emit log_min_messages as SET or set_config().
+          # This session-only setting is unnecessary for restore; filter it from both dumps.
           for dump_file in roles.sql schema.sql; do
-            sed -i -E '/^[[:space:]]*SET[[:space:]]+log_min_messages[[:space:]]*=/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
+            sed -i -E '/log_min_messages/Id' "$RUNNER_TEMP/backup-unpacked/$dump_file"
           done
           docker run --rm --network host \
             -v "$RUNNER_TEMP/backup-unpacked:/backup:ro" \
