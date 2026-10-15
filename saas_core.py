@@ -1296,6 +1296,7 @@ def data_load_sidebar_settings(ttl_seconds=10):
 
 
 def data_load(entity,default):
+    """Load tenant data once per short session window; reuse safely on Streamlit reruns."""
     entity = _validate_data_entity(entity)
     if not saas_enabled():
         path=f"data/{tenant_id()}_{entity}.json"
@@ -1306,34 +1307,49 @@ def data_load(entity,default):
             # A tenant-specific local file is the only non-Supabase fallback.
             return default
 
+    tenant = str(tenant_id() or "")
+    user_id = str(st.session_state.get("saas_user_id") or "")
+    cache_key = f"{user_id}:{tenant}:{entity}"
+    cache = st.session_state.setdefault("_saas_data_load_cache", {})
+    now = time.time()
+    entry = cache.get(cache_key)
+    if isinstance(entry, dict) and now - float(entry.get("at", 0)) < 10:
+        # Never return the cached mutable object directly to callers.
+        return copy.deepcopy(entry.get("value", default))
+
     token=st.session_state.get("saas_access_token")
     rows=_rest_get(
         "/rest/v1/app_data",
         token,
         params={
             "select":"record_id,payload,created_at,updated_at",
-            "tenant_id":f"eq.{tenant_id()}",
+            "tenant_id":f"eq.{tenant}",
             "entity":f"eq.{entity}",
             "order":"created_at.asc,record_id.asc",
         },
     )
     if not rows:
         st.session_state[_data_session_key(entity)] = {}
-        return default
+        value = copy.deepcopy(default)
+    else:
+        baseline = {}
+        loaded = []
+        for row in rows:
+            record_id = str(row.get("record_id"))
+            baseline[record_id] = {
+                "updated_at": row.get("updated_at"),
+                "created_at": row.get("created_at"),
+                "payload": dict(row.get("payload") or {}),
+            }
+            loaded.append(_prepare_loaded_payload(row))
+        st.session_state[_data_session_key(entity)] = baseline
+        value = loaded
 
-    baseline = {}
-    loaded = []
-    for row in rows:
-        record_id = str(row.get("record_id"))
-        baseline[record_id] = {
-            "updated_at": row.get("updated_at"),
-            "created_at": row.get("created_at"),
-            "payload": dict(row.get("payload") or {}),
-        }
-        loaded.append(_prepare_loaded_payload(row))
-
-    st.session_state[_data_session_key(entity)] = baseline
-    return loaded
+    cache[cache_key] = {"at": now, "value": copy.deepcopy(value)}
+    if len(cache) > 40:
+        for old_key in list(cache)[:20]:
+            cache.pop(old_key, None)
+    return copy.deepcopy(value)
 
 
 def export_current_tenant_data():
@@ -1617,6 +1633,8 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_app_growth_snapshot", None)
     st.session_state.pop("_app_growth_snapshot_key", None)
     st.session_state.pop("_saas_data_page_cache", None)
+    # A successful write invalidates loaded entity data as well as derived snapshots.
+    st.session_state.pop("_saas_data_load_cache", None)
     st.session_state.pop("_saas_usage_snapshot_cache", None)
     st.session_state.pop("_saas_onboarding_cache", None)
     st.session_state.pop("_saas_team_members_cache", None)
