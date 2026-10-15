@@ -36,6 +36,7 @@ def test_recovery_persists_verified_settled_payment(monkeypatch):
         "_checkout_by_provider_payment",
         lambda provider, payment_id: {
             "tenant_id": saved["tenant"], "plan": saved["plan"],
+            "provider_order_id": saved["checkout_id"],
             "provider_payment_id": payment_id,
             "expected_amount": saved["amount"], "expected_currency": saved["currency"],
         } if saved else None,
@@ -55,7 +56,11 @@ def test_recovery_persists_verified_settled_payment(monkeypatch):
 
 
 def test_recovery_returns_existing_row_after_concurrent_save(monkeypatch):
-    existing = {"tenant_id": "tenant-test-123", "plan": "pro", "provider_payment_id": "pay-recovery-123"}
+    existing = {
+        "tenant_id": "tenant-test-123", "plan": "pro",
+        "provider_order_id": "checkout-local-123", "provider_payment_id": "pay-recovery-123",
+        "expected_amount": "990.00", "expected_currency": "RUB",
+    }
     monkeypatch.setattr(tbank_webhook, "_save_checkout", lambda *args: (_ for _ in ()).throw(RuntimeError("duplicate insert")))
     monkeypatch.setattr(tbank_webhook, "_checkout_by_provider_payment", lambda provider, payment_id: existing)
 
@@ -104,3 +109,37 @@ def test_recovery_rejects_missing_or_invalid_metadata_before_persisting(monkeypa
         tbank_webhook._recover_checkout_from_provider(payment)
 
     assert exc.value.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tenant_id", "tenant-other"),
+        ("plan", "business"),
+        ("provider_order_id", "checkout-other"),
+        ("provider_payment_id", "pay-other"),
+        ("expected_amount", "9.90"),
+        ("expected_currency", "EUR"),
+    ],
+)
+def test_recovery_rejects_mismatched_existing_row_after_concurrent_save(monkeypatch, field, value):
+    existing = {
+        "tenant_id": "tenant-test-123",
+        "plan": "pro",
+        "provider_order_id": "checkout-local-123",
+        "provider_payment_id": "pay-recovery-123",
+        "expected_amount": "990.00",
+        "expected_currency": "RUB",
+    }
+    existing[field] = value
+    monkeypatch.setattr(
+        tbank_webhook, "_save_checkout",
+        lambda *args: (_ for _ in ()).throw(RuntimeError("concurrent insert")),
+    )
+    monkeypatch.setattr(tbank_webhook, "_checkout_by_provider_payment", lambda provider, payment_id: existing)
+
+    with pytest.raises(HTTPException) as exc:
+        tbank_webhook._recover_checkout_from_provider(settled_payment())
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "Recovered checkout does not match payment"
