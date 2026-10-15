@@ -1756,7 +1756,7 @@ if tab8.open:
         if st.button("Создать AI-задачу на follow-up", key="p3_queue_action"):
             try:
                 queue_agent_action("create_task", {"title":"AI follow-up по горячим лидам","priority":"Высокий"}); st.rerun()
-            except Exception as e: st.error(str(e))
+            except Exception as e: st.error(safe_error_text(e))
         actions = data_load_keyset("agent_actions", page_size=10, search="")["rows"]
         actions = [x for x in actions if x.get("status") == "pending_approval"]
         for action in actions[:10]:
@@ -1764,7 +1764,7 @@ if tab8.open:
             if st.button("Подтвердить и выполнить", key=f"p3_approve_{action.get('id')}"):
                 try:
                     approve_agent_action(action.get("id"), execute=True); st.rerun()
-                except Exception as e: st.error(str(e))
+                except Exception as e: st.error(safe_error_text(e))
     st.markdown("---")
     st.subheader("CRM 360")
     crm360 = crm_insights(leads)
