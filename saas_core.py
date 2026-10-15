@@ -743,10 +743,8 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Authentication calls below report provider failures; avoid a blocking
+    # synchronous health probe while rendering the public login screen.
 
     st.markdown(
         '<div class="public-shell">'
@@ -1277,6 +1275,26 @@ def _validate_data_entity(entity):
     return entity
 
 
+def data_load_sidebar_settings(ttl_seconds=10):
+    """Short tenant-scoped cache for settings displayed in the sidebar only."""
+    tenant = str(tenant_id() or "")
+    cache = st.session_state.get("_saas_sidebar_settings_cache")
+    now = time.time()
+    if (
+        isinstance(cache, dict)
+        and cache.get("tenant") == tenant
+        and now - float(cache.get("at", 0)) < max(1, int(ttl_seconds))
+    ):
+        return cache.get("value", [])
+    value = data_load("settings", [])
+    st.session_state["_saas_sidebar_settings_cache"] = {
+        "tenant": tenant,
+        "at": now,
+        "value": value,
+    }
+    return value
+
+
 def data_load(entity,default):
     entity = _validate_data_entity(entity)
     if not saas_enabled():
@@ -1606,6 +1624,7 @@ def _invalidate_computed_snapshots():
     # WebMCP data is a derived snapshot of settings, products and content plan.
     # Clear it after successful writes so the next rerun publishes fresh data.
     st.session_state.pop("_webmcp_data_cache", None)
+    st.session_state.pop("_saas_sidebar_settings_cache", None)
 
 
 def data_save(entity,rows):
