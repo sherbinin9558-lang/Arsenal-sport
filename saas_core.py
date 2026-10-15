@@ -216,10 +216,14 @@ def _establish_session(result):
     token = result.get("access_token")
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
+    started_user = time.perf_counter()
     user = result.get("user") or get_user(token)
+    _record_auth_timing("resolve_user", started_user)
     previous_user_id = st.session_state.get("saas_user_id")
     selected_tenant_id = st.session_state.get("saas_tenant_id") if previous_user_id == user.get("id") else None
+    started_membership = time.perf_counter()
     tenants = user_tenants(token,user.get("id"))
+    _record_auth_timing("tenant_membership_lookup", started_membership)
     # Reuse the membership response above instead of issuing the same Supabase
     # query a second time during every session restoration.
     tenant = None
@@ -405,14 +409,30 @@ def _safe_auth_error(exc):
     return "Не удалось восстановить сессию. Повторите попытку позже."
 
 
+def _record_auth_timing(operation, started):
+    """Log auth-stage latency without recording credentials, tokens, or user IDs."""
+    try:
+        from observability import logger
+        duration_ms = round((time.perf_counter() - started) * 1000, 1)
+        logger().info(
+            "authentication stage completed",
+            extra={"event": "auth_timing", "operation": operation, "duration_ms": duration_ms},
+        )
+    except Exception:
+        pass
+
+
 def sign_in(email,password):
     _check_auth_attempt_limit(email)
     _check_global_auth_attempt_limit(email)
+    started_auth = time.perf_counter()
     try:
         result = _request("POST","/auth/v1/token?grant_type=password",json={"email":email,"password":password})
     except SupabaseRequestError:
+        _record_auth_timing("supabase_password_auth_failed", started_auth)
         raise
     else:
+        _record_auth_timing("supabase_password_auth", started_auth)
         _clear_auth_attempts(email)
         try:
             from observability import security_event
