@@ -253,7 +253,7 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("Сессию не удалось восстановить автоматически. Войдите снова.", source)
         self.assertIn("Не удалось подтвердить текущую сессию. Войдите снова.", source)
         self.assertIn('st.info(notice)', source)
-        self.assertIn('st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")', source)
+        self.assertNotIn("ok, message = supabase_health()", source)
         self.assertNotIn('st.error("Не удалось восстановить сессию.', source)
         self.assertNotIn('st.error("Сервер аккаунтов временно недоступен.', source)
 
@@ -382,7 +382,7 @@ class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
 
     def test_max_initial_data_load_and_recommendations_show_progress_and_cache(self):
         source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
-        self.assertIn('st.spinner("MAX загружает данные магазина…")', source)
+        self.assertIn('st.spinner("«Вектор» загружает данные магазина…")', source)
         self.assertIn('_max_session_cached(', source)
         self.assertIn('f"_max_recommendations:{tenant_key}:{revision_key}"', source)
         self.assertIn('f"_max_usage_summary:{tenant_key}"', source)
@@ -391,4 +391,4 @@ class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "ui" / "max.py").read_text(encoding="utf-8")
         self.assertIn('st.session_state.setdefault("_max_sales_reply_cache", {})', source)
         self.assertIn('st.session_state.setdefault("_max_followup_cache", {})', source)
-        self.assertIn('with st.spinner("MAX ищет подходящие товары…")', source)
+        self.assertIn('with st.spinner("«Вектор» ищет подходящие товары…")', source)
