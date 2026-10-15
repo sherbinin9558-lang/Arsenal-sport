@@ -102,3 +102,15 @@ def test_capture_exception_sends_only_redacted_exception_to_sentry(monkeypatch):
     assert "RAW_SENTRY_SECRET" not in str(fake.captured)
     assert "owner@example.com" not in str(fake.captured)
     assert fake.captured.__traceback__ is not None
+
+
+def test_redact_text_removes_provider_key_prefixes():
+    from observability import _redact_text
+
+    openai_key = "sk-proj-" + "A" * 36
+    stripe_key = "sk_live_" + "B" * 24
+    supabase_key = "sb_secret_" + "C" * 24
+    safe = _redact_text(f"OpenAI {openai_key} Stripe {stripe_key} Supabase {supabase_key}")
+    assert openai_key not in safe
+    assert stripe_key not in safe
+    assert supabase_key not in safe
