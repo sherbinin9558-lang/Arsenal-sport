@@ -1,6 +1,6 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
-import hashlib, json, os, re, time
+import copy, hashlib, json, os, re, time
 from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 from typing import Optional
