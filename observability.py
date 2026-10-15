@@ -19,6 +19,7 @@ _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-
 _URL_CREDENTIALS_RE = re.compile(r"(://)[^/@\s:]+:[^/@\s]+@")
 _QUERY_SECRET_RE = re.compile(r"(?i)([?&](?:token|key|secret|password|signature|authorization)=)[^&\s]+")
 _EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+_PROVIDER_KEY_RE = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9_-]{16,})\b")
 
 
 def _redact_text(value):
@@ -28,6 +29,7 @@ def _redact_text(value):
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
     text = _TELEGRAM_BOT_TOKEN_RE.sub("bot[REDACTED]", text)
     text = _JWT_RE.sub("[REDACTED_JWT]", text)
+    text = _PROVIDER_KEY_RE.sub("[REDACTED_PROVIDER_KEY]", text)
     text = _URL_CREDENTIALS_RE.sub(r"\1[REDACTED]@", text)
     text = _QUERY_SECRET_RE.sub(r"\1[REDACTED]", text)
     text = _EMAIL_RE.sub("[REDACTED_EMAIL]", text)
@@ -59,7 +61,7 @@ def configure_observability():
     if dsn:
         try:
             import sentry_sdk
-            sentry_sdk.init(dsn=dsn, environment=os.getenv('APP_ENV','production'), traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE','0.05')), send_default_pii=False)
+            sentry_sdk.init(dsn=dsn, environment=os.getenv('APP_ENV','production'), traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE','0.05')), send_default_pii=False, include_local_variables=False)
             _SENTRY = sentry_sdk
         except Exception: root.warning('Sentry initialization failed', extra={'event':'sentry_init_failed'})
     _CONFIGURED = True
