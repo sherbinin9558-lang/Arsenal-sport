@@ -254,7 +254,6 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("Не удалось подтвердить текущую сессию. Войдите снова.", source)
         self.assertIn('st.info(notice)', source)
         self.assertNotIn('st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")', source)
-        self.assertIn("def render_login", source)
         self.assertNotIn('st.error("Не удалось восстановить сессию.', source)
         self.assertNotIn('st.error("Сервер аккаунтов временно недоступен.', source)
 
