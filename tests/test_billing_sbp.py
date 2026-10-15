@@ -28,7 +28,15 @@ class YooKassaSBPCheckoutTests(unittest.TestCase):
         self.assertFalse(payload["save_payment_method"])
         self.assertEqual(payload["metadata"]["tenant_id"], "tenant-1")
         self.assertEqual(result["id"], "payment-123")
-        save_checkout.assert_called_once_with("tenant-1", payload["metadata"]["checkout_id"], "payment-123", "pro")
+        # The checkout persistence contract may gain server-calculated amount
+        # and currency arguments in the billing-hardening PR. Assert the stable
+        # leading contract here so this test remains compatible after rebasing.
+        save_checkout.assert_called_once()
+        saved_args = save_checkout.call_args.args
+        self.assertEqual(
+            saved_args[:4],
+            ("tenant-1", payload["metadata"]["checkout_id"], "payment-123", "pro"),
+        )
 
     @patch.object(billing, "_save_checkout")
     @patch.object(billing.requests, "post")
