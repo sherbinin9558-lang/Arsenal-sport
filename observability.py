@@ -117,5 +117,9 @@ def install_exception_hook():
     configure_observability(); previous=sys.excepthook
     if getattr(previous,'_ai_agent_observability',False): return
     def hook(exc_type,exc_value,exc_traceback):
-        capture_exception(exc_value,event='uncaught_exception'); previous(exc_type,exc_value,exc_traceback)
+        capture_exception(exc_value,event='uncaught_exception')
+        # The default excepthook prints the original exception message directly to
+        # stderr, bypassing JsonFormatter. Pass a sanitized exception instead.
+        safe_exc = RuntimeError(_redact_text(str(exc_value)) or "Unhandled exception")
+        previous(type(safe_exc), safe_exc, exc_traceback)
     hook._ai_agent_observability=True; sys.excepthook=hook
