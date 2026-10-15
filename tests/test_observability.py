@@ -35,3 +35,70 @@ def test_observability_supports_sentry_dsn(monkeypatch):
     observability._SENTRY = None
     observability.configure_observability()
     assert observability._CONFIGURED is True
+
+
+def test_redact_text_removes_credentials_and_email():
+    from observability import _redact_text
+
+    raw = (
+        "request failed api_key=SECRET123 "
+        "Authorization: Bearer BEARERSECRET "
+        "https://user:pass@example.com/path?token=QUERYSECRET "
+        "bot123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+        "owner@example.com"
+    )
+    safe = _redact_text(raw)
+    for secret in (
+        "SECRET123", "BEARERSECRET", "user:pass", "QUERYSECRET",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "owner@example.com",
+    ):
+        assert secret not in safe
+    assert "[REDACTED]" in safe
+    assert "[REDACTED_EMAIL]" in safe
+
+
+def test_json_formatter_redacts_exception_message():
+    import json
+    formatter = JsonFormatter()
+    try:
+        raise RuntimeError("provider failed token=RAWSECRET owner@example.com")
+    except RuntimeError as exc:
+        record = logging.LogRecord("test", logging.ERROR, __file__, 1, str(exc), (), (type(exc), exc, exc.__traceback__))
+    rendered = formatter.format(record)
+    assert "RAWSECRET" not in rendered
+    assert "owner@example.com" not in rendered
+    payload = json.loads(rendered)
+    assert payload["exception"]["type"] == "RuntimeError"
+
+
+def test_capture_exception_sends_only_redacted_exception_to_sentry(monkeypatch):
+    import contextlib
+    import observability
+
+    class FakeScope:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def set_tag(self, *_args):
+            pass
+
+    class FakeSentry:
+        captured = None
+        def push_scope(self):
+            return FakeScope()
+        def capture_exception(self, exc):
+            self.captured = exc
+
+    fake = FakeSentry()
+    monkeypatch.setattr(observability, "_SENTRY", fake)
+    try:
+        raise RuntimeError("provider failed token=RAW_SENTRY_SECRET email=owner@example.com")
+    except RuntimeError as exc:
+        with contextlib.redirect_stderr(__import__("io").StringIO()):
+            observability.capture_exception(exc)
+
+    assert fake.captured is not None
+    assert "RAW_SENTRY_SECRET" not in str(fake.captured)
+    assert "owner@example.com" not in str(fake.captured)
+    assert fake.captured.__traceback__ is not None
