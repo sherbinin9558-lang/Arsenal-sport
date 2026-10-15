@@ -9,9 +9,9 @@ _SENTRY = None
 
 # Redact secrets in exception messages before they reach stdout or Sentry.
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"""(?ix)\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|"
-    r"""authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\b"""
-    r"""(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&]+)"""
+    r"(?i)\\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|"
+    r"authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\\b"
+    r"(\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s,;&]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _TELEGRAM_BOT_TOKEN_RE = re.compile(r"(?i)\bbot\d{5,}:[A-Za-z0-9_-]{20,}")
