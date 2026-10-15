@@ -160,6 +160,29 @@ def _verify_yookassa_payment_amount(payment, checkout):
     if not expected_currency or actual_currency != expected_currency:
         raise HTTPException(status_code=422, detail="Checkout currency verification failed")
 
+def _validate_recovered_checkout(row, *, checkout_id, tenant_id, payment_id, plan, expected_amount, expected_currency):
+    """Fail closed unless the durable row exactly matches verified provider metadata."""
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=503, detail="Checkout recovery is temporarily unavailable")
+    try:
+        stored_amount = Decimal(str(row.get("expected_amount")))
+        wanted_amount = Decimal(str(expected_amount))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=409, detail="Recovered checkout does not match payment")
+    if (
+        str(row.get("provider_payment_id") or "") != payment_id
+        or str(row.get("provider_order_id") or "") != checkout_id
+        or str(row.get("tenant_id") or "") != tenant_id
+        or str(row.get("plan") or "").lower() != plan
+        or str(row.get("expected_currency") or "").upper() != expected_currency
+        or not stored_amount.is_finite()
+        or not wanted_amount.is_finite()
+        or stored_amount != wanted_amount
+    ):
+        raise HTTPException(status_code=409, detail="Recovered checkout does not match payment")
+    return row
+
+
 def _recover_checkout_from_provider(payment):
     """Recreate a missing checkout row only from verified, settled provider metadata.
 
@@ -187,17 +210,22 @@ def _recover_checkout_from_provider(payment):
     try:
         _save_checkout(tenant_id, checkout_id, payment_id, plan, expected_amount, expected_currency)
     except Exception:
-        # A concurrent webhook may already have restored the same row. Only
-        # continue if the durable row is now present; otherwise ask YooKassa
-        # to retry rather than acknowledging an unrecorded payment.
+        # A concurrent webhook may have created the row. Presence alone is not
+        # sufficient: verify every identity and amount field before accepting it.
         existing = _checkout_by_provider_payment("yookassa", payment_id)
         if not existing:
             raise HTTPException(status_code=503, detail="Checkout recovery is temporarily unavailable")
-        return existing
+        return _validate_recovered_checkout(
+            existing, checkout_id=checkout_id, tenant_id=tenant_id, payment_id=payment_id,
+            plan=plan, expected_amount=expected_amount, expected_currency=expected_currency,
+        )
     recovered = _checkout_by_provider_payment("yookassa", payment_id)
     if not recovered:
         raise HTTPException(status_code=503, detail="Checkout recovery is temporarily unavailable")
-    return recovered
+    return _validate_recovered_checkout(
+        recovered, checkout_id=checkout_id, tenant_id=tenant_id, payment_id=payment_id,
+        plan=plan, expected_amount=expected_amount, expected_currency=expected_currency,
+    )
 
 
 

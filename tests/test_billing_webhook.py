@@ -70,7 +70,10 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertIn("/webhooks/yookassa", paths)
         self.assertNotIn("/webhooks/tbank/payment-status", paths)
 
-    @patch("tbank_webhook._checkout_by_provider_payment", return_value={"tenant_id": "tenant-1", "plan": "pro"})
+    @patch("tbank_webhook._checkout_by_provider_payment", return_value={
+        "tenant_id": "tenant-1", "plan": "pro", "provider_order_id": "checkout-1",
+        "provider_payment_id": "payment-recovery", "expected_amount": "990.00", "expected_currency": "RUB",
+    })
     @patch("tbank_webhook._save_checkout")
     def test_recovery_uses_provider_metadata_and_persists_checkout(self, save_checkout, lookup):
         payment = {
