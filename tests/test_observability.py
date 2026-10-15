@@ -114,3 +114,31 @@ def test_redact_text_removes_provider_key_prefixes():
     assert openai_key not in safe
     assert stripe_key not in safe
     assert supabase_key not in safe
+
+
+
+def test_uncaught_exception_hook_does_not_print_original_secret(monkeypatch):
+    import io
+    import sys
+    import observability
+
+    captured = {}
+    def previous(exc_type, exc_value, exc_traceback):
+        captured["type"] = exc_type
+        captured["message"] = str(exc_value)
+        captured["traceback"] = exc_traceback
+
+    monkeypatch.setattr(observability, "_CONFIGURED", True)
+    monkeypatch.setattr(observability, "_SENTRY", None)
+    monkeypatch.setattr(sys, "excepthook", previous)
+    observability.install_exception_hook()
+
+    try:
+        raise RuntimeError("uncaught token=UNCaughtSecret owner@example.com")
+    except RuntimeError as exc:
+        sys.excepthook(type(exc), exc, exc.__traceback__)
+
+    assert captured["type"] is RuntimeError
+    assert "UNCaughtSecret" not in captured["message"]
+    assert "owner@example.com" not in captured["message"]
+    assert captured["traceback"] is not None
