@@ -9,9 +9,11 @@ _SENTRY = None
 
 # Redact secrets in exception messages before they reach stdout or Sentry.
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(password|passwd|secret|api[_-]?key|token|access[_-]?token|refresh[_-]?token|"
-    r"authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\b"
-    r"(\s*[:=]\s*)(?:Bearer\s+)?(?:\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
+    r"""(?ix)
+    (?P<prefix>["']?\b(?:password|passwd|secret|api[_-]?key|token|access[_-]?token|refresh[_-]?token|
+    authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\b["']?\s*[:=]\s*)
+    (?:Bearer\s+)?(?:"[^"]*"|'[^']*'|[^\s,;&}]+)
+    """
 )
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _TELEGRAM_BOT_TOKEN_RE = re.compile(r"(?i)\bbot\d{5,}:[A-Za-z0-9_-]{20,}")
@@ -25,7 +27,7 @@ _PROVIDER_KEY_RE = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|sk_(?:live|
 def _redact_text(value):
     """Return bounded log-safe text without common credential/PII patterns."""
     text = str(value or "")
-    text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", text)
+    text = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group('prefix')}[REDACTED]", text)
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
     text = _TELEGRAM_BOT_TOKEN_RE.sub("bot[REDACTED]", text)
     text = _JWT_RE.sub("[REDACTED_JWT]", text)
@@ -87,7 +89,9 @@ def capture_exception(exc, **context):
     safe={}
     for key,value in context.items():
         safe[key] = '[REDACTED]' if any(x in key.lower() for x in ('token','secret','password','authorization','api_key')) else _redact_text(str(value)[:300])
-    logger().error(_redact_text(str(exc)), exc_info=(type(exc),exc,exc.__traceback__), extra={'event':'exception', 'error_type': type(exc).__name__, **safe})
+    # Never attach the original exception/traceback to an ERROR log record:
+    # Sentry's logging integration can capture exc_info before our safe capture.
+    logger().error(_redact_text(str(exc)), extra={'event':'exception', 'error_type': type(exc).__name__, **safe})
     if _SENTRY is not None:
         try:
             # Preserve the stack trace while ensuring the exception value sent to
@@ -104,7 +108,7 @@ def timed_operation(name):
     started=time.perf_counter()
     try: yield
     except Exception as exc:
-        duration=round((time.perf_counter()-started)*1000,1); logger().error(_redact_text(str(exc)),exc_info=True,extra={'event':'operation_failed','operation':name,'duration_ms':duration}); capture_exception(exc,operation=name); raise
+        duration=round((time.perf_counter()-started)*1000,1); logger().error(_redact_text(str(exc)),extra={'event':'operation_failed','operation':name,'duration_ms':duration,'error_type':type(exc).__name__}); capture_exception(exc,operation=name); raise
     else:
         duration=round((time.perf_counter()-started)*1000,1); logger().info(name+' completed',extra={'event':'operation_completed','operation':name,'duration_ms':duration})
 
