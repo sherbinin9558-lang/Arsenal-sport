@@ -9,9 +9,9 @@ _SENTRY = None
 
 # Redact secrets in exception messages before they reach stdout or Sentry.
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|"
-    r"authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\\b"
-    r"(\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s,;&]+)"
+    r"(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|"
+    r"authorization|service[_-]?role[_-]?key|client[_-]?secret|signature)\b"
+    r"(\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _TELEGRAM_BOT_TOKEN_RE = re.compile(r"(?i)\bbot\d{5,}:[A-Za-z0-9_-]{20,}")
@@ -28,8 +28,8 @@ def _redact_text(value):
     text = _BEARER_RE.sub("Bearer [REDACTED]", text)
     text = _TELEGRAM_BOT_TOKEN_RE.sub("bot[REDACTED]", text)
     text = _JWT_RE.sub("[REDACTED_JWT]", text)
-    text = _URL_CREDENTIALS_RE.sub(r"\\1[REDACTED]@", text)
-    text = _QUERY_SECRET_RE.sub(r"\\1[REDACTED]", text)
+    text = _URL_CREDENTIALS_RE.sub(r"\1[REDACTED]@", text)
+    text = _QUERY_SECRET_RE.sub(r"\1[REDACTED]", text)
     text = _EMAIL_RE.sub("[REDACTED_EMAIL]", text)
     return text[:2000]
 
