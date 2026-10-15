@@ -253,7 +253,7 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("Сессию не удалось восстановить автоматически. Войдите снова.", source)
         self.assertIn("Не удалось подтвердить текущую сессию. Войдите снова.", source)
         self.assertIn('st.info(notice)', source)
-        self.assertIn('st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")', source)
+        self.assertNotIn('st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")', source)
         self.assertNotIn('st.error("Не удалось восстановить сессию.', source)
         self.assertNotIn('st.error("Сервер аккаунтов временно недоступен.', source)
 
@@ -392,3 +392,22 @@ class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
         self.assertIn('st.session_state.setdefault("_max_sales_reply_cache", {})', source)
         self.assertIn('st.session_state.setdefault("_max_followup_cache", {})', source)
         self.assertIn('with st.spinner("MAX ищет подходящие товары…")', source)
+
+
+class StreamlitDataLoadCacheRegressionTests(unittest.TestCase):
+    def test_data_load_cache_is_tenant_and_user_scoped(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('cache_key = f"{user_id}:{tenant}:{entity}"', source)
+        self.assertIn('params={', source)
+        self.assertIn('"tenant_id":f"eq.{tenant}"', source)
+
+    def test_data_load_cache_returns_copies_and_has_short_ttl(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('now - float(entry.get("at", 0)) < 10', source)
+        self.assertIn('return copy.deepcopy(entry.get("value", default))', source)
+        self.assertIn('cache[cache_key] = {"at": now, "value": copy.deepcopy(value)}', source)
+
+    def test_successful_write_invalidates_loaded_data_cache(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('st.session_state.pop("_saas_data_load_cache", None)', source)
+        self.assertIn('def _invalidate_computed_snapshots():', source)

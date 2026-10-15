@@ -1,6 +1,6 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
-import hashlib, json, os, re, time
+import copy, hashlib, json, os, re, time
 from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -216,10 +216,14 @@ def _establish_session(result):
     token = result.get("access_token")
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
+    started_user = time.perf_counter()
     user = result.get("user") or get_user(token)
+    _record_auth_timing("resolve_user", started_user)
     previous_user_id = st.session_state.get("saas_user_id")
     selected_tenant_id = st.session_state.get("saas_tenant_id") if previous_user_id == user.get("id") else None
+    started_membership = time.perf_counter()
     tenants = user_tenants(token,user.get("id"))
+    _record_auth_timing("tenant_membership_lookup", started_membership)
     # Reuse the membership response above instead of issuing the same Supabase
     # query a second time during every session restoration.
     tenant = None
@@ -405,14 +409,30 @@ def _safe_auth_error(exc):
     return "Не удалось восстановить сессию. Повторите попытку позже."
 
 
+def _record_auth_timing(operation, started):
+    """Log auth-stage latency without recording credentials, tokens, or user IDs."""
+    try:
+        from observability import logger
+        duration_ms = round((time.perf_counter() - started) * 1000, 1)
+        logger().info(
+            "authentication stage completed",
+            extra={"event": "auth_timing", "operation": operation, "duration_ms": duration_ms},
+        )
+    except Exception:
+        pass
+
+
 def sign_in(email,password):
     _check_auth_attempt_limit(email)
     _check_global_auth_attempt_limit(email)
+    started_auth = time.perf_counter()
     try:
         result = _request("POST","/auth/v1/token?grant_type=password",json={"email":email,"password":password})
     except SupabaseRequestError:
+        _record_auth_timing("supabase_password_auth_failed", started_auth)
         raise
     else:
+        _record_auth_timing("supabase_password_auth", started_auth)
         _clear_auth_attempts(email)
         try:
             from observability import security_event
@@ -743,10 +763,8 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Authentication calls below report provider failures; avoid a blocking
+    # synchronous health probe while rendering the public login screen.
 
     st.markdown(
         '<div class="public-shell">'
@@ -1277,7 +1295,28 @@ def _validate_data_entity(entity):
     return entity
 
 
+def data_load_sidebar_settings(ttl_seconds=10):
+    """Short tenant-scoped cache for settings displayed in the sidebar only."""
+    tenant = str(tenant_id() or "")
+    cache = st.session_state.get("_saas_sidebar_settings_cache")
+    now = time.time()
+    if (
+        isinstance(cache, dict)
+        and cache.get("tenant") == tenant
+        and now - float(cache.get("at", 0)) < max(1, int(ttl_seconds))
+    ):
+        return cache.get("value", [])
+    value = data_load("settings", [])
+    st.session_state["_saas_sidebar_settings_cache"] = {
+        "tenant": tenant,
+        "at": now,
+        "value": value,
+    }
+    return value
+
+
 def data_load(entity,default):
+    """Load tenant data once per short session window; reuse safely on Streamlit reruns."""
     entity = _validate_data_entity(entity)
     if not saas_enabled():
         path=f"data/{tenant_id()}_{entity}.json"
@@ -1288,34 +1327,49 @@ def data_load(entity,default):
             # A tenant-specific local file is the only non-Supabase fallback.
             return default
 
+    tenant = str(tenant_id() or "")
+    user_id = str(st.session_state.get("saas_user_id") or "")
+    cache_key = f"{user_id}:{tenant}:{entity}"
+    cache = st.session_state.setdefault("_saas_data_load_cache", {})
+    now = time.time()
+    entry = cache.get(cache_key)
+    if isinstance(entry, dict) and now - float(entry.get("at", 0)) < 10:
+        # Never return the cached mutable object directly to callers.
+        return copy.deepcopy(entry.get("value", default))
+
     token=st.session_state.get("saas_access_token")
     rows=_rest_get(
         "/rest/v1/app_data",
         token,
         params={
             "select":"record_id,payload,created_at,updated_at",
-            "tenant_id":f"eq.{tenant_id()}",
+            "tenant_id":f"eq.{tenant}",
             "entity":f"eq.{entity}",
             "order":"created_at.asc,record_id.asc",
         },
     )
     if not rows:
         st.session_state[_data_session_key(entity)] = {}
-        return default
+        value = copy.deepcopy(default)
+    else:
+        baseline = {}
+        loaded = []
+        for row in rows:
+            record_id = str(row.get("record_id"))
+            baseline[record_id] = {
+                "updated_at": row.get("updated_at"),
+                "created_at": row.get("created_at"),
+                "payload": dict(row.get("payload") or {}),
+            }
+            loaded.append(_prepare_loaded_payload(row))
+        st.session_state[_data_session_key(entity)] = baseline
+        value = loaded
 
-    baseline = {}
-    loaded = []
-    for row in rows:
-        record_id = str(row.get("record_id"))
-        baseline[record_id] = {
-            "updated_at": row.get("updated_at"),
-            "created_at": row.get("created_at"),
-            "payload": dict(row.get("payload") or {}),
-        }
-        loaded.append(_prepare_loaded_payload(row))
-
-    st.session_state[_data_session_key(entity)] = baseline
-    return loaded
+    cache[cache_key] = {"at": now, "value": copy.deepcopy(value)}
+    if len(cache) > 40:
+        for old_key in list(cache)[:20]:
+            cache.pop(old_key, None)
+    return copy.deepcopy(value)
 
 
 def export_current_tenant_data():
@@ -1599,6 +1653,8 @@ def _invalidate_computed_snapshots():
     st.session_state.pop("_app_growth_snapshot", None)
     st.session_state.pop("_app_growth_snapshot_key", None)
     st.session_state.pop("_saas_data_page_cache", None)
+    # A successful write invalidates loaded entity data as well as derived snapshots.
+    st.session_state.pop("_saas_data_load_cache", None)
     st.session_state.pop("_saas_usage_snapshot_cache", None)
     st.session_state.pop("_saas_onboarding_cache", None)
     st.session_state.pop("_saas_team_members_cache", None)
@@ -1606,6 +1662,7 @@ def _invalidate_computed_snapshots():
     # WebMCP data is a derived snapshot of settings, products and content plan.
     # Clear it after successful writes so the next rerun publishes fresh data.
     st.session_state.pop("_webmcp_data_cache", None)
+    st.session_state.pop("_saas_sidebar_settings_cache", None)
 
 
 def data_save(entity,rows):
