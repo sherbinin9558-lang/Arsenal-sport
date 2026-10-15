@@ -42,6 +42,11 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info: payload['exception'] = {'type': record.exc_info[0].__name__, 'message': _redact_text(record.exc_info[1])}
         return json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
 
+def safe_error_text(value):
+    """Return a user-displayable error with common secrets and email redacted."""
+    return _redact_text(value)
+
+
 def configure_observability():
     global _CONFIGURED, _SENTRY
     if _CONFIGURED: return
