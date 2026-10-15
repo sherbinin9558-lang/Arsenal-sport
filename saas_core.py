@@ -743,10 +743,9 @@ def login_ui():
     if notice:
         st.info(notice)
 
-    if saas_enabled():
-        ok, message = supabase_health()
-        if not ok:
-            st.info("Сервис аккаунтов временно недоступен. Попробуйте войти через несколько секунд.")
+    # Do not make a synchronous network health probe while rendering the login UI.
+    # Authentication requests below already report service failures, and this
+    # extra probe added up to 3 seconds to every anonymous page render.
 
     st.markdown(
         '<div class="public-shell">'
