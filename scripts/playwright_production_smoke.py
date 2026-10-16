@@ -281,7 +281,6 @@ def run():
                                     "(el) => { const r = el.getBoundingClientRect(); "
                                     "return {x:r.x,y:r.y,width:r.width,height:r.height,"
                                     "visible:!!(r.width && r.height)}; }",
-                                    timeout=100,
                                 )
                             except Exception as frame_exc:
                                 frame_state["geometry_error"] = str(frame_exc)[:160]
