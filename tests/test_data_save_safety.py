@@ -247,6 +247,11 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertNotIn("time.sleep(0.15)", gate_source)
         self.assertNotIn("st.rerun()", gate_source)
 
+    def test_legacy_blocking_session_restore_screen_is_removed(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertNotIn("Восстанавливаем сохранённую сессию…", source)
+        self.assertNotIn('if bootstrap is None:', source)
+
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn('st.session_state["_saas_login_notice"]', source)
