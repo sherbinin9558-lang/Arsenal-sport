@@ -58,19 +58,52 @@ def _visible_app_frame(page, timeout_ms=45000):
 def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception():
     base_url = _base_url()
     browser_errors = []
+    console_errors = []
+    failed_app_requests = []
+    server_errors = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
+        context = browser.new_context()
+        page = context.new_page()
+        app_host = (urlparse(base_url).hostname or "").lower()
+
+        def is_app_url(url):
+            host = (urlparse(url).hostname or "").lower()
+            return host == app_host or host.endswith(".streamlit.app") or host.endswith(".streamlit.io")
+
         page.on("pageerror", lambda error: browser_errors.append(str(error)))
-        response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
-        assert response is not None, "The app returned no navigation response."
-        assert response.status < 500, f"App returned HTTP {response.status}"
-        app_frame = _visible_app_frame(page)
-        assert app_frame.locator("[data-testid='stException']").count() == 0, (
-            "Streamlit rendered an exception panel in the application frame."
+        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+        page.on(
+            "requestfailed",
+            lambda request: failed_app_requests.append(
+                f"{request.method} {request.url}: {request.failure}"
+            ) if is_app_url(request.url) else None,
         )
-        browser.close()
-    assert not browser_errors, "Uncaught browser errors: " + "; ".join(browser_errors)
+        page.on(
+            "response",
+            lambda response: server_errors.append(
+                f"HTTP {response.status} {response.url}"
+            ) if response.status >= 500 and is_app_url(response.url) else None,
+        )
+        try:
+            response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
+            assert response is not None, "The app returned no navigation response."
+            assert response.status < 500, f"App returned HTTP {response.status}"
+            app_frame = _visible_app_frame(page)
+            assert app_frame.locator("[data-testid='stException']").count() == 0, (
+                "Streamlit rendered an exception panel in the application frame."
+            )
+            assert not browser_errors, "Uncaught JavaScript errors: " + "; ".join(browser_errors[-10:])
+            assert not server_errors, "App-origin server errors: " + "; ".join(server_errors[-10:])
+            assert not failed_app_requests, "Failed app-origin requests: " + "; ".join(failed_app_requests[-10:])
+        finally:
+            context.close()
+            browser.close()
+    assert not browser_errors, "Uncaught JavaScript errors: " + "; ".join(browser_errors[-10:])
+    assert not server_errors, "App-origin server errors: " + "; ".join(server_errors[-10:])
+    assert not failed_app_requests, "Failed app-origin requests: " + "; ".join(failed_app_requests[-10:])
+    # Console errors are recorded for diagnostics; third-party embeds can emit harmless errors.
+    # The Streamlit exception panel and uncaught JavaScript exceptions remain hard failures.
 
 
 @pytest.mark.e2e
