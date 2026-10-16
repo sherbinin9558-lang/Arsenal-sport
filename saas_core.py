@@ -430,8 +430,21 @@ def sign_in(email,password):
     started_auth = time.perf_counter()
     try:
         result = _request("POST","/auth/v1/token?grant_type=password",json={"email":email,"password":password})
-    except SupabaseRequestError:
+    except SupabaseRequestError as exc:
         _record_auth_timing("supabase_password_auth_failed", started_auth)
+        # Record only the HTTP status; never log credentials, tokens, or raw provider responses.
+        try:
+            from observability import logger
+            logger().warning(
+                "Supabase password authentication rejected",
+                extra={
+                    "event": "auth_rejected",
+                    "operation": "supabase_password_auth",
+                    "status_code": exc.status_code,
+                },
+            )
+        except Exception:
+            pass
         raise
     else:
         _record_auth_timing("supabase_password_auth", started_auth)
