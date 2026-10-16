@@ -228,7 +228,9 @@ def run():
             page.on("response", record_http_response)
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
-                page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+                # Start sampling as soon as the navigation response commits; waiting for DOMContentLoaded
+                # can skip the very transient shell/login states this test is meant to capture.
+                page.goto(browser_url(), wait_until="commit", timeout=TIMEOUT_MS)
                 # Sample intermediate renders to detect transient red/error screens before
                 # the expected login form appears. Samples contain text markers, not screenshots.
                 for sample_ms in (0, 250, 500, 1000, 2000, 5000):
@@ -236,7 +238,7 @@ def run():
                     if sample_ms > elapsed_before_sample:
                         page.wait_for_timeout(sample_ms - elapsed_before_sample)
                     sample_text = visible_page_text(page, per_frame_timeout_ms=100)
-                    state_samples.append({
+                    sample_record = {
                         "target_elapsed_ms": sample_ms,
                         "elapsed_ms": round((time.perf_counter() - started) * 1000),
                         "state": classify_visible_state(sample_text),
@@ -245,7 +247,14 @@ def run():
                         "has_status_embed": "Status embed installed correctly" in sample_text,
                         "has_exception_marker": any(x in sample_text.lower() for x in ("traceback", "uncaught app exception", "exception occurred")),
                         "text_prefix": sample_text[:500],
-                    })
+                    }
+                    # Keep a small visual trace of the first renders to detect transient red
+                    # login/error screens that text-only diagnostics cannot reliably identify.
+                    if sample_ms in (0, 1000, 2000):
+                        screenshot_name = f"{name}-startup-{sample_ms}ms.png"
+                        page.screenshot(path=str(OUT / screenshot_name), full_page=False)
+                        sample_record["screenshot"] = screenshot_name
+                    state_samples.append(sample_record)
                 # Continue waiting for the settled login UI after recording the transition.
                 startup_text = wait_for_expected_login_text(page, timeout_ms=45000)
                 item["initial_url"] = safe_url(page.url)
