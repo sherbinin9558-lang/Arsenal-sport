@@ -1,6 +1,7 @@
 """Public, unauthenticated browser smoke tests for the isolated test deployment."""
 import json
 import os
+import re
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urlunparse
@@ -26,6 +27,15 @@ def _safe_url(value):
         return "<invalid-url>"
 
 
+def _safe_message(value):
+    """Redact query strings and fragments from URLs embedded in diagnostic text."""
+    text = str(value)[:500]
+    return re.sub(
+        r"https?://[^\\s\"'<>]+",
+        lambda match: _safe_url(match.group(0)),
+        text,
+    )
+
 def _source_for_url(value, app_host):
     host = (urlparse(value).hostname or "").lower()
     if host == app_host:
@@ -45,6 +55,14 @@ def _network_event(response, app_host):
         "source": _source_for_url(response.url, app_host),
         "event_type": "http_response",
     }
+
+def test_diagnostic_url_sanitization_and_source_classification():
+    assert _safe_url("https://example.test/path?token=secret#fragment") == "https://example.test/path"
+    assert _safe_url("https://example.test/path") == "https://example.test/path"
+    assert _source_for_url("https://test-app.streamlit.app/_stcore/stream", "test-app.streamlit.app") == "application"
+    assert _source_for_url("https://static.streamlit.io/assets/app.js", "test-app.streamlit.app") == "streamlit"
+    assert _source_for_url("https://sdk.us.heap-api.com/js/heap-.js", "test-app.streamlit.app") == "third_party"
+    assert "token=secret" not in _safe_message("request failed https://example.test/path?token=secret#fragment")
 
 def _is_streamlit_app_frame(frame):
     """Only accept the deployed Streamlit app; status/analytics embeds are not the app."""
@@ -138,8 +156,8 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
             host = (urlparse(url).hostname or "").lower()
             return host == app_host or host.endswith(".streamlit.app") or host.endswith(".streamlit.io")
 
-        page.on("pageerror", lambda error: browser_errors.append(str(error)[:300]))
-        page.on("console", lambda msg: console_errors.append(msg.type + ": " + msg.text[:300]) if msg.type == "error" else None)
+        page.on("pageerror", lambda error: browser_errors.append(_safe_message(error)))
+        page.on("console", lambda msg: console_errors.append(msg.type + ": " + _safe_message(msg.text)) if msg.type == "error" else None)
 
         def on_request_failed(request):
             if is_app_url(request.url):
@@ -213,7 +231,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         }))
         page.on("response", lambda response: http_diagnostics.append(_network_event(response, app_host))
                   if response.status in (403, 404) or response.status >= 500 else None)
-        page.on("pageerror", lambda error: page_errors.append(str(error)[:300]))
+        page.on("pageerror", lambda error: page_errors.append(_safe_message(error)))
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
         app_frame = _visible_app_frame(page)
