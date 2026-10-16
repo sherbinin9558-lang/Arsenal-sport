@@ -1,9 +1,4 @@
-"""Public, unauthenticated browser smoke tests for the isolated test deployment.
-
-Streamlit renders the Python application inside an iframe; assertions must inspect
-that app frame rather than the outer hosting shell.
-These checks do not log in or mutate application data.
-"""
+"""Public, unauthenticated browser smoke tests for the isolated test deployment."""
 import os
 
 import pytest
@@ -17,20 +12,36 @@ def _base_url():
     return value.rstrip("/")
 
 
-def _app_frame(page):
-    """Return Streamlit's application frame, not the outer hosting document."""
-    for frame in page.frames:
-        if frame.name == "streamlitApp":
-            return frame
-    # Some Streamlit versions don't expose a stable frame name. Prefer the
-    # frame that actually contains app inputs or rendered Streamlit elements.
+def _visible_app_frame(page, timeout_ms=45000):
+    """Wait for a visible Streamlit app frame; ignore hidden bootstrap frames."""
+    deadline = timeout_ms
+    while deadline > 0:
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                body = frame.locator("body")
+                if body.is_visible() and body.inner_text(timeout=500).strip():
+                    return frame
+            except Exception:
+                pass
+        page.wait_for_timeout(500)
+        deadline -= 500
+    frame_info = []
     for frame in page.frames:
         try:
-            if frame.locator("input, [data-testid='stApp'], [data-testid='stException']").count():
-                return frame
-        except Exception:
-            continue
-    return None
+            frame_info.append({
+                "name": frame.name,
+                "url": frame.url,
+                "body_visible": frame.locator("body").is_visible(),
+                "body_text": " ".join(frame.locator("body").inner_text(timeout=500).split())[:180],
+            })
+        except Exception as exc:
+            frame_info.append({"name": frame.name, "url": frame.url, "error": str(exc)[:120]})
+    raise AssertionError(
+        "No visible Streamlit app frame with content appeared. "
+        f"title={page.title()!r}; frames={frame_info!r}"
+    )
 
 
 @pytest.mark.e2e
@@ -44,20 +55,7 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None, "The app returned no navigation response."
         assert response.status < 500, f"App returned HTTP {response.status}"
-        page.locator("body").wait_for(state="visible", timeout=10000)
-        app_frame = None
-        for _ in range(30):
-            app_frame = _app_frame(page)
-            if app_frame is not None:
-                break
-            page.wait_for_timeout(1000)
-        assert app_frame is not None, (
-            "Streamlit application iframe did not appear. "
-            f"title={page.title()!r}; frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}"
-        )
-        app_frame.locator("body").wait_for(state="visible", timeout=15000)
-        body = app_frame.locator("body").inner_text().lower()
-        assert body.strip(), "The Streamlit application frame rendered an empty body."
+        app_frame = _visible_app_frame(page)
         assert app_frame.locator("[data-testid='stException']").count() == 0, (
             "Streamlit rendered an exception panel in the application frame."
         )
@@ -79,18 +77,8 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         page.on("pageerror", lambda error: page_errors.append(str(error)))
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
-        page.locator("body").wait_for(state="visible", timeout=10000)
+        app_frame = _visible_app_frame(page)
         auth_words = ("войти", "login", "sign in", "авториза", "вход")
-        app_frame = None
-        for _ in range(30):
-            app_frame = _app_frame(page)
-            if app_frame is not None:
-                break
-            page.wait_for_timeout(1000)
-        assert app_frame is not None, (
-            "Streamlit application iframe did not appear. "
-            f"title={page.title()!r}; frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}"
-        )
         try:
             app_frame.wait_for_function(
                 """words => {
@@ -112,7 +100,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                     "aria_label": field.get_attribute("aria-label"),
                 })
             raise AssertionError(
-                "Login content did not appear within 45s inside the Streamlit app frame. "
+                "Login content did not appear within 45s inside the visible Streamlit app frame. "
                 f"title={page.title()!r}; url={page.url!r}; "
                 f"frame_name={app_frame.name!r}; frame_url={app_frame.url!r}; "
                 f"body={body_excerpt!r}; inputs={input_details!r}; "
@@ -120,7 +108,6 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                 f"page_errors={page_errors[-10:]!r}; "
                 f"failed_requests={failed_requests[-10:]!r}"
             ) from exc
-        body = app_frame.locator("body").inner_text().lower()
         fields = app_frame.locator("input")
         field_text = []
         for i in range(fields.count()):
