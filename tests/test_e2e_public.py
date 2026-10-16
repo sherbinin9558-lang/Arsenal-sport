@@ -1,4 +1,5 @@
 """Public, unauthenticated browser smoke tests for the isolated test deployment."""
+import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -54,6 +55,40 @@ def _visible_app_frame(page, timeout_ms=45000):
     )
 
 
+def _write_public_diagnostics(page, label, details):
+    """Persist sanitized public-page evidence for both passing and failing runs."""
+    artifact_dir = Path("artifacts")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    safe_details = {
+        "label": label,
+        "page_url": page.url,
+        "page_title": page.title(),
+        "frames": [],
+        **details,
+    }
+    for frame in page.frames:
+        item = {"name": frame.name, "url": frame.url}
+        try:
+            body_text = " ".join(frame.locator("body").inner_text(timeout=1000).split())
+            item.update({
+                "body_text_excerpt": body_text[:800],
+                "input_count": frame.locator("input").count(),
+                "visible_input_count": sum(
+                    1 for i in range(min(frame.locator("input").count(), 30))
+                    if frame.locator("input").nth(i).is_visible()
+                ),
+                "button_count": frame.locator("button").count(),
+            })
+        except Exception as exc:
+            item["inspection_error"] = str(exc)[:160]
+        safe_details["frames"].append(item)
+    (artifact_dir / f"{label}.json").write_text(
+        json.dumps(safe_details, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    # The public unauthenticated screen contains no entered credentials.
+    page.screenshot(path=str(artifact_dir / f"{label}.png"), full_page=True)
+
+
 @pytest.mark.e2e
 def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception():
     base_url = _base_url()
@@ -96,6 +131,13 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
             assert not browser_errors, "Uncaught JavaScript errors: " + "; ".join(browser_errors[-10:])
             assert not server_errors, "App-origin server errors: " + "; ".join(server_errors[-10:])
             assert not failed_app_requests, "Failed app-origin requests: " + "; ".join(failed_app_requests[-10:])
+            _write_public_diagnostics(page, "public-app-smoke", {
+                "browser_errors": browser_errors[-10:],
+                "console_errors": console_errors[-10:],
+                "failed_app_requests": failed_app_requests[-10:],
+                "server_errors": server_errors[-10:],
+                "streamlit_exception_count": app_frame.locator("[data-testid='stException']").count(),
+            })
         finally:
             context.close()
             browser.close()
@@ -193,6 +235,14 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                     })
                 except Exception as exc:
                     dom_inventory.append({"url": candidate_frame.url, "error": str(exc)[:160]})
+        _write_public_diagnostics(page, "public-auth-screen", {
+            "visible_auth_input": visible_auth_input,
+            "auth_words_detected": True,
+            "input_inventory": input_details,
+            "console_errors": console_errors[-10:],
+            "page_errors": page_errors[-10:],
+            "failed_requests": failed_requests[-10:],
+        })
         assert visible_auth_input, (
             "Login text was detected, but no visible email/password/text input was found "
             f"in any browser frame. frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}; "
