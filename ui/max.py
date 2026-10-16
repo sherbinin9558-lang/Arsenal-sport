@@ -302,7 +302,7 @@ def render_max():
         try:
             tenant_key = str(st.session_state.get("saas_tenant_id") or "session")
             usage = _max_session_cached(
-                f"_max_usage_summary:{tenant_key}", 30,
+                f"_max_usage_summary:{tenant_key}", 120,
                 lambda: usage_summary(30),
                 "Загружаем сводку использования…",
             )
@@ -318,7 +318,7 @@ def render_max():
         revision_key = int(st.session_state.get("_app_data_revision", 0) or 0)
         max_recs = _max_session_cached(
             f"_max_recommendations:{tenant_key}:{revision_key}",
-            20,
+            120,
             lambda: growth_recommendations(products, leads, orders, plan),
             "MAX анализирует данные магазина…",
         )
