@@ -23,6 +23,7 @@ from observability_import import load_observability
 _observability = load_observability()
 configure_observability = _observability.configure_observability
 install_exception_hook = _observability.install_exception_hook
+safe_error_text = _observability.safe_error_text
 
 configure_observability()
 install_exception_hook()
@@ -220,14 +221,20 @@ def publish_to_telegram(image_bytes, caption):
         files = {"photo": ("card.png", image_bytes, "image/png")}
         data = {"chat_id": channel, "caption": caption[:1024]}
         resp = requests.post(api_url, files=files, data=data, timeout=60)
-        if resp.status_code == 200:
+        try:
+            payload = resp.json()
+        except ValueError:
+            payload = {}
+        if resp.ok and payload.get("ok") is True:
             return True, "Пост успешно опубликован!"
-        else:
-            return False, f"Ошибка {resp.status_code}: {resp.text}"
-    except KeyError as e:
-        return False, f"Не найден секрет: {e}."
+        description = payload.get("description") or "проверьте права бота и настройки канала"
+        return False, safe_error_text(
+            f"Telegram API отклонил публикацию (HTTP {resp.status_code}): {description}"
+        )
+    except KeyError:
+        return False, "Не настроен обязательный параметр Telegram."
     except Exception as e:
-        return False, f"Ошибка публикации: {e}"
+        return False, safe_error_text(f"Ошибка публикации Telegram: {e}")
 
 # ==================== ПУБЛИКАЦИЯ REELS ====================
 def _telegram_token_candidates():
@@ -313,7 +320,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         if resp.ok and result.get("ok") is True:
             return True, f"Reels опубликован в Telegram ({channel}). Размер: {size_mb:.1f} МБ."
 
-        description = result.get("description") or resp.text or "неизвестная ошибка"
+        description = safe_error_text(result.get("description") or resp.text or "неизвестная ошибка")
         lower = description.lower()
 
         if "chat not found" in lower:
@@ -356,11 +363,11 @@ def publish_reel_to_telegram(video_bytes, caption):
         return False, f"Telegram API не принял Reels: {description} (HTTP {resp.status_code}, {size_mb:.1f} МБ)."
 
     except KeyError as e:
-        return False, f"Не найден секрет: {e}. Нужны TELEGRAM_TOKEN и TELEGRAM_CHANNEL."
+        return False, "Не настроены обязательные параметры Telegram: TELEGRAM_TOKEN и TELEGRAM_CHANNEL."
     except requests.RequestException as e:
-        return False, f"Сеть/Telegram недоступны: {e}"
+        return False, safe_error_text(f"Сеть/Telegram недоступны: {e}")
     except Exception as e:
-        return False, f"Ошибка Telegram: {e}"
+        return False, safe_error_text(f"Ошибка Telegram: {e}")
 
 def publish_reel_to_vk(video_bytes, caption):
     try:
@@ -382,7 +389,7 @@ def publish_reel_to_vk(video_bytes, caption):
         data = resp.json()
 
         if "error" in data:
-            return False, f"Ошибка VK: {data['error'].get('error_msg', data['error'])}"
+            return False, safe_error_text(f"Ошибка VK: {data['error'].get('error_msg', data['error'])}")
 
         video = data.get("response", {})
         upload_url = video.get("upload_url")
@@ -396,13 +403,13 @@ def publish_reel_to_vk(video_bytes, caption):
         )
         upload_data = upload.json()
         if "error" in upload_data:
-            return False, f"Ошибка загрузки VK: {upload_data['error']}"
+            return False, safe_error_text(f"Ошибка загрузки VK: {upload_data['error']}")
 
         return True, "Reels отправлен в VK!"
     except KeyError as e:
-        return False, f"Не найден секрет: {e}."
+        return False, "Не настроены обязательные параметры VK."
     except Exception as e:
-        return False, f"Ошибка VK: {e}"
+        return False, safe_error_text(f"Ошибка VK: {e}")
 
 
 # ==================== OWNER CONSOLE ====================
@@ -418,7 +425,7 @@ def render_platform_admin():
     try:
         tenants, subs, members, users = platform_admin_snapshot()
     except Exception as e:
-        st.error(f"Не удалось загрузить данные админ-панели: {e}")
+        st.error(safe_error_text(f"Не удалось загрузить данные админ-панели: {e}"))
         return
 
     sub_by_tenant = {str(x.get("tenant_id")): x for x in subs}
@@ -490,7 +497,7 @@ def render_platform_admin():
             st.success("Изменения сохранены.")
             st.rerun()
         except Exception as e:
-            st.error(f"Не удалось сохранить: {e}")
+            st.error(safe_error_text(f"Не удалось сохранить: {e}"))
 
     st.markdown("---")
     st.markdown("### Настройки администратора")
@@ -584,7 +591,7 @@ try:
         elif payment.get("status") == "canceled":
             st.warning("Платёж отменён.")
 except Exception as e:
-    st.warning(f"Статус оплаты пока не подтверждён: {e}")
+    st.warning(safe_error_text(f"Статус оплаты пока не подтверждён: {e}"))
 
 
 with st.sidebar:
@@ -1732,7 +1739,7 @@ if tab8.open:
             if st.form_submit_button("Создать задачу"):
                 try:
                     create_task(title, priority=priority, due_date=due); st.success("Задача создана."); st.rerun()
-                except Exception as e: st.error(str(e))
+                except Exception as e: st.error(safe_error_text(e))
     st.markdown("---")
     a,b = st.columns(2)
     with a:
@@ -1749,7 +1756,7 @@ if tab8.open:
         if st.button("Создать AI-задачу на follow-up", key="p3_queue_action"):
             try:
                 queue_agent_action("create_task", {"title":"AI follow-up по горячим лидам","priority":"Высокий"}); st.rerun()
-            except Exception as e: st.error(str(e))
+            except Exception as e: st.error(safe_error_text(e))
         actions = data_load_keyset("agent_actions", page_size=10, search="")["rows"]
         actions = [x for x in actions if x.get("status") == "pending_approval"]
         for action in actions[:10]:
@@ -1757,7 +1764,7 @@ if tab8.open:
             if st.button("Подтвердить и выполнить", key=f"p3_approve_{action.get('id')}"):
                 try:
                     approve_agent_action(action.get("id"), execute=True); st.rerun()
-                except Exception as e: st.error(str(e))
+                except Exception as e: st.error(safe_error_text(e))
     st.markdown("---")
     st.subheader("CRM 360")
     crm360 = crm_insights(leads)
@@ -1787,7 +1794,7 @@ if tab8.open:
                 else:
                     st.error(f"{name.upper()}: проверка не пройдена")
         except Exception as e:
-            st.error(f"Проверка провайдера завершилась ошибкой: {e}")
+            st.error(safe_error_text(f"Проверка провайдера завершилась ошибкой: {e}"))
 
     st.markdown("---")
     st.subheader("Instagram automation")
