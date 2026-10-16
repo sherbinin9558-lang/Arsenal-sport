@@ -31,7 +31,7 @@ def _safe_message(value):
     """Redact query strings and fragments from URLs embedded in diagnostic text."""
     text = str(value)[:500]
     return re.sub(
-        r"https?://\\S+",
+        r"https?://\S+",
         lambda match: _safe_url(match.group(0)),
         text,
     )
