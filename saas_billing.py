@@ -52,7 +52,7 @@ def activate_paid_subscription(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError(response.text)
+        raise RuntimeError("Не удалось активировать подписку в платёжной базе.")
     st.session_state["saas_plan"] = plan
     st.session_state["saas_tenant_status"] = "active"
     return True
@@ -89,7 +89,7 @@ def set_auto_renew(
         timeout=20,
     )
     if not response.ok:
-        raise RuntimeError(response.text)
+        raise RuntimeError("Не удалось изменить настройки автопродления в платёжной базе.")
     st.session_state["auto_renew"] = bool(enabled)
     return True
 
