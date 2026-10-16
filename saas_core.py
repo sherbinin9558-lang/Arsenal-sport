@@ -1174,9 +1174,8 @@ def require_saas_access():
 
     if not st.session_state.get("saas_access_token"):
         bootstrap = _auth_bootstrap_gate()
-        if bootstrap is None:
-            st.info("Восстанавливаем сохранённую сессию…")
-            st.stop()
+        # Do not render a blocking "restoring session" screen. If no usable
+        # session cookie is available on this run, show login immediately.
         if not bootstrap:
             if st.session_state.get("saas_auth_error"):
                 auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
