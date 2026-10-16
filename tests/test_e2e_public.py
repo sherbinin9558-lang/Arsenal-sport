@@ -48,13 +48,19 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
         page.locator("body").wait_for(state="visible", timeout=10000)
-        page.wait_for_timeout(1500)
-        body = page.locator("body").inner_text().lower()
         auth_words = ("войти", "login", "sign in", "авториза", "вход")
-        assert any(word in body for word in auth_words), (
-            "The unauthenticated page does not show a recognizable login screen. "
-            f"Page title: {page.title()!r}; body excerpt: {body[:500]!r}"
+        # Streamlit Community Cloud can return its shell before the Python app
+        # finishes starting. Wait for actual login content instead of sampling
+        # the body only 1.5 seconds after navigation.
+        page.wait_for_function(
+            """words => {
+                const text = (document.body?.innerText || '').toLowerCase();
+                return words.some(word => text.includes(word));
+            }""",
+            arg=list(auth_words),
+            timeout=45000,
         )
+        body = page.locator("body").inner_text().lower()
         fields = page.locator("input")
         field_text = []
         for i in range(fields.count()):
