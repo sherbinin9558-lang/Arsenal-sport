@@ -438,6 +438,7 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn("restored = bool(_restore_session_from_cookie())", source)
         self.assertIn("if restored:", source)
+
     def test_sign_out_clears_refresh_cookie_and_blocks_stale_cookie_restore(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         sign_out_start = source.index("def sign_out(token):")
