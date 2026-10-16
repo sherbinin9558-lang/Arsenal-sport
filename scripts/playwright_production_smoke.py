@@ -197,6 +197,7 @@ def run():
             request_failures = []
             http_diagnostics = []
             state_samples = []
+            startup_timeline = []
             page.on("console", lambda msg: console_errors.append(msg.text[:1000]) if msg.type == "error" else None)
             page.on("pageerror", lambda exc: page_errors.append(str(exc)[:1000]))
             page.on(
@@ -230,7 +231,49 @@ def run():
                     pass
 
             started = time.perf_counter()
+
+            def record_startup_event(event_name, **details):
+                # Keep a bounded, token-free timeline of navigation and iframe lifecycle.
+                if len(startup_timeline) >= 250:
+                    return
+                startup_timeline.append({
+                    "event": event_name,
+                    "timestamp_ms": round((time.perf_counter() - started) * 1000),
+                    **details,
+                })
+
+            def record_document_request(request):
+                try:
+                    if request.resource_type == "document":
+                        record_startup_event(
+                            "document_request",
+                            method=request.method,
+                            url=safe_url(request.url),
+                            frame_url=safe_url(request.frame.url) if request.frame else "",
+                        )
+                except Exception:
+                    pass
+
+            def record_document_response(response):
+                try:
+                    if response.request.resource_type == "document":
+                        record_startup_event(
+                            "document_response",
+                            status=response.status,
+                            url=safe_url(response.url),
+                            frame_url=safe_url(response.request.frame.url) if response.request.frame else "",
+                        )
+                except Exception:
+                    pass
+
+            page.on("request", record_document_request)
             page.on("response", record_http_response)
+            page.on("response", record_document_response)
+            page.on("frameattached", lambda frame: record_startup_event("frame_attached", url=safe_url(frame.url), name=frame.name))
+            page.on("framenavigated", lambda frame: record_startup_event("frame_navigated", url=safe_url(frame.url), name=frame.name))
+            page.on("framedetached", lambda frame: record_startup_event("frame_detached", url=safe_url(frame.url), name=frame.name))
+            page.on("domcontentloaded", lambda: record_startup_event("domcontentloaded", url=safe_url(page.url)))
+            page.on("load", lambda: record_startup_event("load", url=safe_url(page.url)))
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
                 # Start sampling as soon as the navigation response commits; waiting for DOMContentLoaded
@@ -359,6 +402,7 @@ def run():
             finally:
                 item["duration_ms"] = round((time.perf_counter() - started) * 1000)
                 item["state_samples"] = state_samples
+                item["startup_timeline"] = startup_timeline
                 item["http_diagnostics"] = http_diagnostics[-200:]
                 item["console_errors"] = console_errors[-100:]
                 item["page_errors"] = page_errors[-100:]
