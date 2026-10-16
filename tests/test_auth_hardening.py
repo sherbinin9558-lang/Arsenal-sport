@@ -70,6 +70,17 @@ class AuthHardeningTests(unittest.TestCase):
         self.assertEqual(calls["rerun"], 0)
         self.assertEqual(calls["login"], 1)
 
+
+    def test_auth_bootstrap_does_not_wait_indefinitely_for_cookie_component(self):
+        saas_core.st.session_state.pop("_saas_cookie_probe_count", None)
+        with (patch.object(saas_core, "CookieController", object()),
+              patch.object(saas_core, "_restore_session_from_cookie", return_value=False)):
+            self.assertFalse(saas_core._auth_bootstrap_gate())
+
+    def test_auth_bootstrap_still_accepts_cookie_when_component_returns_it(self):
+        with patch.object(saas_core, "_restore_session_from_cookie", return_value=True):
+            self.assertTrue(saas_core._auth_bootstrap_gate())
+
     def test_auth_bootstrap_anonymous_path_is_non_blocking(self):
         saas_core.st.session_state.pop("_saas_auth_bootstrap_done", None)
         saas_core.st.session_state.pop("_saas_auth_bootstrap_started_at", None)
