@@ -1,5 +1,6 @@
 """Public, unauthenticated browser smoke tests for the isolated test deployment."""
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
@@ -140,10 +141,30 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                    for word in ("password", "email", "парол", "почт"))
             or field["type"] == "text"
         ]
-        assert any(field["visible"] for field in relevant_inputs), (
+        visible_auth_input = any(field["visible"] for field in relevant_inputs)
+        if not visible_auth_input:
+            # Preserve evidence when the login heading renders without usable fields.
+            artifact_dir = Path("artifacts")
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(artifact_dir / "public-auth-screen.png"), full_page=True)
+            dom_inventory = []
+            for candidate_frame in page.frames:
+                try:
+                    dom_inventory.append({
+                        "url": candidate_frame.url,
+                        "title": candidate_frame.title(),
+                        "body_text": " ".join(candidate_frame.locator("body").inner_text(timeout=1000).split())[:1200],
+                        "input_count": candidate_frame.locator("input").count(),
+                        "button_count": candidate_frame.locator("button").count(),
+                        "tab_count": candidate_frame.locator("[role='tab']").count(),
+                    })
+                except Exception as exc:
+                    dom_inventory.append({"url": candidate_frame.url, "error": str(exc)[:160]})
+        assert visible_auth_input, (
             "Login text was detected, but no visible email/password/text input was found "
             f"in any browser frame. frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}; "
-            f"inputs={input_details!r}; console_errors={console_errors[-10:]!r}; "
-            f"page_errors={page_errors[-10:]!r}; failed_requests={failed_requests[-10:]!r}"
+            f"inputs={input_details!r}; dom_inventory={dom_inventory if not visible_auth_input else []!r}; "
+            f"console_errors={console_errors[-10:]!r}; page_errors={page_errors[-10:]!r}; "
+            f"failed_requests={failed_requests[-10:]!r}"
         )
         browser.close()
