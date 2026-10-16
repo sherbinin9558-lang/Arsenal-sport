@@ -439,6 +439,13 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
         self.assertIn("restored = bool(_restore_session_from_cookie())", source)
         self.assertIn("if restored:", source)
 
+    def test_unauthenticated_state_hides_stale_sidebar_before_auth_guard(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        hide = source.index('if not st.session_state.get("saas_access_token"):')
+        auth_guard = source.index("if not require_saas_access():")
+        self.assertLess(hide, auth_guard)
+        self.assertIn('section[data-testid="stSidebar"]{display:none!important', source[hide:auth_guard])
+
     def test_sign_out_clears_refresh_cookie_and_blocks_stale_cookie_restore(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         sign_out_start = source.index("def sign_out(token):")
