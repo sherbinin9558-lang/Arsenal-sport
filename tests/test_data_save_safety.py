@@ -243,8 +243,7 @@ class ModularUiRegressionTests(unittest.TestCase):
         from saas_core import _auth_bootstrap_gate
         gate_source = inspect.getsource(_auth_bootstrap_gate)
         self.assertIn("return False", gate_source)
-        self.assertNotIn("return None", gate_source)
-        self.assertNotIn("st.stop()", gate_source)
+        self.assertIn("return None", gate_source)
         self.assertNotIn("time.sleep(0.15)", gate_source)
 
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
@@ -423,17 +422,17 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
         )
         gate_source = ast.get_source_segment(source, gate)
         self.assertIn("probes == 1", gate_source)
-        self.assertIn("st.rerun()", gate_source)
+        self.assertNotIn("st.rerun()", gate_source)
         self.assertIn("return False", gate_source)
-        self.assertNotIn("return None", gate_source)
-        self.assertNotIn("st.stop()", gate_source)
+        self.assertIn("return None", gate_source)
         self.assertIn("not st.session_state.get(\"saas_auth_error\")", gate_source)
         self.assertIn("not st.session_state.get(\"_saas_cookie_restore_failed\")", gate_source)
 
     def test_legacy_blocking_session_restore_screen_is_removed(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertNotIn("Восстанавливаем сохранённую сессию…", source)
-        self.assertNotIn("if bootstrap is None:", source)
+        self.assertIn("if bootstrap is None:", source)
+        self.assertIn("Проверяем сохранённую сессию…", source)
 
     def test_auth_bootstrap_keeps_cookie_restore_attempt(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
