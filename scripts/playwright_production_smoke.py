@@ -233,7 +233,7 @@ def run():
                 # the expected login form appears. Samples contain text markers, not screenshots.
                 for sample_ms in (0, 250, 500, 1000, 2000, 5000):
                     if sample_ms:
-                        page.wait_for_timeout(sample_ms - (state_samples[-1]["elapsed_ms"] if state_samples else 0))
+                        page.wait_for_timeout(max(0, sample_ms - round((time.perf_counter() - started) * 1000)))
                     sample_text = visible_page_text(page)
                     state_samples.append({
                         "elapsed_ms": round((time.perf_counter() - started) * 1000),
