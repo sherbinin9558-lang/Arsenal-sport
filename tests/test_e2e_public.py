@@ -20,7 +20,7 @@ def _is_streamlit_app_frame(frame):
 
 
 def _visible_app_frame(page, timeout_ms=45000):
-    """Wait for visible content in the actual Streamlit app frame, ignoring unrelated embeds."""
+    """Find the actual Streamlit app document, ignoring Statuspage and cookie-controller frames."""
     deadline = timeout_ms
     while deadline > 0:
         for frame in page.frames:
@@ -28,7 +28,8 @@ def _visible_app_frame(page, timeout_ms=45000):
                 continue
             try:
                 body = frame.locator("body")
-                if body.is_visible() and body.inner_text(timeout=500).strip():
+                text = body.inner_text(timeout=500).strip()
+                if text and any(marker in text.lower() for marker in ("ai agent content manager", "единый рабочий центр", "войти", "каталог")):
                     return frame
             except Exception:
                 pass
@@ -47,7 +48,7 @@ def _visible_app_frame(page, timeout_ms=45000):
         except Exception as exc:
             frame_info.append({"name": frame.name, "url": frame.url, "error": str(exc)[:120]})
     raise AssertionError(
-        "No visible Streamlit app frame with content appeared. "
+        "No Streamlit app document with expected application content appeared. "
         f"title={page.title()!r}; frames={frame_info!r}"
     )
 
