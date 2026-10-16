@@ -40,5 +40,5 @@ def demo_mode_enabled():
 def public_app_url():
     return cfg(
         "SAAS_PUBLIC_URL",
-        "https://arsenal-sport-b3rvpnysmxhvw9wud8wjjd.streamlit.app",
+        "https://sherbinin9558-lang-arsenal-sport-app-testauth-ui-accepta-gu0iaz.streamlit.app",
     ).rstrip("/")
