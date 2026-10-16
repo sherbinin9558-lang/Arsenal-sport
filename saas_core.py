@@ -236,15 +236,17 @@ def _establish_session(result):
     st.session_state["saas_access_token"] = token
     st.session_state["saas_user_id"] = user.get("id")
     st.session_state["saas_email"] = user.get("email","")
+    # Persist the rotated refresh token before any multi-tenant early return.
+    # Otherwise a user with multiple stores can log in but lose persistence on reload.
+    refresh_token = result.get("refresh_token")
+    if refresh_token:
+        _persist_refresh_token(refresh_token)
     if len(tenants) > 1 and not tenant:
         st.session_state["saas_tenant_choices"] = tenants
         st.session_state.pop("saas_tenant_status",None)
         return True
     if not tenant:
         raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-    refresh_token = result.get("refresh_token")
-    if refresh_token:
-        _persist_refresh_token(refresh_token)
     _set_identity(user, tenant)
     st.session_state["saas_last_validated_at"] = time.time()
     st.session_state.pop("_saas_cookie_probe_attempts", None)
