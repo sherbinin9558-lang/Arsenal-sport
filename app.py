@@ -540,6 +540,38 @@ font-weight:900!important;
 </style>
 """, unsafe_allow_html=True)
 
+# A logout or cookie-hydration stop can short-circuit before the full workspace CSS
+# is rendered. Hide the previously authenticated sidebar immediately in that state,
+# so Streamlit cannot leave a stale empty sidebar shell on screen.
+if not st.session_state.get("saas_access_token"):
+    st.markdown(
+        """
+        <style>
+        /* Hide the sidebar root, not only its inner section: the root reserves
+           the blank left rail even when the section itself is hidden. */
+        div[data-testid="stSidebar"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            flex: 0 0 0 !important;
+        }
+        section[data-testid="stSidebar"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+        }
+        div[data-testid="stSidebarCollapsedControl"] {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 if not require_saas_access():
     st.stop()
 

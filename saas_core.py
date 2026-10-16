@@ -236,15 +236,17 @@ def _establish_session(result):
     st.session_state["saas_access_token"] = token
     st.session_state["saas_user_id"] = user.get("id")
     st.session_state["saas_email"] = user.get("email","")
+    # Persist the rotated refresh token before any multi-tenant early return.
+    # Otherwise a user with multiple stores can log in but lose persistence on reload.
+    refresh_token = result.get("refresh_token")
+    if refresh_token:
+        _persist_refresh_token(refresh_token)
     if len(tenants) > 1 and not tenant:
         st.session_state["saas_tenant_choices"] = tenants
         st.session_state.pop("saas_tenant_status",None)
         return True
     if not tenant:
         raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-    refresh_token = result.get("refresh_token")
-    if refresh_token:
-        _persist_refresh_token(refresh_token)
     _set_identity(user, tenant)
     st.session_state["saas_last_validated_at"] = time.time()
     st.session_state.pop("_saas_cookie_probe_attempts", None)
@@ -1152,11 +1154,12 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Restore a cookie-backed session without flashing the login screen.
+    """Restore a cookie-backed session, allowing the browser component to hydrate once.
 
-    CookieController is client-side: on a hard reload its cookie value may
-    arrive one component cycle after the Python script starts. None means
-    "wait for that component cycle"; False means "show login".
+    CookieController is client-side. On a hard reload, Python may run before the
+    component has returned the cookie value. Returning None lets the caller stop
+    this run only after the component has been mounted; its own hydration rerun
+    can then restore the session. The probe is bounded, so login remains reachable.
     """
     if st.session_state.get("saas_access_token"):
         return True
@@ -1171,13 +1174,17 @@ def _auth_bootstrap_gate():
     if restored:
         return True
 
-    # Only defer once, and only when the browser cookie component exists.
-    # New users still reach login immediately when the component is unavailable.
     probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    if CookieController is not None and probes <= 1 and not st.session_state.get("saas_auth_error"):
+    if (
+        CookieController is not None
+        and probes <= 1
+        and not st.session_state.get("saas_auth_error")
+        and not st.session_state.get("_saas_cookie_restore_failed")
+    ):
         return None
-    return False
 
+    # Invalid/missing cookie, unavailable component, or exhausted probe: show login.
+    return False
 
 def require_saas_access():
     if not saas_enabled():
@@ -1193,8 +1200,10 @@ def require_saas_access():
 
     if not st.session_state.get("saas_access_token"):
         bootstrap = _auth_bootstrap_gate()
+        # Let CookieController finish mounting and return its cookie value.
+        # This is a single bounded hydration wait, not an unbounded retry loop.
         if bootstrap is None:
-            st.info("Восстанавливаем сохранённую сессию…")
+            st.info("Проверяем сохранённую сессию…")
             st.stop()
         if not bootstrap:
             if st.session_state.get("saas_auth_error"):
