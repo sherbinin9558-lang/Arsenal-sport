@@ -413,7 +413,7 @@ class StreamlitDataLoadCacheRegressionTests(unittest.TestCase):
 
 
 class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
-    def test_auth_bootstrap_allows_only_one_cookie_hydration_rerun(self):
+    def test_auth_bootstrap_allows_one_cookie_hydration_wait(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         gate = next(
@@ -421,7 +421,7 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
             if isinstance(node, ast.FunctionDef) and node.name == "_auth_bootstrap_gate"
         )
         gate_source = ast.get_source_segment(source, gate)
-        self.assertIn("probes == 1", gate_source)
+        self.assertIn("probes <= 1", gate_source)
         self.assertNotIn("st.rerun()", gate_source)
         self.assertIn("return False", gate_source)
         self.assertIn("return None", gate_source)
