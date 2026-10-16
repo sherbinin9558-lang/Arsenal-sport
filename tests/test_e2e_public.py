@@ -125,12 +125,6 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
             assert response is not None, "The app returned no navigation response."
             assert response.status < 500, f"App returned HTTP {response.status}"
             app_frame = _visible_app_frame(page)
-            assert app_frame.locator("[data-testid='stException']").count() == 0, (
-                "Streamlit rendered an exception panel in the application frame."
-            )
-            assert not browser_errors, "Uncaught JavaScript errors: " + "; ".join(browser_errors[-10:])
-            assert not server_errors, "App-origin server errors: " + "; ".join(server_errors[-10:])
-            assert not failed_app_requests, "Failed app-origin requests: " + "; ".join(failed_app_requests[-10:])
             _write_public_diagnostics(page, "public-app-smoke", {
                 "browser_errors": browser_errors[-10:],
                 "console_errors": console_errors[-10:],
@@ -138,6 +132,12 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
                 "server_errors": server_errors[-10:],
                 "streamlit_exception_count": app_frame.locator("[data-testid='stException']").count(),
             })
+            assert app_frame.locator("[data-testid='stException']").count() == 0, (
+                "Streamlit rendered an exception panel in the application frame."
+            )
+            assert not browser_errors, "Uncaught JavaScript errors: " + "; ".join(browser_errors[-10:])
+            assert not server_errors, "App-origin server errors: " + "; ".join(server_errors[-10:])
+            assert not failed_app_requests, "Failed app-origin requests: " + "; ".join(failed_app_requests[-10:])
         finally:
             context.close()
             browser.close()
