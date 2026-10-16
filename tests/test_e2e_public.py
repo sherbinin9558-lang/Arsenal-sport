@@ -1,5 +1,6 @@
 """Public, unauthenticated browser smoke tests for the isolated test deployment."""
 import os
+from urllib.parse import urlparse
 
 import pytest
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
@@ -12,12 +13,18 @@ def _base_url():
     return value.rstrip("/")
 
 
+def _is_streamlit_app_frame(frame):
+    """Only accept the deployed Streamlit app; status/analytics embeds are not the app."""
+    host = (urlparse(frame.url).hostname or "").lower()
+    return host.endswith(".streamlit.app") or host.endswith(".streamlit.io")
+
+
 def _visible_app_frame(page, timeout_ms=45000):
-    """Wait for a visible Streamlit app frame; ignore hidden bootstrap frames."""
+    """Wait for visible content in the actual Streamlit app frame, ignoring unrelated embeds."""
     deadline = timeout_ms
     while deadline > 0:
         for frame in page.frames:
-            if frame == page.main_frame:
+            if frame == page.main_frame or not _is_streamlit_app_frame(frame):
                 continue
             try:
                 body = frame.locator("body")
@@ -33,6 +40,7 @@ def _visible_app_frame(page, timeout_ms=45000):
             frame_info.append({
                 "name": frame.name,
                 "url": frame.url,
+                "is_streamlit_app": _is_streamlit_app_frame(frame),
                 "body_visible": frame.locator("body").is_visible(),
                 "body_text": " ".join(frame.locator("body").inner_text(timeout=500).split())[:180],
             })
