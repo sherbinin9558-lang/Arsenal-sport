@@ -1152,11 +1152,12 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Restore a cookie-backed session with at most one hydration rerun.
+    """Restore a cookie-backed session, allowing the browser component to hydrate once.
 
-    CookieController is client-side and can be empty on the first execution
-    after a hard reload. One bounded rerun gives the component a chance to
-    hydrate; the second miss falls through to login, so this cannot spin forever.
+    CookieController is client-side. On a hard reload, Python may run before the
+    component has returned the cookie value. Returning None lets the caller stop
+    this run only after the component has been mounted; its own hydration rerun
+    can then restore the session. The probe is bounded, so login remains reachable.
     """
     if st.session_state.get("saas_access_token"):
         return True
@@ -1171,19 +1172,16 @@ def _auth_bootstrap_gate():
     if restored:
         return True
 
-    # _read_refresh_token increments this counter only when the request cookie
-    # is absent. Retry exactly once while the client-side component is available.
-    # Do not retry on auth/network errors, invalid cookies, or after logout.
     probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
     if (
         CookieController is not None
-        and probes == 1
+        and probes <= 1
         and not st.session_state.get("saas_auth_error")
         and not st.session_state.get("_saas_cookie_restore_failed")
     ):
-        st.rerun()
+        return None
 
-    # Second miss (or no component): continue to login without a blocking spinner.
+    # Invalid/missing cookie, unavailable component, or exhausted probe: show login.
     return False
 
 def require_saas_access():
@@ -1200,7 +1198,11 @@ def require_saas_access():
 
     if not st.session_state.get("saas_access_token"):
         bootstrap = _auth_bootstrap_gate()
-        # Do not stop the entire Streamlit script while waiting for client cookies.
+        # Let CookieController finish mounting and return its cookie value.
+        # This is a single bounded hydration wait, not an unbounded retry loop.
+        if bootstrap is None:
+            st.info("Проверяем сохранённую сессию…")
+            st.stop()
         if not bootstrap:
             if st.session_state.get("saas_auth_error"):
                 auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
