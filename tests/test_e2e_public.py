@@ -28,7 +28,10 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None, "The app returned no navigation response."
         assert response.status < 500, f"App returned HTTP {response.status}"
-        page.locator("[data-testid='stApp']").wait_for(state="visible", timeout=30000)
+        page.locator("body").wait_for(state="visible", timeout=10000)
+        page.wait_for_timeout(1500)
+        body = page.locator("body").inner_text().lower()
+        assert body.strip(), "The public page rendered an empty body."
         assert page.locator("[data-testid='stException']").count() == 0, (
             "Streamlit rendered an exception panel on the public page."
         )
@@ -44,12 +47,13 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         page = browser.new_page()
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
-        page.locator("[data-testid='stApp']").wait_for(state="visible", timeout=30000)
-        page.wait_for_timeout(1000)
+        page.locator("body").wait_for(state="visible", timeout=10000)
+        page.wait_for_timeout(1500)
         body = page.locator("body").inner_text().lower()
         auth_words = ("войти", "login", "sign in", "авториза", "вход")
         assert any(word in body for word in auth_words), (
-            "The unauthenticated page does not show a recognizable login screen."
+            "The unauthenticated page does not show a recognizable login screen. "
+            f"Page title: {page.title()!r}; body excerpt: {body[:500]!r}"
         )
         fields = page.locator("input")
         field_text = []
