@@ -1152,11 +1152,11 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Restore a cookie-backed session without flashing the login screen.
+    """Restore a cookie-backed session without blocking the login path.
 
-    CookieController is client-side: on a hard reload its cookie value may
-    arrive one component cycle after the Python script starts. None means
-    "wait for that component cycle"; False means "show login".
+    CookieController is client-side and may not have hydrated on the first run.
+    Try the current request/component cookie immediately; if unavailable, show
+    login now rather than stopping the entire Streamlit script.
     """
     if st.session_state.get("saas_access_token"):
         return True
@@ -1171,13 +1171,9 @@ def _auth_bootstrap_gate():
     if restored:
         return True
 
-    # Only defer once, and only when the browser cookie component exists.
-    # New users still reach login immediately when the component is unavailable.
-    probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    if CookieController is not None and probes <= 1 and not st.session_state.get("saas_auth_error"):
-        return None
+    # Never block the app on a client-side cookie component handshake.
+    # If it has not arrived yet, render login; component hydration may rerun the app.
     return False
-
 
 def require_saas_access():
     if not saas_enabled():
@@ -1193,9 +1189,7 @@ def require_saas_access():
 
     if not st.session_state.get("saas_access_token"):
         bootstrap = _auth_bootstrap_gate()
-        if bootstrap is None:
-            st.info("Восстанавливаем сохранённую сессию…")
-            st.stop()
+        # Do not stop the entire Streamlit script while waiting for client cookies.
         if not bootstrap:
             if st.session_state.get("saas_auth_error"):
                 auth_error = str(st.session_state.pop("saas_auth_error") or "").strip()
