@@ -154,12 +154,12 @@ def visible_label_locator(page, label, timeout_ms):
     )
 
 
-def visible_page_text(page):
+def visible_page_text(page, per_frame_timeout_ms=3000):
     """Collect visible text from the top-level page and embedded app frames."""
     chunks = []
     for frame in page.frames:
         try:
-            text = frame.locator("body").inner_text(timeout=3000).strip()
+            text = frame.locator("body").inner_text(timeout=per_frame_timeout_ms).strip()
             if text:
                 chunks.append(text)
         except Exception:
@@ -232,10 +232,12 @@ def run():
                 # Sample intermediate renders to detect transient red/error screens before
                 # the expected login form appears. Samples contain text markers, not screenshots.
                 for sample_ms in (0, 250, 500, 1000, 2000, 5000):
-                    if sample_ms:
-                        page.wait_for_timeout(max(0, sample_ms - round((time.perf_counter() - started) * 1000)))
-                    sample_text = visible_page_text(page)
+                    elapsed_before_sample = round((time.perf_counter() - started) * 1000)
+                    if sample_ms > elapsed_before_sample:
+                        page.wait_for_timeout(sample_ms - elapsed_before_sample)
+                    sample_text = visible_page_text(page, per_frame_timeout_ms=100)
                     state_samples.append({
+                        "target_elapsed_ms": sample_ms,
                         "elapsed_ms": round((time.perf_counter() - started) * 1000),
                         "state": classify_visible_state(sample_text),
                         "has_email": "Email" in sample_text,
