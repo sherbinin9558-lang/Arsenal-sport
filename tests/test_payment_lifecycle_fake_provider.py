@@ -70,6 +70,8 @@ class FakeYooKassa:
                 "provider_payment_id": row["provider_payment_id"],
                 "plan": row["plan"],
                 "status": row["status"],
+                "expected_amount": row.get("expected_amount"),
+                "expected_currency": row.get("expected_currency"),
             } for row in rows])
         raise AssertionError(f"Unexpected outbound GET in fake-provider test: {url}")
 
@@ -105,6 +107,8 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
                         lambda provider, payment_id: {
                             "tenant_id": session["tenant_id"],
                             "plan": session["plan"],
+                            "expected_amount": session["expected_amount"],
+                            "expected_currency": session["expected_currency"],
                         })
     # Keep the production _process_billing_event implementation active. The
     # fake intercepts its Supabase RPC request and models duplicate-key behavior;
