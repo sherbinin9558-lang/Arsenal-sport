@@ -2,7 +2,8 @@
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from datetime import datetime, timezone
+from urllib.parse import urlparse, urlunparse
 
 import pytest
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
@@ -14,6 +15,36 @@ def _base_url():
         pytest.skip("E2E_BASE_URL is not configured.")
     return value.rstrip("/")
 
+
+
+def _safe_url(value):
+    """Remove query strings and fragments before writing URLs to diagnostics."""
+    try:
+        parsed = urlparse(value)
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+    except Exception:
+        return "<invalid-url>"
+
+
+def _source_for_url(value, app_host):
+    host = (urlparse(value).hostname or "").lower()
+    if host == app_host:
+        return "application"
+    if host.endswith(".streamlit.app") or host.endswith(".streamlit.io"):
+        return "streamlit"
+    return "third_party"
+
+
+def _network_event(response, app_host):
+    request = response.request
+    return {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "status": response.status,
+        "url": _safe_url(response.url),
+        "resource_type": request.resource_type,
+        "source": _source_for_url(response.url, app_host),
+        "event_type": "http_response",
+    }
 
 def _is_streamlit_app_frame(frame):
     """Only accept the deployed Streamlit app; status/analytics embeds are not the app."""
@@ -42,7 +73,7 @@ def _visible_app_frame(page, timeout_ms=45000):
         try:
             frame_info.append({
                 "name": frame.name,
-                "url": frame.url,
+                "url": _safe_url(frame.url),
                 "is_streamlit_app": _is_streamlit_app_frame(frame),
                 "body_visible": frame.locator("body").is_visible(),
                 "body_text": " ".join(frame.locator("body").inner_text(timeout=500).split())[:180],
@@ -61,13 +92,13 @@ def _write_public_diagnostics(page, label, details):
     artifact_dir.mkdir(parents=True, exist_ok=True)
     safe_details = {
         "label": label,
-        "page_url": page.url,
+        "page_url": _safe_url(page.url),
         "page_title": page.title(),
         "frames": [],
         **details,
     }
     for frame in page.frames:
-        item = {"name": frame.name, "url": frame.url}
+        item = {"name": frame.name, "url": _safe_url(frame.url)}
         try:
             body_text = " ".join(frame.locator("body").inner_text(timeout=1000).split())
             item.update({
@@ -96,6 +127,7 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
     console_errors = []
     failed_app_requests = []
     server_errors = []
+    http_diagnostics = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context()
@@ -106,20 +138,29 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
             host = (urlparse(url).hostname or "").lower()
             return host == app_host or host.endswith(".streamlit.app") or host.endswith(".streamlit.io")
 
-        page.on("pageerror", lambda error: browser_errors.append(str(error)))
-        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
-        page.on(
-            "requestfailed",
-            lambda request: failed_app_requests.append(
-                f"{request.method} {request.url}: {request.failure}"
-            ) if is_app_url(request.url) else None,
-        )
-        page.on(
-            "response",
-            lambda response: server_errors.append(
-                f"HTTP {response.status} {response.url}"
-            ) if response.status >= 500 and is_app_url(response.url) else None,
-        )
+        page.on("pageerror", lambda error: browser_errors.append(str(error)[:300]))
+        page.on("console", lambda msg: console_errors.append(msg.type + ": " + msg.text[:300]) if msg.type == "error" else None)
+
+        def on_request_failed(request):
+            if is_app_url(request.url):
+                failed_app_requests.append({
+                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                    "method": request.method,
+                    "url": _safe_url(request.url),
+                    "resource_type": request.resource_type,
+                    "source": _source_for_url(request.url, app_host),
+                    "event_type": "request_failed",
+                    "failure": str(request.failure or "unknown")[:120],
+                })
+
+        def on_response(response):
+            if response.status in (403, 404) or (response.status >= 500 and is_app_url(response.url)):
+                http_diagnostics.append(_network_event(response, app_host))
+                if response.status >= 500 and is_app_url(response.url):
+                    server_errors.append(f"HTTP {response.status} {_safe_url(response.url)}")
+
+        page.on("requestfailed", on_request_failed)
+        page.on("response", on_response)
         try:
             response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
             assert response is not None, "The app returned no navigation response."
@@ -130,6 +171,7 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
                 "console_errors": console_errors[-10:],
                 "failed_app_requests": failed_app_requests[-10:],
                 "server_errors": server_errors[-10:],
+                "http_diagnostics": http_diagnostics[-100:],
                 "streamlit_exception_count": app_frame.locator("[data-testid='stException']").count(),
             })
             assert app_frame.locator("[data-testid='stException']").count() == 0, (
@@ -157,9 +199,21 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         console_errors = []
         failed_requests = []
         page_errors = []
-        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
-        page.on("requestfailed", lambda request: failed_requests.append(f"{request.method} {request.url}: {request.failure}"))
-        page.on("pageerror", lambda error: page_errors.append(str(error)))
+        http_diagnostics = []
+        app_host = (urlparse(base_url).hostname or "").lower()
+        page.on("console", lambda msg: console_errors.append(msg.type + ": " + msg.text[:300]) if msg.type == "error" else None)
+        page.on("requestfailed", lambda request: failed_requests.append({
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "method": request.method,
+            "url": _safe_url(request.url),
+            "resource_type": request.resource_type,
+            "source": _source_for_url(request.url, app_host),
+            "event_type": "request_failed",
+            "failure": str(request.failure or "unknown")[:120],
+        }))
+        page.on("response", lambda response: http_diagnostics.append(_network_event(response, app_host))
+                  if response.status in (403, 404) or response.status >= 500 else None)
+        page.on("pageerror", lambda error: page_errors.append(str(error)[:300]))
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
         app_frame = _visible_app_frame(page)
@@ -202,7 +256,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                 for i in range(min(fields.count(), 30)):
                     field = fields.nth(i)
                     input_details.append({
-                        "frame_url": candidate_frame.url,
+                        "frame_url": _safe_url(candidate_frame.url),
                         "type": (field.get_attribute("type") or "").lower(),
                         "placeholder": (field.get_attribute("placeholder") or "").lower(),
                         "aria_label": (field.get_attribute("aria-label") or "").lower(),
@@ -226,7 +280,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
             for candidate_frame in page.frames:
                 try:
                     dom_inventory.append({
-                        "url": candidate_frame.url,
+                        "url": _safe_url(candidate_frame.url),
                         "title": candidate_frame.title(),
                         "body_text": " ".join(candidate_frame.locator("body").inner_text(timeout=1000).split())[:1200],
                         "input_count": candidate_frame.locator("input").count(),
@@ -241,7 +295,8 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
             "input_inventory": input_details,
             "console_errors": console_errors[-10:],
             "page_errors": page_errors[-10:],
-            "failed_requests": failed_requests[-10:],
+            "failed_requests": failed_requests[-30:],
+            "http_diagnostics": http_diagnostics[-100:],
         })
         assert visible_auth_input, (
             "Login text was detected, but no visible email/password/text input was found "
