@@ -160,16 +160,18 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
         page.on("console", lambda msg: console_errors.append(msg.type + ": " + _safe_message(msg.text)) if msg.type == "error" else None)
 
         def on_request_failed(request):
+            event = {
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "method": request.method,
+                "url": _safe_url(request.url),
+                "resource_type": request.resource_type,
+                "source": _source_for_url(request.url, app_host),
+                "event_type": "request_failed",
+                "failure": str(request.failure or "unknown")[:120],
+            }
+            http_diagnostics.append(event)
             if is_app_url(request.url):
-                failed_app_requests.append({
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                    "method": request.method,
-                    "url": _safe_url(request.url),
-                    "resource_type": request.resource_type,
-                    "source": _source_for_url(request.url, app_host),
-                    "event_type": "request_failed",
-                    "failure": str(request.failure or "unknown")[:120],
-                })
+                failed_app_requests.append(event)
 
         def on_response(response):
             if response.status in (403, 404) or (response.status >= 500 and is_app_url(response.url)):
@@ -318,7 +320,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         })
         assert visible_auth_input, (
             "Login text was detected, but no visible email/password/text input was found "
-            f"in any browser frame. frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}; "
+            f"in any browser frame. frames={[{'name': f.name, 'url': _safe_url(f.url)} for f in page.frames]!r}; "
             f"inputs={input_details!r}; dom_inventory={dom_inventory if not visible_auth_input else []!r}; "
             f"console_errors={console_errors[-10:]!r}; page_errors={page_errors[-10:]!r}; "
             f"failed_requests={failed_requests[-10:]!r}"
