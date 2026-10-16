@@ -7,7 +7,7 @@ not claimed by this suite.
 import os
 
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 
 def _base_url():
@@ -45,6 +45,12 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
+        console_errors = []
+        failed_requests = []
+        page_errors = []
+        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+        page.on("requestfailed", lambda request: failed_requests.append(f"{request.method} {request.url}: {request.failure}"))
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
         response = page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
         assert response is not None and response.status < 500
         page.locator("body").wait_for(state="visible", timeout=10000)
@@ -52,14 +58,34 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         # Streamlit Community Cloud can return its shell before the Python app
         # finishes starting. Wait for actual login content instead of sampling
         # the body only 1.5 seconds after navigation.
-        page.wait_for_function(
-            """words => {
-                const text = (document.body?.innerText || '').toLowerCase();
-                return words.some(word => text.includes(word));
-            }""",
-            arg=list(auth_words),
-            timeout=45000,
-        )
+        try:
+            page.wait_for_function(
+                """words => {
+                    const text = (document.body?.innerText || '').toLowerCase();
+                    return words.some(word => text.includes(word));
+                }""",
+                arg=list(auth_words),
+                timeout=45000,
+            )
+        except PlaywrightTimeoutError as exc:
+            body_excerpt = " ".join(page.locator("body").inner_text().split())[:1200]
+            inputs = page.locator("input")
+            input_details = []
+            for i in range(min(inputs.count(), 20)):
+                field = inputs.nth(i)
+                input_details.append({
+                    "type": field.get_attribute("type"),
+                    "placeholder": field.get_attribute("placeholder"),
+                    "aria_label": field.get_attribute("aria-label"),
+                })
+            raise AssertionError(
+                "Login content did not appear within 45s. "
+                f"title={page.title()!r}; url={page.url!r}; "
+                f"body={body_excerpt!r}; inputs={input_details!r}; "
+                f"console_errors={console_errors[-10:]!r}; "
+                f"page_errors={page_errors[-10:]!r}; "
+                f"failed_requests={failed_requests[-10:]!r}"
+            ) from exc
         body = page.locator("body").inner_text().lower()
         fields = page.locator("input")
         field_text = []
