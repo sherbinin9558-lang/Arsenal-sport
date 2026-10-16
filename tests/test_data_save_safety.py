@@ -411,3 +411,27 @@ class StreamlitDataLoadCacheRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn('st.session_state.pop("_saas_data_load_cache", None)', source)
         self.assertIn('def _invalidate_computed_snapshots():', source)
+
+
+class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
+    def test_auth_bootstrap_does_not_wait_indefinitely_for_cookie_component(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        gate = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_auth_bootstrap_gate"
+        )
+        gate_source = ast.get_source_segment(source, gate)
+        self.assertIn("return False", gate_source)
+        self.assertNotIn("return None", gate_source)
+        self.assertNotIn("st.stop()", gate_source)
+
+    def test_legacy_blocking_session_restore_screen_is_removed(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertNotIn("Восстанавливаем сохранённую сессию…", source)
+        self.assertNotIn("if bootstrap is None:", source)
+
+    def test_auth_bootstrap_keeps_cookie_restore_attempt(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn("restored = bool(_restore_session_from_cookie())", source)
+        self.assertIn("if restored:", source)
