@@ -1,8 +1,8 @@
 """Public, unauthenticated browser smoke tests for the isolated test deployment.
 
-These checks intentionally do not log in or mutate application data. Authenticated
-login/logout and tenant-isolation flows require dedicated test credentials and are
-not claimed by this suite.
+Streamlit renders the Python application inside an iframe; assertions must inspect
+that app frame rather than the outer hosting shell.
+These checks do not log in or mutate application data.
 """
 import os
 
@@ -17,6 +17,22 @@ def _base_url():
     return value.rstrip("/")
 
 
+def _app_frame(page):
+    """Return Streamlit's application frame, not the outer hosting document."""
+    for frame in page.frames:
+        if frame.name == "streamlitApp":
+            return frame
+    # Some Streamlit versions don't expose a stable frame name. Prefer the
+    # frame that actually contains app inputs or rendered Streamlit elements.
+    for frame in page.frames:
+        try:
+            if frame.locator("input, [data-testid='stApp'], [data-testid='stException']").count():
+                return frame
+        except Exception:
+            continue
+    return None
+
+
 @pytest.mark.e2e
 def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception():
     base_url = _base_url()
@@ -29,11 +45,21 @@ def test_public_app_loads_without_uncaught_browser_errors_or_streamlit_exception
         assert response is not None, "The app returned no navigation response."
         assert response.status < 500, f"App returned HTTP {response.status}"
         page.locator("body").wait_for(state="visible", timeout=10000)
-        page.wait_for_timeout(1500)
-        body = page.locator("body").inner_text().lower()
-        assert body.strip(), "The public page rendered an empty body."
-        assert page.locator("[data-testid='stException']").count() == 0, (
-            "Streamlit rendered an exception panel on the public page."
+        app_frame = None
+        for _ in range(30):
+            app_frame = _app_frame(page)
+            if app_frame is not None:
+                break
+            page.wait_for_timeout(1000)
+        assert app_frame is not None, (
+            "Streamlit application iframe did not appear. "
+            f"title={page.title()!r}; frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}"
+        )
+        app_frame.locator("body").wait_for(state="visible", timeout=15000)
+        body = app_frame.locator("body").inner_text().lower()
+        assert body.strip(), "The Streamlit application frame rendered an empty body."
+        assert app_frame.locator("[data-testid='stException']").count() == 0, (
+            "Streamlit rendered an exception panel in the application frame."
         )
         browser.close()
     assert not browser_errors, "Uncaught browser errors: " + "; ".join(browser_errors)
@@ -55,11 +81,18 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
         assert response is not None and response.status < 500
         page.locator("body").wait_for(state="visible", timeout=10000)
         auth_words = ("войти", "login", "sign in", "авториза", "вход")
-        # Streamlit Community Cloud can return its shell before the Python app
-        # finishes starting. Wait for actual login content instead of sampling
-        # the body only 1.5 seconds after navigation.
+        app_frame = None
+        for _ in range(30):
+            app_frame = _app_frame(page)
+            if app_frame is not None:
+                break
+            page.wait_for_timeout(1000)
+        assert app_frame is not None, (
+            "Streamlit application iframe did not appear. "
+            f"title={page.title()!r}; frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}"
+        )
         try:
-            page.wait_for_function(
+            app_frame.wait_for_function(
                 """words => {
                     const text = (document.body?.innerText || '').toLowerCase();
                     return words.some(word => text.includes(word));
@@ -68,8 +101,8 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                 timeout=45000,
             )
         except PlaywrightTimeoutError as exc:
-            body_excerpt = " ".join(page.locator("body").inner_text().split())[:1200]
-            inputs = page.locator("input")
+            body_excerpt = " ".join(app_frame.locator("body").inner_text().split())[:1200]
+            inputs = app_frame.locator("input")
             input_details = []
             for i in range(min(inputs.count(), 20)):
                 field = inputs.nth(i)
@@ -79,15 +112,16 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                     "aria_label": field.get_attribute("aria-label"),
                 })
             raise AssertionError(
-                "Login content did not appear within 45s. "
+                "Login content did not appear within 45s inside the Streamlit app frame. "
                 f"title={page.title()!r}; url={page.url!r}; "
+                f"frame_name={app_frame.name!r}; frame_url={app_frame.url!r}; "
                 f"body={body_excerpt!r}; inputs={input_details!r}; "
                 f"console_errors={console_errors[-10:]!r}; "
                 f"page_errors={page_errors[-10:]!r}; "
                 f"failed_requests={failed_requests[-10:]!r}"
             ) from exc
-        body = page.locator("body").inner_text().lower()
-        fields = page.locator("input")
+        body = app_frame.locator("body").inner_text().lower()
+        fields = app_frame.locator("input")
         field_text = []
         for i in range(fields.count()):
             field = fields.nth(i)
