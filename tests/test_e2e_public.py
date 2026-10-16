@@ -79,7 +79,7 @@ def _visible_app_frame(page, timeout_ms=45000):
                 "body_text": " ".join(frame.locator("body").inner_text(timeout=500).split())[:180],
             })
         except Exception as exc:
-            frame_info.append({"name": frame.name, "url": frame.url, "error": str(exc)[:120]})
+            frame_info.append({"name": frame.name, "url": _safe_url(frame.url), "error": str(exc)[:120]})
     raise AssertionError(
         "No Streamlit app document with expected application content appeared. "
         f"title={page.title()!r}; frames={frame_info!r}"
@@ -240,8 +240,8 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                 })
             raise AssertionError(
                 "Login content did not appear within 45s inside the visible Streamlit app frame. "
-                f"title={page.title()!r}; url={page.url!r}; "
-                f"frame_name={app_frame.name!r}; frame_url={app_frame.url!r}; "
+                f"title={page.title()!r}; url={_safe_url(page.url)!r}; "
+                f"frame_name={app_frame.name!r}; frame_url={_safe_url(app_frame.url)!r}; "
                 f"body={body_excerpt!r}; inputs={input_details!r}; "
                 f"console_errors={console_errors[-10:]!r}; "
                 f"page_errors={page_errors[-10:]!r}; "
@@ -288,7 +288,7 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                         "tab_count": candidate_frame.locator("[role='tab']").count(),
                     })
                 except Exception as exc:
-                    dom_inventory.append({"url": candidate_frame.url, "error": str(exc)[:160]})
+                    dom_inventory.append({"url": _safe_url(candidate_frame.url), "error": str(exc)[:160]})
         _write_public_diagnostics(page, "public-auth-screen", {
             "visible_auth_input": visible_auth_input,
             "auth_words_detected": True,
