@@ -1153,11 +1153,10 @@ def _auth_bootstrap_gate():
     if restored:
         return True
 
-    # Only defer once, and only when the browser cookie component exists.
-    # New users still reach login immediately when the component is unavailable.
-    probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    if CookieController is not None and probes <= 1 and not st.session_state.get("saas_auth_error"):
-        return None
+    # Never block the entire app on a client-side cookie component handshake.
+    # A valid cookie is restored above when available from the request or component.
+    # If the component has not supplied it yet, render login now; the mounted
+    # CookieController can trigger a subsequent rerun and restore the session.
     return False
 
 
