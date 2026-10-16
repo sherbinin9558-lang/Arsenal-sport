@@ -117,19 +117,33 @@ def test_public_auth_screen_exposes_an_email_or_password_input():
                 f"page_errors={page_errors[-10:]!r}; "
                 f"failed_requests={failed_requests[-10:]!r}"
             ) from exc
-        fields = app_frame.locator("input")
-        field_text = []
-        for i in range(fields.count()):
-            field = fields.nth(i)
-            field_text.extend([
-                (field.get_attribute("type") or "").lower(),
-                (field.get_attribute("placeholder") or "").lower(),
-                (field.get_attribute("aria-label") or "").lower(),
-            ])
-        combined = " ".join(field_text)
-        assert any(word in combined for word in (
-            "password", "email", "парол", "почт"
-        )) or "text" in field_text, (
-            "Login screen is present but no email/password-like input was found."
+        # Streamlit widgets can be hosted in nested frames depending on the deployed shell.
+        # Search every frame, not only the frame that contains the visible login heading.
+        input_details = []
+        for candidate_frame in page.frames:
+            try:
+                fields = candidate_frame.locator("input")
+                for i in range(min(fields.count(), 30)):
+                    field = fields.nth(i)
+                    input_details.append({
+                        "frame_url": candidate_frame.url,
+                        "type": (field.get_attribute("type") or "").lower(),
+                        "placeholder": (field.get_attribute("placeholder") or "").lower(),
+                        "aria_label": (field.get_attribute("aria-label") or "").lower(),
+                        "visible": field.is_visible(),
+                    })
+            except Exception:
+                continue
+        relevant_inputs = [
+            field for field in input_details
+            if any(word in " ".join((field["type"], field["placeholder"], field["aria_label"]))
+                   for word in ("password", "email", "парол", "почт"))
+            or field["type"] == "text"
+        ]
+        assert any(field["visible"] for field in relevant_inputs), (
+            "Login text was detected, but no visible email/password/text input was found "
+            f"in any browser frame. frames={[{'name': f.name, 'url': f.url} for f in page.frames]!r}; "
+            f"inputs={input_details!r}; console_errors={console_errors[-10:]!r}; "
+            f"page_errors={page_errors[-10:]!r}; failed_requests={failed_requests[-10:]!r}"
         )
         browser.close()
