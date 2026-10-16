@@ -281,7 +281,7 @@ def run():
                 page.goto(browser_url(), wait_until="commit", timeout=TIMEOUT_MS)
                 # Sample intermediate renders to detect transient red/error screens before
                 # the expected login form appears. Samples contain text markers, not screenshots.
-                for sample_ms in (0, 250, 500, 1000, 2000, 5000, 7000, 10000):
+                for sample_ms in (0, 250, 500, 1000, 2000, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 10000):
                     elapsed_before_sample = round((time.perf_counter() - started) * 1000)
                     if sample_ms > elapsed_before_sample:
                         page.wait_for_timeout(sample_ms - elapsed_before_sample)
@@ -298,7 +298,7 @@ def run():
                     }
                     # Keep a small visual trace of the first renders to detect transient red
                     # login/error screens that text-only diagnostics cannot reliably identify.
-                    if sample_ms in (0, 1000, 2000, 5000, 10000):
+                    if sample_ms in (0, 1000, 2000, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 10000):
                         screenshot_name = f"{name}-startup-{sample_ms}ms.png"
                         page.screenshot(path=str(OUT / screenshot_name), full_page=False)
                         sample_record["screenshot"] = screenshot_name
