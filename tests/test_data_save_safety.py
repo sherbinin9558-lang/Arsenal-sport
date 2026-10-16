@@ -438,3 +438,21 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn("restored = bool(_restore_session_from_cookie())", source)
         self.assertIn("if restored:", source)
+    def test_sign_out_clears_refresh_cookie_and_blocks_stale_cookie_restore(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        sign_out_start = source.index("def sign_out(token):")
+        sign_out_end = source.index("\ndef request_password_reset", sign_out_start)
+        sign_out_source = source[sign_out_start:sign_out_end]
+        self.assertIn("_clear_refresh_token()", sign_out_source)
+        self.assertIn('st.session_state["_saas_logout_completed"] = True', sign_out_source)
+        self.assertIn('st.session_state.pop("_saas_cookie_probe_count", None)', sign_out_source)
+
+    def test_refresh_token_is_persisted_before_multi_tenant_early_return(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        establish_start = source.index("def _establish_session(result):")
+        establish_end = source.index("\ndef _restore_session_from_cookie", establish_start)
+        establish_source = source[establish_start:establish_end]
+        persist_index = establish_source.index("_persist_refresh_token(refresh_token)")
+        multi_tenant_index = establish_source.index("if len(tenants) > 1 and not tenant:")
+        self.assertLess(persist_index, multi_tenant_index)
+
