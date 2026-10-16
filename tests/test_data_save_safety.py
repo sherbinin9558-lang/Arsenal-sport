@@ -392,3 +392,39 @@ class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
         self.assertIn('st.session_state.setdefault("_max_sales_reply_cache", {})', source)
         self.assertIn('st.session_state.setdefault("_max_followup_cache", {})', source)
         self.assertIn('with st.spinner("MAX ищет подходящие товары…")', source)
+
+class SidebarSettingsCacheRegressionTests(unittest.TestCase):
+    def test_sidebar_cache_is_scoped_to_current_tenant(self):
+        tree = ast.parse(self.source)
+        fn = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "data_load_sidebar_settings"
+        )
+        source = ast.get_source_segment(self.source, fn)
+        self.assertIn('tenant = str(tenant_id() or "")', source)
+        self.assertIn('cache.get("tenant") == tenant', source)
+        self.assertIn('"tenant": tenant', source)
+        self.assertIn('value = data_load("settings", [])', source)
+
+    def test_sidebar_cache_is_invalidated_after_successful_writes(self):
+        tree = ast.parse(self.source)
+        invalidate = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_invalidate_computed_snapshots"
+        )
+        invalidate_source = ast.get_source_segment(self.source, invalidate)
+        self.assertIn('st.session_state.pop("_saas_sidebar_settings_cache", None)', invalidate_source)
+
+        save = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "data_save"
+        )
+        save_source = ast.get_source_segment(self.source, save)
+        self.assertIn("_invalidate_computed_snapshots()", save_source)
+        self.assertIn('"/rest/v1/rpc/save_app_data_batch"', save_source)
+        self.assertLess(
+            save_source.rfind('data_load(entity,[])'),
+            save_source.rfind("_invalidate_computed_snapshots()"),
+            "After a successful database write, refresh persisted rows before invalidating cached snapshots.",
+        )
+
