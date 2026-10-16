@@ -918,11 +918,14 @@ def dashboard_snapshot():
     token = st.session_state.get("saas_access_token")
     if not token:
         raise RuntimeError("Нужна авторизация для dashboard aggregation.")
+    tenant_id = st.session_state.get("saas_tenant_id")
+    if not tenant_id:
+        raise RuntimeError("Не выбран магазин для загрузки сводки.")
     raw = _request(
         "POST",
         "/rest/v1/rpc/app_data_dashboard_summary",
         token=token,
-        json={},
+        json={"p_tenant_id": tenant_id},
     )
     return raw or {
         "products": {"total": 0, "low_stock": 0},
