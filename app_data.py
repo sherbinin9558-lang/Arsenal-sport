@@ -102,18 +102,31 @@ def delete_product(record_id, existing=None):
 
 
 def _growth_snapshot(products, plan, leads, orders):
-    """Reuse expensive growth analytics across ordinary Streamlit reruns."""
+    """Reuse expensive growth analytics across reruns within one tenant session."""
+    # Dashboard queries may return fresh list objects on every rerun, so object
+    # identity is not a useful cache key. Scope by tenant + mutation revision and
+    # use a short TTL as a guard for data changes made outside this session.
     key = (
-        id(products), id(plan), id(leads), id(orders),
+        str(st.session_state.get("saas_tenant_id") or "demo-tenant"),
+        int(st.session_state.get("_app_data_revision", 0) or 0),
         len(products), len(plan), len(leads), len(orders),
     )
-    if st.session_state.get("_app_growth_snapshot_key") != key:
+    now = __import__("time").time()
+    cached_at = float(st.session_state.get("_app_growth_snapshot_at", 0) or 0)
+    if (
+        st.session_state.get("_app_growth_snapshot_key") != key
+        or now - cached_at >= 10
+        or "_app_growth_snapshot" not in st.session_state
+    ):
         st.session_state["_app_growth_snapshot"] = ai_summary(products, leads, orders, plan)
         st.session_state["_app_growth_snapshot_key"] = key
+        st.session_state["_app_growth_snapshot_at"] = now
     return st.session_state["_app_growth_snapshot"]
 
 
 def _cached_growth_recommendations(products, leads, orders, plan):
+    # _growth_snapshot expects (products, plan, leads, orders); keep this adapter's
+    # public signature aligned with growth_engine.recommendations(products, leads, orders, plan).
     return _growth_snapshot(products, plan, leads, orders).get("recommendations", [])
 
 
