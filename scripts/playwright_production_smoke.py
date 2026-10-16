@@ -155,16 +155,21 @@ def visible_label_locator(page, label, timeout_ms):
 
 
 def visible_page_text(page, per_frame_timeout_ms=3000):
-    """Collect visible text from the top-level page and embedded app frames."""
+    """Collect text without auto-scrolling or waiting for locator visibility."""
     chunks = []
     for frame in page.frames:
         try:
-            text = frame.locator("body").inner_text(timeout=per_frame_timeout_ms).strip()
+            # evaluate reads the current document immediately; inner_text can wait for
+            # attachment/visibility and distort the timestamp being measured.
+            text = frame.locator("body").evaluate(
+                "(el) => el.innerText || ''",
+                timeout=per_frame_timeout_ms,
+            ).strip()
             if text:
                 chunks.append(text)
         except Exception:
             continue
-    return "\n".join(chunks)[:20000]
+    return "\\n".join(chunks)[:20000]
 
 
 def wait_for_expected_login_text(page, timeout_ms=45000):
@@ -254,33 +259,34 @@ def run():
                         screenshot_name = f"{name}-startup-{sample_ms}ms.png"
                         page.screenshot(path=str(OUT / screenshot_name), full_page=False)
                         sample_record["screenshot"] = screenshot_name
-                        # Capture each document body separately as well. A full-page screenshot
-                        # can be blank while an embedded Streamlit frame already exposes text.
-                        frame_screenshots = []
+                        # Record frame geometry and current text without locator screenshots:
+                        # screenshot helpers may auto-scroll or wait for fonts/visibility, distorting
+                        # early-state timestamps and causing timeouts.
+                        frame_states = []
                         for frame_index, frame in enumerate(page.frames):
+                            frame_state = {
+                                "frame_index": frame_index,
+                                "url": safe_url(frame.url),
+                                "name": frame.name,
+                            }
                             try:
-                                frame_text = frame.locator("body").inner_text(timeout=250).strip()
-                                if not frame_text:
-                                    continue
-                                frame_screenshot_name = (
-                                    f"{name}-startup-{sample_ms}ms-frame-{frame_index}.png"
+                                frame_state["text_prefix"] = frame.locator("body").evaluate(
+                                    "(el) => (el.innerText || '').slice(0, 200)",
+                                    timeout=100,
                                 )
-                                frame.locator("body").screenshot(
-                                    path=str(OUT / frame_screenshot_name), timeout=1000
-                                )
-                                frame_screenshots.append({
-                                    "frame_index": frame_index,
-                                    "url": safe_url(frame.url),
-                                    "screenshot": frame_screenshot_name,
-                                    "text_prefix": frame_text[:200],
-                                })
                             except Exception as frame_exc:
-                                frame_screenshots.append({
-                                    "frame_index": frame_index,
-                                    "url": safe_url(frame.url),
-                                    "screenshot_error": str(frame_exc)[:200],
-                                })
-                        sample_record["frame_screenshots"] = frame_screenshots
+                                frame_state["text_error"] = str(frame_exc)[:160]
+                            try:
+                                frame_state["geometry"] = frame.frame_element().evaluate(
+                                    "(el) => { const r = el.getBoundingClientRect(); "
+                                    "return {x:r.x,y:r.y,width:r.width,height:r.height,"
+                                    "visible:!!(r.width && r.height)}; }",
+                                    timeout=100,
+                                )
+                            except Exception as frame_exc:
+                                frame_state["geometry_error"] = str(frame_exc)[:160]
+                            frame_states.append(frame_state)
+                        sample_record["frames"] = frame_states
                     state_samples.append(sample_record)
                 # Continue waiting for the settled login UI after recording the transition.
                 startup_text = wait_for_expected_login_text(page, timeout_ms=45000)
