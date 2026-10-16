@@ -394,6 +394,10 @@ class MobileUxAndMaxPerformanceRegressionTests(unittest.TestCase):
         self.assertIn('with st.spinner("MAX ищет подходящие товары…")', source)
 
 class SidebarSettingsCacheRegressionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = SAAS_CORE.read_text(encoding="utf-8")
+
     def test_sidebar_cache_is_scoped_to_current_tenant(self):
         tree = ast.parse(self.source)
         fn = next(
