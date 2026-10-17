@@ -421,7 +421,8 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
             if isinstance(node, ast.FunctionDef) and node.name == "_auth_bootstrap_gate"
         )
         gate_source = ast.get_source_segment(source, gate)
-        self.assertIn("probes <= 1", gate_source)
+        self.assertIn("probes <= 3", gate_source)
+        self.assertIn("min(probe_count + 1, 4)", source)
         self.assertNotIn("st.rerun()", gate_source)
         self.assertIn("return False", gate_source)
         self.assertIn("return None", gate_source)
