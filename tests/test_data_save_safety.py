@@ -238,14 +238,13 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("getAll()", source)
         self.assertIn("_AUTH_COOKIE_DAYS = 30", source)
         self.assertIn("_saas_cookie_probe_count", source)
-        self.assertIn("min(probe_count + 1, 2)", source)
+        self.assertIn("min(probe_count + 1, 4)", source)
         self.assertIn("request_token = st.context.cookies.get(_AUTH_COOKIE)", source)
         from saas_core import _auth_bootstrap_gate
         gate_source = inspect.getsource(_auth_bootstrap_gate)
-        self.assertIn("probes <= 1", gate_source)
+        self.assertIn("return False", gate_source)
         self.assertIn("return None", gate_source)
         self.assertNotIn("time.sleep(0.15)", gate_source)
-        self.assertNotIn("st.rerun()", gate_source)
 
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
@@ -411,3 +410,61 @@ class StreamlitDataLoadCacheRegressionTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn('st.session_state.pop("_saas_data_load_cache", None)', source)
         self.assertIn('def _invalidate_computed_snapshots():', source)
+
+
+class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
+    def test_auth_bootstrap_allows_one_cookie_hydration_wait(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        gate = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_auth_bootstrap_gate"
+        )
+        gate_source = ast.get_source_segment(source, gate)
+        self.assertIn("probes <= 3", gate_source)
+        self.assertIn("min(probe_count + 1, 4)", source)
+        self.assertNotIn("st.rerun()", gate_source)
+        self.assertIn("return False", gate_source)
+        self.assertIn("return None", gate_source)
+        self.assertIn("not st.session_state.get(\"saas_auth_error\")", gate_source)
+        self.assertIn("not st.session_state.get(\"_saas_cookie_restore_failed\")", gate_source)
+
+    def test_legacy_blocking_session_restore_screen_is_removed(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertNotIn("Восстанавливаем сохранённую сессию…", source)
+        self.assertIn("if bootstrap is None:", source)
+        self.assertIn("Проверяем сохранённую сессию…", source)
+
+    def test_auth_bootstrap_keeps_cookie_restore_attempt(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn("restored = bool(_restore_session_from_cookie())", source)
+        self.assertIn("if restored:", source)
+
+    def test_unauthenticated_state_hides_stale_sidebar_before_auth_guard(self):
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        hide = source.index('if not st.session_state.get("saas_access_token"):')
+        auth_guard = source.index("if not require_saas_access():")
+        self.assertLess(hide, auth_guard)
+        self.assertIn('div[data-testid="stSidebar"] {', source[hide:auth_guard])
+        self.assertIn('section[data-testid="stSidebar"] {', source[hide:auth_guard])
+        self.assertIn('div[data-testid="stSidebarCollapsedControl"] {', source[hide:auth_guard])
+
+    def test_sign_out_clears_refresh_cookie_and_blocks_stale_cookie_restore(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        sign_out_start = source.index("def sign_out(token):")
+        sign_out_end = source.index("\ndef request_password_reset", sign_out_start)
+        sign_out_source = source[sign_out_start:sign_out_end]
+        self.assertIn("_clear_refresh_token()", sign_out_source)
+        self.assertIn('st.session_state["_saas_logout_completed"] = True', sign_out_source)
+        self.assertIn('st.session_state.pop("_saas_cookie_probe_count", None)', sign_out_source)
+
+    def test_refresh_token_is_persisted_before_multi_tenant_early_return(self):
+        source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
+        establish_start = source.index("def _establish_session(result):")
+        establish_end = source.index("\ndef _restore_session_from_cookie", establish_start)
+        establish_source = source[establish_start:establish_end]
+        persist_index = establish_source.index("_persist_refresh_token(refresh_token)")
+        multi_tenant_index = establish_source.index("if len(tenants) > 1 and not tenant:")
+        self.assertLess(persist_index, multi_tenant_index)
+
+# trigger-ci-refresh

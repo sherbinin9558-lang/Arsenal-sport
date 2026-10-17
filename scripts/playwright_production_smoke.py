@@ -155,6 +155,32 @@ def wait_for_expected_login_text(page, timeout_ms=45000):
     return latest_text
 
 
+def wait_for_auth_or_dashboard(page, timeout_ms=45000):
+    """After a hard reload, require a stable app state rather than a transient spinner."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    latest_text = ""
+    while time.monotonic() < deadline:
+        latest_text = visible_page_text(page)
+        has_login = "Email" in latest_text and "Пароль" in latest_text
+        has_dashboard = (
+            "AI AGENT CONTENT MANAGER" in latest_text
+            or "Центр управления магазином" in latest_text
+            or "Добро пожаловать" in latest_text
+        )
+        status_only = (
+            "Восстанавливаем сохранённую сессию" in latest_text
+            and not has_login
+            and not has_dashboard
+        )
+        if (has_login or has_dashboard) and not status_only:
+            return latest_text, ("login" if has_login else "dashboard")
+        page.wait_for_timeout(500)
+    raise RuntimeError(
+        "After browser reload, the app did not reach a stable login or dashboard state "
+        f"within {timeout_ms} ms. Last visible text: {latest_text[:1200]!r}"
+    )
+
+
 def run():
     health_check()
     startup_http_probe()
@@ -234,6 +260,17 @@ def run():
                 item["login_control_context"] = {
                     "email_frame_url": email_frame_url,
                     "password_frame_url": password_frame_url,
+                }
+                # Hard-reload regression: the anonymous browser must settle on a
+                # real login or dashboard UI, never remain on the session-restore screen.
+                # This does not claim authenticated-session persistence; that requires a
+                # dedicated test account and credentials which are intentionally not stored in CI.
+                page.reload(wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+                reloaded_text, reloaded_state = wait_for_auth_or_dashboard(page, timeout_ms=45000)
+                item["hard_reload"] = {
+                    "status": "PASS",
+                    "settled_state": reloaded_state,
+                    "body_prefix": reloaded_text[:2000],
                 }
                 item["status"] = "PASS"
             except Exception as exc:
