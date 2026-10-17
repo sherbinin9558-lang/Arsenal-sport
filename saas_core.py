@@ -134,22 +134,26 @@ def _read_refresh_token():
     # current request cookies. Use that before mounting the client-side
     # CookieController component. This keeps the public/anonymous startup
     # independent from a third-party component handshake.
+    request_token = None
     try:
         request_token = st.context.cookies.get(_AUTH_COOKIE)
-        if request_token:
-            return str(request_token)
     except Exception:
-        pass
+        # Log only presence/availability; never log cookie values or exception text.
+        print("[AUTH_DIAG] Context cookie access: error")
+    print(f"[AUTH_DIAG] Context cookie present: {bool(request_token)}")
+    if request_token:
+        return str(request_token)
 
     probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
     st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 4)
 
     cookies = _auth_cookies()
+    print(f"[AUTH_DIAG] CookieController available: {cookies is not None}")
     if cookies is not None:
         try:
             cookies.refresh()
         except Exception:
-            pass
+            print("[AUTH_DIAG] CookieController refresh: error")
 
         # Do not sleep between cookie probes. This function runs during normal
         # Streamlit reruns, including button clicks, so even a small client-side
@@ -159,16 +163,18 @@ def _read_refresh_token():
         try:
             all_cookies = cookies.getAll() or {}
             token = all_cookies.get(_AUTH_COOKIE)
+            print(f"[AUTH_DIAG] CookieController getAll cookie present: {bool(token)}")
             if token:
                 return str(token)
         except Exception:
-            pass
+            print("[AUTH_DIAG] CookieController getAll: error")
         try:
             token = cookies.get(_AUTH_COOKIE)
+            print(f"[AUTH_DIAG] CookieController get cookie present: {bool(token)}")
             if token:
                 return str(token)
         except Exception:
-            pass
+            print("[AUTH_DIAG] CookieController get: error")
 
     # Compatibility fallback when the component is unavailable.
     try:
@@ -256,13 +262,17 @@ def _establish_session(result):
 def _restore_session_from_cookie():
     refresh_token = _read_refresh_token()
     if not refresh_token:
+        print("[AUTH_DIAG] Refresh token available to restore: False")
         return False
+    print("[AUTH_DIAG] Refresh token available to restore: True")
     try:
         restored = _establish_session(refresh_session(refresh_token))
+        print(f"[AUTH_DIAG] Session restore result: {bool(restored)}")
         st.session_state.pop("_saas_cookie_probe_count", None)
         st.session_state.pop("_saas_cookie_restore_failed", None)
         return restored
     except SupabaseRequestError as e:
+        print(f"[AUTH_DIAG] Supabase restore error status: {e.status_code if e.status_code is not None else 'unknown'}")
         if e.status_code in (400,401,403):
             _clear_refresh_token()
             st.session_state["_saas_cookie_restore_failed"] = True
@@ -270,8 +280,9 @@ def _restore_session_from_cookie():
             return False
         st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
-    except Exception as e:
-        st.session_state["saas_auth_error"] = _safe_auth_error(e)
+    except Exception:
+        print("[AUTH_DIAG] Session restore error: unexpected exception")
+        st.session_state["saas_auth_error"] = "Не удалось восстановить сессию."
         return False
 
 def _restore_session_from_access_token():
