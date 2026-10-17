@@ -142,7 +142,7 @@ def _read_refresh_token():
         pass
 
     probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
-    st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 2)
+    st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 4)
 
     cookies = _auth_cookies()
     if cookies is not None:
@@ -1159,7 +1159,7 @@ def _auth_bootstrap_gate():
     CookieController is client-side. On a hard reload, Python may run before the
     component has returned the cookie value. Returning None lets the caller stop
     this run only after the component has been mounted; its own hydration rerun
-    can then restore the session. The probe is bounded, so login remains reachable.
+    can then restore the session. The probe is bounded to a few component hydration cycles, so login remains reachable.
     """
     if st.session_state.get("saas_access_token"):
         return True
@@ -1177,7 +1177,7 @@ def _auth_bootstrap_gate():
     probes = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
     if (
         CookieController is not None
-        and probes <= 1
+        and probes <= 3
         and not st.session_state.get("saas_auth_error")
         and not st.session_state.get("_saas_cookie_restore_failed")
     ):
