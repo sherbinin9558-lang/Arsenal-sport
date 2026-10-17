@@ -467,3 +467,4 @@ class AuthCookieBootstrapFallbackRegressionTests(unittest.TestCase):
         multi_tenant_index = establish_source.index("if len(tenants) > 1 and not tenant:")
         self.assertLess(persist_index, multi_tenant_index)
 
+# trigger-ci-refresh
