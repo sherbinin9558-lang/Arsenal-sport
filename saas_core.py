@@ -80,6 +80,18 @@ def _safe_supabase_error(status_code):
     return "Не удалось выполнить запрос к Supabase."
 
 
+def _perf_endpoint_group(path):
+    """Return a low-cardinality endpoint label without query/path identifiers."""
+    clean_path = str(path or "").split("?", 1)[0].lower()
+    if "/auth/" in clean_path:
+        return "auth"
+    if "/rpc/" in clean_path:
+        return "rest_rpc"
+    if "/rest/v1/" in clean_path:
+        return "rest_table"
+    return "other"
+
+
 def _request(method,path,token=None,**kwargs):
     url, _ = _supabase_config()
     if not url:
@@ -88,16 +100,29 @@ def _request(method,path,token=None,**kwargs):
     headers=_headers(token)
     headers.update(extra_headers)
     request_timeout = kwargs.pop("timeout", 20)
-    r=requests.request(method,f"{url}{path}",headers=headers,timeout=request_timeout,**kwargs)
-    try: data=r.json()
-    except Exception: data={"message":r.text}
-    if not r.ok:
-        raise SupabaseRequestError(
-            _safe_supabase_error(r.status_code),
-            r.status_code,
-            error_code=_supabase_error_code(data),
+    started = time.perf_counter()
+    status_code = "error"
+    try:
+        r=requests.request(method,f"{url}{path}",headers=headers,timeout=request_timeout,**kwargs)
+        raw_status_code = getattr(r, "status_code", None)
+        status_code = raw_status_code if isinstance(raw_status_code, int) else "unknown"
+        try: data=r.json()
+        except Exception: data={"message":r.text}
+        if not r.ok:
+            raise SupabaseRequestError(
+                _safe_supabase_error(r.status_code),
+                r.status_code,
+                error_code=_supabase_error_code(data),
+            )
+        return data
+    finally:
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        # Never log URLs, query strings, headers, tokens, response bodies or IDs.
+        print(
+            f"[PERF_DIAG] method={str(method).upper()} "
+            f"endpoint={_perf_endpoint_group(path)} "
+            f"elapsed_ms={elapsed_ms} status={status_code}"
         )
-    return data
 
 
 class DataConflictError(RuntimeError):
