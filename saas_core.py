@@ -104,7 +104,8 @@ def _request(method,path,token=None,**kwargs):
     status_code = "error"
     try:
         r=requests.request(method,f"{url}{path}",headers=headers,timeout=request_timeout,**kwargs)
-        status_code = int(r.status_code)
+        raw_status_code = getattr(r, "status_code", None)
+        status_code = raw_status_code if isinstance(raw_status_code, int) else "unknown"
         try: data=r.json()
         except Exception: data={"message":r.text}
         if not r.ok:
