@@ -29,8 +29,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
+      # Cache Playwright browser binaries; --with-deps still installs required
+      # OS packages on each fresh runner, but avoids re-downloading browser builds.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements-test.txt', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers
-        run: playwright install --with-deps chromium firefox webkit
+        run: timeout 480s playwright install --with-deps chromium firefox webkit
 
       - name: Production Playwright smoke
         run: python scripts/playwright_production_smoke.py
