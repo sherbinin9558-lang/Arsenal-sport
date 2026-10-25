@@ -80,17 +80,21 @@ class TestP2Hardening(unittest.TestCase):
     def test_large_xlsx_roundtrip(self):
         from openpyxl import Workbook, load_workbook
         import tempfile
+        from pathlib import Path
         wb = Workbook(write_only=True)
         ws = wb.create_sheet()
         ws.append(["name", "brand", "article"])
         for i in range(20000):
             ws.append([f"Product {i}", "Brand", str(i)])
-        with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
-            wb.save(f.name)
-            read = load_workbook(f.name, read_only=True, data_only=True)
-            ws2 = read.active
-            rows = sum(1 for _ in ws2.iter_rows(min_row=2, values_only=True))
-            read.close()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xlsx_path = Path(tmpdir) / "large_test.xlsx"
+            wb.save(xlsx_path)
+            read = load_workbook(xlsx_path, read_only=True, data_only=True)
+            try:
+                ws2 = read.active
+                rows = sum(1 for _ in ws2.iter_rows(min_row=2, values_only=True))
+            finally:
+                read.close()
         self.assertEqual(rows, 20000)
 
 if __name__ == "__main__":
