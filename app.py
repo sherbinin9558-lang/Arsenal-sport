@@ -2,6 +2,7 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re, tempfile, os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from ai_seller import ai_sales_reply, sales_followup
@@ -559,13 +560,38 @@ try:
             payment_id=str(checkout["provider_payment_id"])
         payment=get_payment(payment_id)
         if payment.get("status") == "succeeded" and payment.get("paid"):
-            plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
-            tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
-            if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
+            plan=str((payment.get("metadata") or {}).get("plan") or "").lower()
+            tenant=str((payment.get("metadata") or {}).get("tenant_id") or "")
+            expected_currency=str(checkout.get("expected_currency") or "").upper() if checkout_id else ""
+            amount=payment.get("amount") or {}
+            try:
+                actual_amount=Decimal(str(amount.get("value")))
+                expected_amount=Decimal(str(checkout.get("expected_amount"))) if checkout_id else Decimal("-1")
+            except (InvalidOperation, TypeError, ValueError):
+                actual_amount=Decimal("-1")
+                expected_amount=Decimal("-2")
+            amount_matches=(
+                checkout_id
+                and expected_currency == "RUB"
+                and str(amount.get("currency") or "").upper() == expected_currency
+                and actual_amount == expected_amount
+                and actual_amount > 0
+            )
+            if (
+                checkout_id
+                and amount_matches
+                and plan in ("starter","pro","business")
+                and plan == str(checkout.get("plan") or "").lower()
+                and tenant == str(checkout.get("tenant_id") or "")
+                and tenant == str(st.session_state.get("saas_tenant_id"))
+                and str(checkout.get("provider_payment_id")) == str(payment_id)
+            ):
                 method_id=(payment.get("payment_method") or {}).get("id")
                 activate_paid_subscription(plan,payment_id,method_id,provider="yookassa",tenant=tenant)
                 st.session_state["billing_verified"]=True
                 st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
+            else:
+                st.warning("Платёж получен, но данные checkout не совпали. Тариф не активирован; требуется проверка.")
         elif payment.get("status") == "canceled":
             st.warning("Платёж отменён.")
 except Exception as e:
