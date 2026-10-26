@@ -103,6 +103,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009170000_require_captured_payment_for_activation.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009190000_billing_checkout_amount_validation.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261009193000_prevent_reactivation_after_refund.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026090000_yookassa_only_provider.sql
       - name: Verify authorization, captured payment, actual refund revocation, and late events
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -133,6 +134,13 @@ jobs:
                   and column_name in ('expected_amount','expected_currency')) <> 2 then
               raise exception 'Expected amount/currency columns were not installed';
             end if;
+
+            begin
+              perform public.process_billing_payment_event('tbank', 'evt-tbank-rejected', 'fake-payment', 'CONFIRMED', auth_tenant, 'pro', null, null);
+              raise exception 'T-Bank provider was unexpectedly accepted';
+            exception when others then
+              if sqlerrm <> 'INVALID_PROVIDER' then raise; end if;
+            end;
 
             insert into public.tenants(id, plan) values (auth_tenant, 'trial'), (refund_tenant, 'trial');
             insert into public.billing_checkout_sessions
