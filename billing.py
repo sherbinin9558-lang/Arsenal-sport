@@ -52,6 +52,8 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
             "provider_order_id": str(checkout_id),
             "provider_payment_id": str(payment_id),
             "plan": plan,
+            "expected_amount": f"{plan_price(plan):.2f}",
+            "expected_currency": "RUB",
             "status": "created",
         },
         timeout=15,
@@ -68,7 +70,7 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
     r=requests.get(
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=headers,
-        params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.yookassa","provider_order_id":f"eq.{checkout_id}",**({"tenant_id":f"eq.{tenant_id}"} if tenant_id is not None else {}),"limit":"1"},
+        params={"select":"tenant_id,provider_payment_id,plan,status,expected_amount,expected_currency","provider":"eq.yookassa","provider_order_id":f"eq.{checkout_id}",**({"tenant_id":f"eq.{tenant_id}"} if tenant_id is not None else {}),"limit":"1"},
         timeout=15,
     )
     if not r.ok:
