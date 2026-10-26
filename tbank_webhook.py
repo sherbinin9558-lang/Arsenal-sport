@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import requests
+from decimal import Decimal, InvalidOperation
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
@@ -128,7 +129,7 @@ def _checkout_by_provider_payment(provider, payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": f"eq.{provider}",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -256,6 +257,24 @@ async def yookassa_payment_status(request: Request):
     tenant = str(checkout.get("tenant_id") or "")
     if plan not in ("starter", "pro", "business") or not tenant:
         raise HTTPException(status_code=422, detail="Invalid checkout session")
+
+    # Validate the provider's authoritative payment amount against the exact
+    # server-created checkout before allowing any payment/refund event to
+    # mutate subscription state. Missing legacy expectations fail closed.
+    expected_currency = str(checkout.get("expected_currency") or "").upper()
+    provider_amount = payment.get("amount") or {}
+    try:
+        expected_amount = Decimal(str(checkout.get("expected_amount")))
+        actual_amount = Decimal(str(provider_amount.get("value")))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount validation failed")
+    if (
+        expected_currency != "RUB"
+        or str(provider_amount.get("currency") or "").upper() != expected_currency
+        or expected_amount <= 0
+        or actual_amount != expected_amount
+    ):
+        raise HTTPException(status_code=422, detail="Checkout amount/currency mismatch")
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
