@@ -116,6 +116,32 @@ async def readyz():
         )
         if not storage_check.ok:
             raise HTTPException(status_code=503, detail="Webhook storage schema is unavailable")
+
+        # Do not advertise readiness while legacy YooKassa links could still
+        # be payable but lack a saved expected amount/currency. Provider-side
+        # cancellation or reconciliation must happen before notifications are enabled.
+        legacy_check = requests.get(
+            f"{url}/rest/v1/billing_checkout_sessions",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            params={
+                "select": "id",
+                "provider": "eq.yookassa",
+                "or": "(expected_amount.is.null,expected_currency.is.null,expected_currency.eq.,expected_amount.lte.0)",
+                "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,deadline_expired,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
+                "limit": "1",
+            },
+            timeout=3,
+        )
+        if not legacy_check.ok:
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        try:
+            legacy_rows = legacy_check.json()
+        except ValueError:
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        if not isinstance(legacy_rows, list):
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        if legacy_rows:
+            raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
     except HTTPException:
         raise
     except requests.RequestException:
