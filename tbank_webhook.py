@@ -116,6 +116,32 @@ async def readyz():
         )
         if not storage_check.ok:
             raise HTTPException(status_code=503, detail="Webhook storage schema is unavailable")
+
+        # Do not advertise readiness while legacy YooKassa links could still
+        # be payable but lack a saved expected amount/currency. Provider-side
+        # cancellation or reconciliation must happen before notifications are enabled.
+        # Ask Postgres for a boolean only, so readiness stays efficient as
+        # checkout history grows and does not expose checkout or tenant data.
+        legacy_check = requests.post(
+            f"{url}/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            },
+            json={},
+            timeout=3,
+        )
+        if not legacy_check.ok:
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        try:
+            legacy_needs_reconciliation = legacy_check.json()
+        except ValueError:
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        if not isinstance(legacy_needs_reconciliation, bool):
+            raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+        if legacy_needs_reconciliation:
+            raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
     except HTTPException:
         raise
     except requests.RequestException:

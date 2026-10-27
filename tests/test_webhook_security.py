@@ -1,7 +1,7 @@
 import os
 import unittest
 import asyncio
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import tbank_webhook
 
@@ -146,8 +146,14 @@ class WebhookSecurityTests(unittest.TestCase):
     }, clear=False)
     @patch("tbank_webhook.requests.get")
     def test_ready_accepts_tbank_provider_configuration_when_supabase_reachable(self, get):
-        get.return_value.ok = True
-        result = asyncio.run(tbank_webhook.readyz())
+        schema_response = Mock(ok=True)
+        get.return_value = schema_response
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = False
+
+        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
+            result = asyncio.run(tbank_webhook.readyz())
+
         self.assertTrue(result["ok"])
         self.assertEqual(result["supabase"], "reachable")
         self.assertEqual(result["tbank"], "configured")
@@ -158,6 +164,67 @@ class WebhookSecurityTests(unittest.TestCase):
             params={"select": "id,expected_amount,expected_currency", "limit": "0"},
             timeout=3,
         )
+        post.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": "x",
+                "Authorization": "Bearer x",
+                "Content-Type": "application/json",
+            },
+            json={},
+            timeout=3,
+        )
+
+    @patch.dict(os.environ, {
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "x",
+        "TBANK_TERMINAL_KEY": "terminal",
+        "TBANK_PASSWORD": "password",
+        "YOO_KASSA_SHOP_ID": "shop",
+        "YOO_KASSA_SECRET_KEY": "secret",
+    }, clear=False)
+    @patch("tbank_webhook.requests.get")
+    def test_ready_rejects_unresolved_legacy_yookassa_checkout(self, get):
+        get.return_value = Mock(ok=True)
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = True
+
+        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.readyz())
+
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
+        self.assertIn("Legacy YooKassa checkouts require provider reconciliation", str(ctx.exception))
+        self.assertNotIn("sensitive-checkout", str(ctx.exception))
+        post.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": "x",
+                "Authorization": "Bearer x",
+                "Content-Type": "application/json",
+            },
+            json={},
+            timeout=3,
+        )
+
+    @patch.dict(os.environ, {
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "x",
+        "TBANK_TERMINAL_KEY": "terminal",
+        "TBANK_PASSWORD": "password",
+    }, clear=False)
+    @patch("tbank_webhook.requests.get")
+    def test_ready_rejects_invalid_legacy_status_rpc_response(self, get):
+        get.return_value = Mock(ok=True)
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = {"has_unresolved": False}
+
+        with patch("tbank_webhook.requests.post", return_value=rpc_response):
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.readyz())
+
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
+        self.assertIn("Legacy checkout status is unavailable", str(ctx.exception))
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
