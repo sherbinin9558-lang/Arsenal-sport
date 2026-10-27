@@ -28,7 +28,6 @@ begin
            'canceled',
            'cancelled',
            'rejected',
-           'deadline_expired',
            'refund_pending',
            'refund_canceled',
            'partial_refunded',
