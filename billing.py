@@ -180,3 +180,44 @@ def get_refund(refund_id):
     if not isinstance(data, dict):
         raise RuntimeError("ЮKassa вернула некорректный ответ по возврату.")
     return data
+
+
+def get_refunds_for_payment(payment_id):
+    """Fetch every refund for a payment, following YooKassa cursor pagination."""
+    if not configured():
+        raise RuntimeError("ЮKassa не настроена.")
+    payment_id = str(payment_id or "").strip()
+    if not payment_id:
+        raise ValueError("Идентификатор платежа обязателен.")
+    refunds = []
+    cursor = None
+    # Bound pagination so a malformed provider response cannot loop forever.
+    for _page in range(100):
+        params = {"payment_id": payment_id, "limit": 100}
+        if cursor:
+            params["cursor"] = cursor
+        response = requests.get(
+            "https://api.yookassa.ru/v3/refunds",
+            auth=(SHOP_ID, SECRET_KEY),
+            params=params,
+            timeout=20,
+        )
+        if not response.ok:
+            raise RuntimeError("Не удалось проверить список возвратов в ЮKassa.")
+        try:
+            data = response.json()
+        except Exception as exc:
+            raise RuntimeError("ЮKassa вернула некорректный список возвратов.") from exc
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            raise RuntimeError("ЮKassa вернула некорректный список возвратов.")
+        for item in data["items"]:
+            if not isinstance(item, dict) or str(item.get("payment_id") or "") != payment_id:
+                raise RuntimeError("ЮKassa вернула некорректные данные возврата.")
+            refunds.append(item)
+        next_cursor = str(data.get("next_cursor") or "").strip()
+        if not next_cursor:
+            return refunds
+        if next_cursor == cursor:
+            raise RuntimeError("ЮKassa вернула повторяющийся курсор списка возвратов.")
+        cursor = next_cursor
+    raise RuntimeError("Список возвратов ЮKassa превысил допустимый предел страниц.")

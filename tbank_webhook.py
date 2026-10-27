@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from billing import get_payment, get_refund
+from billing import get_payment, get_refund, get_refunds_for_payment
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
 
@@ -233,14 +233,55 @@ async def yookassa_payment_status(request: Request):
         if str(refund.get("payment_id") or "") != payment_id:
             raise HTTPException(status_code=400, detail="Refund/payment mismatch")
         refund_status = str(refund.get("status") or "").lower()
+        payment = get_payment(payment_id)
+        provider_status = str(payment.get("status") or "").lower()
         if refund_status == "succeeded":
-            status = "refunded"
+            # A successful refund may be partial. Reconcile all successful
+            # refunds for this payment before revoking the entire subscription.
+            payment_amount = payment.get("amount") or {}
+            try:
+                original_amount = Decimal(str(payment_amount.get("value")))
+            except (InvalidOperation, TypeError, ValueError):
+                raise HTTPException(status_code=422, detail="Payment amount validation failed")
+            if (
+                original_amount <= 0
+                or str(payment_amount.get("currency") or "").upper() != "RUB"
+            ):
+                raise HTTPException(status_code=422, detail="Payment amount/currency mismatch")
+            refunds = get_refunds_for_payment(payment_id)
+            # The single-refund lookup is authoritative too; include it if the
+            # list endpoint has not reflected it yet, without double-counting.
+            refunds_by_id = {
+                str(item.get("id") or ""): item
+                for item in refunds
+                if isinstance(item, dict) and item.get("id")
+            }
+            refunds_by_id[refund_id] = refund
+            total_refunded = Decimal("0")
+            for item in refunds_by_id.values():
+                if str(item.get("payment_id") or "") != payment_id:
+                    raise HTTPException(status_code=422, detail="Refund/payment mismatch")
+                if str(item.get("status") or "").lower() != "succeeded":
+                    continue
+                amount = item.get("amount") or {}
+                try:
+                    refund_amount = Decimal(str(amount.get("value")))
+                except (InvalidOperation, TypeError, ValueError):
+                    raise HTTPException(status_code=422, detail="Refund amount validation failed")
+                if (
+                    refund_amount <= 0
+                    or str(amount.get("currency") or "").upper()
+                    != str(payment_amount.get("currency") or "").upper()
+                ):
+                    raise HTTPException(status_code=422, detail="Refund amount/currency mismatch")
+                total_refunded += refund_amount
+            if total_refunded > original_amount:
+                raise HTTPException(status_code=422, detail="Refund total exceeds payment amount")
+            status = "refunded" if total_refunded == original_amount else "partial_refunded"
         elif refund_status == "canceled":
             status = "refund_canceled"
         else:
             status = "refund_pending"
-        payment = get_payment(payment_id)
-        provider_status = str(payment.get("status") or "").lower()
     else:
         payment_id = str(obj.get("id") or "").strip()
         if not payment_id:

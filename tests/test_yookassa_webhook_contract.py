@@ -37,8 +37,9 @@ def test_wrong_optional_bearer_is_rejected(monkeypatch):
 
 def test_refund_notification_fetches_refund_and_uses_refund_id_for_idempotency(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', 'optional-extra-secret')
-    refund_fetch = Mock(return_value={'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded'})
+    refund_fetch = Mock(return_value={'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '125.00', 'currency': 'RUB'}})
     monkeypatch.setattr(tbank_webhook, 'get_refund', refund_fetch)
+    monkeypatch.setattr(tbank_webhook, 'get_refunds_for_payment', lambda _payment_id: [{'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '125.00', 'currency': 'RUB'}}])
     monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '125.00', 'currency': 'RUB'}})
     monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '125.00', 'expected_currency': 'RUB'})
     captured = {}
@@ -84,3 +85,33 @@ def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
         billing.get_refund('refund/with?unsafe=query')
     assert 'PRIVATE_PROVIDER_SECRET' not in str(exc.value)
     assert '/v3/refunds/refund%2Fwith%3Funsafe%3Dquery' in call.call_args.args[0]
+
+
+def test_partial_refund_does_not_revoke_full_subscription(monkeypatch):
+    monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
+    refund = {'id': 'refund-partial-1', 'payment_id': 'pay-1', 'status': 'succeeded',
+              'amount': {'value': '25.00', 'currency': 'RUB'}}
+    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: refund)
+    monkeypatch.setattr(tbank_webhook, 'get_refunds_for_payment', lambda _payment_id: [refund])
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '125.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '125.00', 'expected_currency': 'RUB'})
+    captured = {}
+    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    result = invoke_webhook(monkeypatch, {'event': 'refund.succeeded', 'object': {'id': 'refund-partial-1', 'payment_id': 'pay-1'}})
+    assert result['status'] == 'partial_refunded'
+    assert captured['args'][3] == 'partial_refunded'
+
+
+def test_multiple_partial_refunds_revoke_only_when_total_equals_payment(monkeypatch):
+    monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
+    first = {'id': 'refund-a', 'payment_id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '40.00', 'currency': 'RUB'}}
+    second = {'id': 'refund-b', 'payment_id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '85.00', 'currency': 'RUB'}}
+    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: second)
+    monkeypatch.setattr(tbank_webhook, 'get_refunds_for_payment', lambda _payment_id: [first, second])
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '125.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '125.00', 'expected_currency': 'RUB'})
+    captured = {}
+    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    result = invoke_webhook(monkeypatch, {'event': 'refund.succeeded', 'object': {'id': 'refund-b', 'payment_id': 'pay-1'}})
+    assert result['status'] == 'refunded'
+    assert captured['args'][3] == 'refunded'
