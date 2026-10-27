@@ -155,7 +155,7 @@ class WebhookSecurityTests(unittest.TestCase):
         get.assert_called_once_with(
             "https://example.supabase.co/rest/v1/billing_checkout_sessions",
             headers={"apikey": "x", "Authorization": "Bearer x"},
-            params={"select": "id", "limit": "0"},
+            params={"select": "id,expected_amount,expected_currency", "limit": "0"},
             timeout=3,
         )
 
