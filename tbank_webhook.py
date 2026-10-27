@@ -101,10 +101,26 @@ async def readyz():
     yookassa_ready = bool(_env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY"))
     if not tbank_ready and not yookassa_ready:
         raise HTTPException(status_code=503, detail="Webhook provider authentication credentials are not configured")
+
+    # Check that Supabase's REST endpoint is reachable and accepts these
+    # credentials. Keep the timeout short and never expose provider responses.
+    try:
+        storage_check = requests.get(
+            f"{url}/rest/v1/",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=3,
+        )
+        if not storage_check.ok:
+            raise HTTPException(status_code=503, detail="Webhook storage is unavailable")
+    except HTTPException:
+        raise
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="Webhook storage is unavailable")
+
     return {
         "ok": True,
         "service": "billing-webhook",
-        "supabase": "configured",
+        "supabase": "reachable",
         "tbank": "configured" if tbank_ready else "disabled",
         "yookassa": "configured" if yookassa_ready else "disabled",
     }
