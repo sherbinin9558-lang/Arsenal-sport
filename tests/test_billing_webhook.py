@@ -92,9 +92,9 @@ class BillingWebhookTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"YOOKASSA_WEBHOOK_SECRET": "unit-yoo-secret"}, clear=False), \
              patch.object(tbank_webhook, "_read_body", return_value=payload), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "1490.00", "currency": "RUB"}}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
-                 "tenant_id": "tenant-sensitive-654", "plan": "starter"
+                 "tenant_id": "tenant-sensitive-654", "plan": "starter", "expected_amount": "1490.00", "expected_currency": "RUB"
              }), \
              patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
             with self.assertRaises(HTTPException) as ctx:

@@ -32,7 +32,7 @@ SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
 SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 
-def _save_checkout(tenant_id, checkout_id, payment_id, plan):
+def _save_checkout(tenant_id, checkout_id, payment_id, plan, expected_amount, expected_currency="RUB"):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -52,12 +52,14 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
             "provider_order_id": str(checkout_id),
             "provider_payment_id": str(payment_id),
             "plan": plan,
+            "expected_amount": f"{float(expected_amount):.2f}",
+            "expected_currency": str(expected_currency).upper(),
             "status": "created",
         },
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в Supabase.")
 
 def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
@@ -72,12 +74,18 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из Supabase.")
     rows=r.json()
     return rows[0] if rows else None
 
+def provider_api_configured():
+    """Whether authenticated API lookups can run; independent of the checkout return URL."""
+    return bool(SHOP_ID and SECRET_KEY)
+
+
 def configured():
-    return bool(SHOP_ID and SECRET_KEY and PUBLIC_URL)
+    """Whether the app can create redirect checkouts."""
+    return bool(provider_api_configured() and PUBLIC_URL)
 
 def plan_price(plan):
     if plan not in PLANS:
@@ -126,7 +134,7 @@ def create_checkout(plan, tenant_id):
     save_error = None
     for attempt in range(3):
         try:
-            _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
+            _save_checkout(tenant_id, checkout_id, data.get("id"), plan, price, payload["amount"]["currency"])
             save_error = None
             break
         except Exception as exc:
@@ -142,7 +150,7 @@ def create_checkout(plan, tenant_id):
     return data
 
 def get_payment(payment_id):
-    if not configured():
+    if not provider_api_configured():
         raise RuntimeError("ЮKassa не настроена.")
     r=requests.get(
         f"https://api.yookassa.ru/v3/payments/{payment_id}",
@@ -158,7 +166,7 @@ def get_payment(payment_id):
 
 def get_refund(refund_id):
     """Fetch a refund from YooKassa; never trust a webhook's refund status alone."""
-    if not configured():
+    if not provider_api_configured():
         raise RuntimeError("ЮKassa не настроена.")
     refund_id = str(refund_id or "").strip()
     if not refund_id:

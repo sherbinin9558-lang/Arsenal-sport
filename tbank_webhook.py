@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import os
+from decimal import Decimal, InvalidOperation
 import requests
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -98,13 +99,32 @@ async def readyz():
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
     tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
-    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
+    yookassa_ready = bool(_env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY"))
     if not tbank_ready and not yookassa_ready:
-        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+        raise HTTPException(status_code=503, detail="Webhook provider authentication credentials are not configured")
+
+    # Check that Supabase's REST endpoint is reachable and accepts these
+    # credentials. Keep the timeout short and never expose provider responses.
+    try:
+        # Probe the billing table actually required by webhook processing,
+        # not merely the Supabase host root. limit=0 avoids reading tenant data.
+        storage_check = requests.get(
+            f"{url}/rest/v1/billing_checkout_sessions",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            params={"select": "id,expected_amount,expected_currency", "limit": "0"},
+            timeout=3,
+        )
+        if not storage_check.ok:
+            raise HTTPException(status_code=503, detail="Webhook storage schema is unavailable")
+    except HTTPException:
+        raise
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="Webhook storage is unavailable")
+
     return {
         "ok": True,
         "service": "billing-webhook",
-        "supabase": "configured",
+        "supabase": "reachable",
         "tbank": "configured" if tbank_ready else "disabled",
         "yookassa": "configured" if yookassa_ready else "disabled",
     }
@@ -136,7 +156,7 @@ def _checkout_by_provider_payment(provider, payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": f"eq.{provider}",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -146,6 +166,21 @@ def _checkout_by_provider_payment(provider, payment_id):
     response.raise_for_status()
     data = response.json()
     return data[0] if data else None
+
+def _payment_matches_checkout(payment, checkout):
+    """Fail closed unless the provider amount matches the saved checkout."""
+    expected_amount = checkout.get("expected_amount")
+    expected_currency = str(checkout.get("expected_currency") or "").strip().upper()
+    actual = payment.get("amount")
+    if expected_amount is None or not expected_currency or not isinstance(actual, dict):
+        return False
+    actual_currency = str(actual.get("currency") or "").strip().upper()
+    try:
+        expected = Decimal(str(expected_amount)).quantize(Decimal("0.01"))
+        received = Decimal(str(actual.get("value"))).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+    return expected.is_finite() and received.is_finite() and expected > 0 and received == expected and actual_currency == expected_currency
 
 def _checkout_by_payment(payment_id):
     url, _ = _supabase()
@@ -339,6 +374,20 @@ async def yookassa_payment_status(request: Request):
     tenant = str(checkout.get("tenant_id") or "")
     if plan not in ("starter", "pro", "business") or not tenant:
         raise HTTPException(status_code=422, detail="Invalid checkout session")
+
+    # For refund notifications validate the original payment, not the refund amount.
+    # Older confirmed checkouts may predate persisted expected amounts. They must
+    # never activate from a new success notification, but provider-verified
+    # refunds must remain processable so a refund can revoke existing access.
+    legacy_refund_without_expected_amount = (
+        is_refund
+        and (
+            checkout.get("expected_amount") is None
+            or not str(checkout.get("expected_currency") or "").strip()
+        )
+    )
+    if not _payment_matches_checkout(payment, checkout) and not legacy_refund_without_expected_amount:
+        raise HTTPException(status_code=422, detail="Payment amount or currency does not match checkout")
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None
