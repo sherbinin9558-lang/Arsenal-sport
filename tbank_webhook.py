@@ -376,7 +376,17 @@ async def yookassa_payment_status(request: Request):
         raise HTTPException(status_code=422, detail="Invalid checkout session")
 
     # For refund notifications validate the original payment, not the refund amount.
-    if not _payment_matches_checkout(payment, checkout):
+    # Older confirmed checkouts may predate persisted expected amounts. They must
+    # never activate from a new success notification, but provider-verified
+    # refunds must remain processable so a refund can revoke existing access.
+    legacy_refund_without_expected_amount = (
+        is_refund
+        and (
+            checkout.get("expected_amount") is None
+            or not str(checkout.get("expected_currency") or "").strip()
+        )
+    )
+    if not _payment_matches_checkout(payment, checkout) and not legacy_refund_without_expected_amount:
         raise HTTPException(status_code=422, detail="Payment amount or currency does not match checkout")
 
     payment_method = payment.get("payment_method") or {}
