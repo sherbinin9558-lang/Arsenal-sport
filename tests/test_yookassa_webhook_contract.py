@@ -110,3 +110,20 @@ def test_payment_missing_expected_checkout_amount_fails_closed(monkeypatch):
         invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-1'}})
     assert getattr(exc.value, 'status_code', None) == 422
     process.assert_not_called()
+
+def test_zero_expected_checkout_amount_fails_closed(monkeypatch):
+    monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {
+        'id': 'pay-zero', 'status': 'succeeded',
+        'amount': {'value': '0.00', 'currency': 'RUB'},
+    })
+    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
+        'tenant_id': 'tenant-a', 'plan': 'pro',
+        'expected_amount': '0.00', 'expected_currency': 'RUB',
+    })
+    process = Mock()
+    monkeypatch.setattr(tbank_webhook, '_process_billing_event', process)
+    with pytest.raises(Exception) as exc:
+        invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-zero'}})
+    assert getattr(exc.value, 'status_code', None) == 422
+    process.assert_not_called()
