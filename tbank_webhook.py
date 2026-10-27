@@ -111,7 +111,7 @@ async def readyz():
         storage_check = requests.get(
             f"{url}/rest/v1/billing_checkout_sessions",
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            params={"select": "id", "limit": "0"},
+            params={"select": "id,expected_amount,expected_currency", "limit": "0"},
             timeout=3,
         )
         if not storage_check.ok:
