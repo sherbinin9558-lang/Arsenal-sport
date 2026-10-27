@@ -147,33 +147,34 @@ class WebhookSecurityTests(unittest.TestCase):
     @patch("tbank_webhook.requests.get")
     def test_ready_accepts_tbank_provider_configuration_when_supabase_reachable(self, get):
         schema_response = Mock(ok=True)
-        legacy_response = Mock(ok=True)
-        legacy_response.json.return_value = []
-        get.side_effect = [schema_response, legacy_response]
+        get.return_value = schema_response
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = False
 
-        result = asyncio.run(tbank_webhook.readyz())
+        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
+            result = asyncio.run(tbank_webhook.readyz())
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["supabase"], "reachable")
         self.assertEqual(result["tbank"], "configured")
         self.assertEqual(result["yookassa"], "disabled")
-        self.assertEqual(get.call_count, 2)
-        self.assertEqual(get.call_args_list[0].args[0], "https://example.supabase.co/rest/v1/billing_checkout_sessions")
-        self.assertEqual(
-            get.call_args_list[0].kwargs["params"],
-            {"select": "id,expected_amount,expected_currency", "limit": "0"},
+        get.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/billing_checkout_sessions",
+            headers={"apikey": "x", "Authorization": "Bearer x"},
+            params={"select": "id,expected_amount,expected_currency", "limit": "0"},
+            timeout=3,
         )
-        self.assertEqual(
-            get.call_args_list[1].kwargs["params"],
-            {
-                "select": "id,expected_amount,expected_currency,status",
-                "provider": "eq.yookassa",
-                "limit": "1001",
+        post.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": "x",
+                "Authorization": "Bearer x",
+                "Content-Type": "application/json",
             },
+            json={},
+            timeout=3,
         )
-        self.assertEqual(get.call_args_list[1].kwargs["timeout"], 3)
 
- 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
@@ -184,43 +185,46 @@ class WebhookSecurityTests(unittest.TestCase):
     }, clear=False)
     @patch("tbank_webhook.requests.get")
     def test_ready_rejects_unresolved_legacy_yookassa_checkout(self, get):
-        schema_response = Mock(ok=True)
-        legacy_response = Mock(ok=True)
-        legacy_response.json.return_value = [{"id": "sensitive-checkout", "expected_amount": "1490.00", "expected_currency": "   ", "status": "created"}]
-        get.side_effect = [schema_response, legacy_response]
+        get.return_value = Mock(ok=True)
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = True
 
-        with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
+        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.readyz())
 
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
         self.assertIn("Legacy YooKassa checkouts require provider reconciliation", str(ctx.exception))
         self.assertNotIn("sensitive-checkout", str(ctx.exception))
-        self.assertEqual(get.call_count, 2)
+        post.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": "x",
+                "Authorization": "Bearer x",
+                "Content-Type": "application/json",
+            },
+            json={},
+            timeout=3,
+        )
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
         "TBANK_TERMINAL_KEY": "terminal",
         "TBANK_PASSWORD": "password",
-        "YOO_KASSA_SHOP_ID": "shop",
-        "YOO_KASSA_SECRET_KEY": "secret",
     }, clear=False)
     @patch("tbank_webhook.requests.get")
-    def test_ready_fails_closed_when_legacy_checkout_scan_hits_row_cap(self, get):
-        schema_response = Mock(ok=True)
-        legacy_response = Mock(ok=True)
-        legacy_response.json.return_value = [
-            {"id": str(i), "expected_amount": "1490.00", "expected_currency": "RUB", "status": "created"}
-            for i in range(1000)
-        ]
-        get.side_effect = [schema_response, legacy_response]
+    def test_ready_rejects_invalid_legacy_status_rpc_response(self, get):
+        get.return_value = Mock(ok=True)
+        rpc_response = Mock(ok=True)
+        rpc_response.json.return_value = {"has_unresolved": False}
 
-        with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
+        with patch("tbank_webhook.requests.post", return_value=rpc_response):
+            with self.assertRaises(Exception) as ctx:
+                asyncio.run(tbank_webhook.readyz())
 
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("review exceeds readiness limit", str(ctx.exception))
-        self.assertEqual(get.call_count, 2)
+        self.assertIn("Legacy checkout status is unavailable", str(ctx.exception))
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
