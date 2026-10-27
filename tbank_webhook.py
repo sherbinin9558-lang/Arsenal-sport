@@ -140,7 +140,9 @@ async def readyz():
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
         if not isinstance(legacy_rows, list):
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
-        if len(legacy_rows) > 1000:
+        # Supabase/PostgREST may cap responses at 1000 rows even when a
+        # larger limit is requested. Treat a full-cap response as incomplete.
+        if len(legacy_rows) >= 1000:
             raise HTTPException(status_code=503, detail="Legacy YooKassa checkout review exceeds readiness limit")
         terminal_checkout_statuses = {
             "confirmed", "refunded", "reversed", "canceled", "cancelled",
