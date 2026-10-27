@@ -1,0 +1,21 @@
+# Render Blueprint for a separate billing webhook service.
+# Apply manually in Render after the PR is reviewed and merged.
+# Secrets are intentionally not committed; Render will prompt for each sync:false value.
+services:
+  - type: web
+    name: shoppilot-billing-webhook
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn tbank_webhook:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: YOO_KASSA_SHOP_ID
+        sync: false
+      - key: YOO_KASSA_SECRET_KEY
+        sync: false
