@@ -202,6 +202,31 @@ class WebhookSecurityTests(unittest.TestCase):
         "SUPABASE_SERVICE_ROLE_KEY": "x",
         "TBANK_TERMINAL_KEY": "terminal",
         "TBANK_PASSWORD": "password",
+        "YOO_KASSA_SHOP_ID": "shop",
+        "YOO_KASSA_SECRET_KEY": "secret",
+    }, clear=False)
+    @patch("tbank_webhook.requests.get")
+    def test_ready_fails_closed_when_legacy_checkout_scan_hits_row_cap(self, get):
+        schema_response = Mock(ok=True)
+        legacy_response = Mock(ok=True)
+        legacy_response.json.return_value = [
+            {"id": str(i), "expected_amount": "1490.00", "expected_currency": "RUB", "status": "created"}
+            for i in range(1000)
+        ]
+        get.side_effect = [schema_response, legacy_response]
+
+        with self.assertRaises(Exception) as ctx:
+            asyncio.run(tbank_webhook.readyz())
+
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
+        self.assertIn("review exceeds readiness limit", str(ctx.exception))
+        self.assertEqual(get.call_count, 2)
+
+    @patch.dict(os.environ, {
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "x",
+        "TBANK_TERMINAL_KEY": "terminal",
+        "TBANK_PASSWORD": "password",
     }, clear=False)
     @patch("tbank_webhook.requests.get")
     def test_ready_rejects_unavailable_supabase(self, get):
