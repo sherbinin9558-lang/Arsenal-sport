@@ -32,7 +32,7 @@ SHOP_ID=_cfg("YOO_KASSA_SHOP_ID")
 SECRET_KEY=_cfg("YOO_KASSA_SECRET_KEY")
 PUBLIC_URL=_cfg("SAAS_PUBLIC_URL").rstrip("/")
 
-def _save_checkout(tenant_id, checkout_id, payment_id, plan):
+def _save_checkout(tenant_id, checkout_id, payment_id, plan, expected_amount):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
     url=_cfg("SUPABASE_URL").rstrip("/")
     if not key or not url:
@@ -52,7 +52,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
             "provider_order_id": str(checkout_id),
             "provider_payment_id": str(payment_id),
             "plan": plan,
-            "expected_amount": f"{plan_price(plan):.2f}",
+            "expected_amount": f"{expected_amount:.2f}",
             "expected_currency": "RUB",
             "status": "created",
         },
@@ -128,7 +128,7 @@ def create_checkout(plan, tenant_id):
     save_error = None
     for attempt in range(3):
         try:
-            _save_checkout(tenant_id, checkout_id, data.get("id"), plan)
+            _save_checkout(tenant_id, checkout_id, data.get("id"), plan, price)
             save_error = None
             break
         except Exception as exc:
