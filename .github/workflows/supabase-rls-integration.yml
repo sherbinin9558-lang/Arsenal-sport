@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   rls-integration:
-    environment: production
+    environment: supabase-test
     runs-on: ubuntu-latest
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
