@@ -166,11 +166,10 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(
             get.call_args_list[1].kwargs["params"],
             {
-                "select": "id",
+                "select": "id,expected_amount,expected_currency",
                 "provider": "eq.yookassa",
-                "or": "(expected_amount.is.null,expected_currency.is.null,expected_currency.eq.,expected_amount.lte.0)",
                 "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
-                "limit": "1",
+                "limit": "1001",
             },
         )
         self.assertEqual(get.call_args_list[1].kwargs["timeout"], 3)
@@ -188,7 +187,7 @@ class WebhookSecurityTests(unittest.TestCase):
     def test_ready_rejects_unresolved_legacy_yookassa_checkout(self, get):
         schema_response = Mock(ok=True)
         legacy_response = Mock(ok=True)
-        legacy_response.json.return_value = [{"id": "legacy-checkout"}]
+        legacy_response.json.return_value = [{"id": "sensitive-checkout", "expected_amount": "1490.00", "expected_currency": "   "}]
         get.side_effect = [schema_response, legacy_response]
 
         with self.assertRaises(Exception) as ctx:
@@ -196,7 +195,7 @@ class WebhookSecurityTests(unittest.TestCase):
 
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
         self.assertIn("Legacy YooKassa checkouts require provider reconciliation", str(ctx.exception))
-        self.assertNotIn("legacy-checkout", str(ctx.exception))
+        self.assertNotIn("sensitive-checkout", str(ctx.exception))
         self.assertEqual(get.call_count, 2)
 
     @patch.dict(os.environ, {
