@@ -2,6 +2,13 @@
 -- has been cancelled or reconciled. A local status update cannot cancel a
 -- YooKassa payment link, and guessed historical prices must never be used.
 --
+-- The checkout schema predates amount/currency binding. Add nullable columns
+-- first so the guard can identify legacy rows without guessing historical
+-- values. Existing YooKassa rows remain unresolved until reconciled explicitly.
+alter table public.billing_checkout_sessions
+    add column if not exists expected_amount numeric(12, 2),
+    add column if not exists expected_currency text;
+
 -- Expose only a boolean reconciliation gate to the service; do not return
 -- checkout identifiers or tenant data to readiness checks.
 create or replace function public.has_unresolved_legacy_yookassa_checkouts()
