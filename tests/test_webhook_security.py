@@ -144,11 +144,47 @@ class WebhookSecurityTests(unittest.TestCase):
         "TBANK_PASSWORD": "password",
         "TBANK_WEBHOOK_SECRET": "",
     }, clear=False)
-    def test_ready_accepts_tbank_provider_configuration(self):
+    @patch("tbank_webhook.requests.get")
+    def test_ready_accepts_tbank_provider_configuration_when_supabase_reachable(self, get):
+        get.return_value.ok = True
         result = asyncio.run(tbank_webhook.readyz())
         self.assertTrue(result["ok"])
+        self.assertEqual(result["supabase"], "reachable")
         self.assertEqual(result["tbank"], "configured")
         self.assertEqual(result["yookassa"], "disabled")
+        get.assert_called_once_with(
+            "https://example.supabase.co/rest/v1/",
+            headers={"apikey": "x", "Authorization": "Bearer x"},
+            timeout=3,
+        )
+
+    @patch.dict(os.environ, {
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "x",
+        "TBANK_TERMINAL_KEY": "terminal",
+        "TBANK_PASSWORD": "password",
+    }, clear=False)
+    @patch("tbank_webhook.requests.get")
+    def test_ready_rejects_unavailable_supabase(self, get):
+        get.return_value.ok = False
+        with self.assertRaises(Exception) as ctx:
+            asyncio.run(tbank_webhook.readyz())
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
+        self.assertIn("Webhook storage is unavailable", str(ctx.exception))
+
+    @patch.dict(os.environ, {
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "x",
+        "TBANK_TERMINAL_KEY": "terminal",
+        "TBANK_PASSWORD": "password",
+    }, clear=False)
+    @patch("tbank_webhook.requests.get", side_effect=tbank_webhook.requests.RequestException("sensitive details"))
+    def test_ready_sanitizes_supabase_connection_errors(self, get):
+        with self.assertRaises(Exception) as ctx:
+            asyncio.run(tbank_webhook.readyz())
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
+        self.assertIn("Webhook storage is unavailable", str(ctx.exception))
+        self.assertNotIn("sensitive details", str(ctx.exception))
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
     def test_yookassa_rejects_wrong_optional_bearer(self):
