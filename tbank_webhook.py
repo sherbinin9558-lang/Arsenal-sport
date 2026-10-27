@@ -100,7 +100,7 @@ async def readyz():
     tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
     yookassa_ready = bool(_env("YOO_KASSA_SHOP_ID") and _env("YOO_KASSA_SECRET_KEY"))
     if not tbank_ready and not yookassa_ready:
-        raise HTTPException(status_code=503, detail="Webhook provider credentials are not configured")
+        raise HTTPException(status_code=503, detail="Webhook provider authentication credentials are not configured")
     return {
         "ok": True,
         "service": "billing-webhook",
