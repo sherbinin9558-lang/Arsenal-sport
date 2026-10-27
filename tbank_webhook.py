@@ -120,50 +120,28 @@ async def readyz():
         # Do not advertise readiness while legacy YooKassa links could still
         # be payable but lack a saved expected amount/currency. Provider-side
         # cancellation or reconciliation must happen before notifications are enabled.
-        legacy_check = requests.get(
-            f"{url}/rest/v1/billing_checkout_sessions",
-            headers={"apikey": key, "Authorization": f"Bearer {key}"},
-            params={
-                "select": "id,expected_amount,expected_currency,status",
-                "provider": "eq.yookassa",
-                # Inspect a bounded response and classify terminal states locally
-                # so NULL status values cannot silently bypass a PostgREST filter.
-                "limit": "1001",
+        # Ask Postgres for a boolean only, so readiness stays efficient as
+        # checkout history grows and does not expose checkout or tenant data.
+        legacy_check = requests.post(
+            f"{url}/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
             },
+            json={},
             timeout=3,
         )
         if not legacy_check.ok:
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
         try:
-            legacy_rows = legacy_check.json()
+            legacy_needs_reconciliation = legacy_check.json()
         except ValueError:
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
-        if not isinstance(legacy_rows, list):
+        if not isinstance(legacy_needs_reconciliation, bool):
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
-        # Supabase/PostgREST may cap responses at 1000 rows even when a
-        # larger limit is requested. Treat a full-cap response as incomplete.
-        if len(legacy_rows) >= 1000:
-            raise HTTPException(status_code=503, detail="Legacy YooKassa checkout review exceeds readiness limit")
-        terminal_checkout_statuses = {
-            "confirmed", "refunded", "reversed", "canceled", "cancelled",
-            "rejected", "refund_pending", "refund_canceled",
-            "partial_refunded", "partial_reversed",
-        }
-        for legacy_row in legacy_rows:
-            if not isinstance(legacy_row, dict):
-                raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
-            row_status = str(legacy_row.get("status") or "").strip().lower()
-            if row_status in terminal_checkout_statuses:
-                continue
-            expected_amount = legacy_row.get("expected_amount")
-            expected_currency = legacy_row.get("expected_currency")
-            try:
-                amount_value = Decimal(str(expected_amount))
-                invalid_amount = not amount_value.is_finite() or amount_value <= 0
-            except (InvalidOperation, TypeError, ValueError):
-                invalid_amount = True
-            if expected_amount is None or invalid_amount or not str(expected_currency or "").strip():
-                raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
+        if legacy_needs_reconciliation:
+            raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
     except HTTPException:
         raise
     except requests.RequestException:
