@@ -166,9 +166,8 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(
             get.call_args_list[1].kwargs["params"],
             {
-                "select": "id,expected_amount,expected_currency",
+                "select": "id,expected_amount,expected_currency,status",
                 "provider": "eq.yookassa",
-                "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
                 "limit": "1001",
             },
         )
@@ -187,7 +186,7 @@ class WebhookSecurityTests(unittest.TestCase):
     def test_ready_rejects_unresolved_legacy_yookassa_checkout(self, get):
         schema_response = Mock(ok=True)
         legacy_response = Mock(ok=True)
-        legacy_response.json.return_value = [{"id": "sensitive-checkout", "expected_amount": "1490.00", "expected_currency": "   "}]
+        legacy_response.json.return_value = [{"id": "sensitive-checkout", "expected_amount": "1490.00", "expected_currency": "   ", "status": "created"}]
         get.side_effect = [schema_response, legacy_response]
 
         with self.assertRaises(Exception) as ctx:
