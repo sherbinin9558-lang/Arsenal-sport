@@ -169,7 +169,7 @@ class WebhookSecurityTests(unittest.TestCase):
                 "select": "id",
                 "provider": "eq.yookassa",
                 "or": "(expected_amount.is.null,expected_currency.is.null,expected_currency.eq.,expected_amount.lte.0)",
-                "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,deadline_expired,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
+                "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
                 "limit": "1",
             },
         )
