@@ -78,8 +78,14 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
     rows=r.json()
     return rows[0] if rows else None
 
+def provider_api_configured():
+    """Whether authenticated API lookups can run; independent of the checkout return URL."""
+    return bool(SHOP_ID and SECRET_KEY)
+
+
 def configured():
-    return bool(SHOP_ID and SECRET_KEY and PUBLIC_URL)
+    """Whether the app can create redirect checkouts."""
+    return bool(provider_api_configured() and PUBLIC_URL)
 
 def plan_price(plan):
     if plan not in PLANS:
@@ -144,7 +150,7 @@ def create_checkout(plan, tenant_id):
     return data
 
 def get_payment(payment_id):
-    if not configured():
+    if not provider_api_configured():
         raise RuntimeError("ЮKassa не настроена.")
     r=requests.get(
         f"https://api.yookassa.ru/v3/payments/{payment_id}",
@@ -160,7 +166,7 @@ def get_payment(payment_id):
 
 def get_refund(refund_id):
     """Fetch a refund from YooKassa; never trust a webhook's refund status alone."""
-    if not configured():
+    if not provider_api_configured():
         raise RuntimeError("ЮKassa не настроена.")
     refund_id = str(refund_id or "").strip()
     if not refund_id:
