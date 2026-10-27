@@ -73,8 +73,54 @@ def test_refund_for_another_payment_is_rejected(monkeypatch):
     process.assert_not_called()
 
 
+
+
+def test_get_payment_works_without_checkout_return_url(monkeypatch):
+    monkeypatch.setattr(billing, 'SHOP_ID', 'test-shop')
+    monkeypatch.setattr(billing, 'SECRET_KEY', 'test-secret')
+    monkeypatch.setattr(billing, 'PUBLIC_URL', '')
+    response = SimpleNamespace(ok=True, json=lambda: {'id': 'pay-1', 'status': 'succeeded'})
+    call = Mock(return_value=response)
+    monkeypatch.setattr(billing.requests, 'get', call)
+
+    result = billing.get_payment('pay-1')
+
+    assert result['id'] == 'pay-1'
+    call.assert_called_once_with(
+        'https://api.yookassa.ru/v3/payments/pay-1',
+        auth=('test-shop', 'test-secret'),
+        timeout=20,
+    )
+
+
+def test_legacy_confirmed_checkout_can_process_verified_refund(monkeypatch):
+    monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
+    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: {
+        'id': 'refund-legacy', 'payment_id': 'pay-legacy', 'status': 'succeeded',
+    })
+    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {
+        'id': 'pay-legacy', 'status': 'succeeded',
+        'amount': {'value': '1490.00', 'currency': 'RUB'},
+    })
+    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
+        'tenant_id': 'tenant-a', 'plan': 'pro', 'status': 'confirmed',
+        'expected_amount': None, 'expected_currency': None,
+    })
+    captured = {}
+    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+
+    result = invoke_webhook(monkeypatch, {
+        'event': 'refund.succeeded',
+        'object': {'id': 'refund-legacy', 'payment_id': 'pay-legacy'},
+    })
+
+    assert result['status'] == 'refunded'
+    assert captured['args'][3] == 'refunded'
+    assert captured['args'][4] == 'tenant-a'
+
+
 def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
-    monkeypatch.setattr(billing, 'configured', lambda: True)
+    monkeypatch.setattr(billing, 'provider_api_configured', lambda: True)
     monkeypatch.setattr(billing, 'SHOP_ID', 'test-shop')
     monkeypatch.setattr(billing, 'SECRET_KEY', 'test-secret')
     response = SimpleNamespace(ok=False, text='PRIVATE_PROVIDER_SECRET', json=lambda: {'description': 'PRIVATE_PROVIDER_SECRET'})
