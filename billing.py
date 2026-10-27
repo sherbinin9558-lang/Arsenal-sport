@@ -57,7 +57,7 @@ def _save_checkout(tenant_id, checkout_id, payment_id, plan):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в Supabase.")
 
 def get_checkout_by_order(checkout_id, tenant_id=None):
     key=_cfg("SUPABASE_SERVICE_ROLE_KEY")
@@ -72,7 +72,7 @@ def get_checkout_by_order(checkout_id, tenant_id=None):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из Supabase.")
     rows=r.json()
     return rows[0] if rows else None
 
