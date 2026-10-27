@@ -21,13 +21,13 @@ class BillingWebhookTests(unittest.TestCase):
     @patch("tbank_webhook.requests.post")
     def test_process_billing_event_uses_atomic_rpc_and_payload_hash(self, post, _supabase):
         post.return_value = FakeResponse({"ok": True, "duplicate": False})
-        payload = {"PaymentId": "123", "Status": "CONFIRMED"}
+        payload = {"event": "payment.succeeded", "object": {"id": "123"}}
 
         result = tbank_webhook._process_billing_event(
-            "tbank",
-            "tbank:123:confirmed",
+            "yookassa",
+            "yookassa:payment.succeeded:123:succeeded",
             "123",
-            "CONFIRMED",
+            "succeeded",
             "tenant-1",
             "pro",
             payload=payload,
@@ -40,7 +40,7 @@ class BillingWebhookTests(unittest.TestCase):
         expected_hash = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         ).hexdigest()
-        self.assertEqual(body["p_event_key"], "tbank:123:confirmed")
+        self.assertEqual(body["p_event_key"], "yookassa:payment.succeeded:123:succeeded")
         self.assertEqual(body["p_payload_hash"], expected_hash)
         self.assertEqual(body["p_tenant_id"], "tenant-1")
         self.assertEqual(body["p_plan"], "pro")
@@ -60,29 +60,6 @@ class BillingWebhookTests(unittest.TestCase):
                 "starter",
             )
 
-    def test_tbank_webhook_errors_do_not_expose_exception_or_tenant(self):
-        from fastapi import HTTPException
-        from types import SimpleNamespace
-        request = SimpleNamespace(headers={})
-        payload = {"PaymentId": "payment-123", "Token": "valid-token"}
-
-        with patch.dict("os.environ", {"TBANK_WEBHOOK_SECRET": ""}, clear=False), \
-             patch.object(tbank_webhook, "_read_body", return_value=payload), \
-             patch.object(tbank_webhook, "_token", return_value="valid-token"), \
-             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-sensitive-987", "plan": "pro"
-             }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
-             patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-DB-SECRET")):
-            with self.assertRaises(HTTPException) as ctx:
-                import asyncio
-                asyncio.run(tbank_webhook.payment_status(request))
-
-        self.assertEqual(ctx.exception.status_code, 502)
-        self.assertEqual(ctx.exception.detail, "Billing state transition failed")
-        self.assertNotIn("INTERNAL-DB-SECRET", str(ctx.exception.detail))
-        self.assertNotIn("tenant-sensitive-987", str(ctx.exception.detail))
-
     def test_yookassa_webhook_errors_do_not_expose_exception_or_tenant(self):
         from fastapi import HTTPException
         from types import SimpleNamespace
@@ -92,9 +69,9 @@ class BillingWebhookTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"YOOKASSA_WEBHOOK_SECRET": "unit-yoo-secret"}, clear=False), \
              patch.object(tbank_webhook, "_read_body", return_value=payload), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded"}), \
+             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "10.00", "currency": "RUB"}}), \
              patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
-                 "tenant_id": "tenant-sensitive-654", "plan": "starter"
+                 "tenant_id": "tenant-sensitive-654", "plan": "starter", "expected_amount": "10.00", "expected_currency": "RUB"
              }), \
              patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
             with self.assertRaises(HTTPException) as ctx:

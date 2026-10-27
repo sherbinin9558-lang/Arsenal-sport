@@ -1,20 +1,15 @@
-"""T-Bank payment webhook.
-
-The webhook never trusts a tenant or plan supplied by the browser. It resolves
-the payment to the checkout session stored in Supabase, verifies the current
-payment state with T-Bank, and only then activates the subscription.
-"""
+"""YooKassa payment/refund webhook with verified provider state."""
 
 import hashlib
 import hmac
 import json
 import os
 import requests
+from decimal import Decimal, InvalidOperation
 from fastapi import FastAPI, Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from tbank_billing import get_state, _token
 from billing import get_payment, get_refund
 
 app = FastAPI(title="AI Agent Content Manager Billing Webhook")
@@ -97,16 +92,16 @@ async def readyz():
     url, key = _supabase()
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
-    tbank_ready = bool(_env("TBANK_TERMINAL_KEY") and _env("TBANK_PASSWORD"))
-    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
-    if not tbank_ready and not yookassa_ready:
-        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+    # YooKassa notifications do not require a custom shared Bearer secret.
+    # The handler verifies the authoritative payment/refund state through the
+    # YooKassa API; the optional extra secret is checked when configured.
+    extra_secret_configured = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
     return {
         "ok": True,
         "service": "billing-webhook",
         "supabase": "configured",
-        "tbank": "configured" if tbank_ready else "disabled",
-        "yookassa": "configured" if yookassa_ready else "disabled",
+        "yookassa": "provider_state_verification",
+        "extra_webhook_secret": "configured" if extra_secret_configured else "not_configured",
     }
 
 
@@ -136,7 +131,7 @@ def _checkout_by_provider_payment(provider, payment_id):
         f"{url}/rest/v1/billing_checkout_sessions",
         headers=_headers(),
         params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
+            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status,expected_amount,expected_currency",
             "provider": f"eq.{provider}",
             "provider_payment_id": f"eq.{payment_id}",
             "limit": "1",
@@ -146,24 +141,6 @@ def _checkout_by_provider_payment(provider, payment_id):
     response.raise_for_status()
     data = response.json()
     return data[0] if data else None
-
-def _checkout_by_payment(payment_id):
-    url, _ = _supabase()
-    rows = requests.get(
-        f"{url}/rest/v1/billing_checkout_sessions",
-        headers=_headers(),
-        params={
-            "select": "tenant_id,provider_order_id,provider_payment_id,plan,status",
-            "provider": "eq.tbank",
-            "provider_payment_id": f"eq.{payment_id}",
-            "limit": "1",
-        },
-        timeout=15,
-    )
-    rows.raise_for_status()
-    data = rows.json()
-    return data[0] if data else None
-
 
 def _update_checkout_provider_payment(provider, payment_id, status):
     url, _ = _supabase()
@@ -205,13 +182,7 @@ def _process_billing_event(provider, event_key, payment_id, status, tenant_id, p
 
 
 def _verify_webhook_secret(request: Request, env_name):
-    """Validate an optional configured Bearer layer.
-
-    T-Bank notifications have their own signed Token. If a Bearer secret is
-    configured for the T-Bank webhook API, a supplied Bearer header is checked;
-    its absence is not rejected because the provider Token is independently
-    verified below.
-    """
+    """Validate an optional configured Bearer layer for webhook notifications."""
     expected = _env(env_name)
     if not expected:
         return False
@@ -234,57 +205,6 @@ async def _read_body(request: Request):
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="JSON object required")
     return body
-
-
-@app.post("/webhooks/tbank/payment-status")
-async def payment_status(request: Request):
-    secret_verified = _verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
-    body = await _read_body(request)
-
-    payment_id = body.get("PaymentId") or body.get("PaymentID")
-    if not payment_id:
-        raise HTTPException(status_code=400, detail="PaymentId is required")
-
-    # If T-Bank provides its notification Token, verify it as well.
-    supplied_token = body.get("Token")
-    if supplied_token:
-        try:
-            expected_token = _token(body)
-        except Exception:
-            expected_token = ""
-        if not expected_token or not hmac.compare_digest(str(supplied_token), str(expected_token)):
-            raise HTTPException(status_code=401, detail="Invalid webhook token")
-    elif not secret_verified:
-        raise HTTPException(status_code=401, detail="Webhook authentication required")
-
-    payment_id = str(payment_id)
-    checkout = _checkout_by_payment(payment_id)
-    if not checkout:
-        raise HTTPException(status_code=404, detail="Checkout session not found")
-
-    state = get_state(payment_id)
-    status = str(state.get("Status") or "").upper()
-    plan = str(checkout.get("plan") or "").lower()
-    tenant = str(checkout.get("tenant_id") or "")
-
-    if plan not in ("starter", "pro", "business") or not tenant:
-        raise HTTPException(status_code=422, detail="Invalid checkout session")
-
-    event_key = f"tbank:{payment_id}:{status.lower()}"
-    try:
-        result = _process_billing_event(
-            "tbank",
-            event_key,
-            payment_id,
-            status,
-            tenant,
-            plan,
-            payload=body,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="Billing state transition failed")
-
-    return PlainTextResponse("OK")
 
 
 @app.post("/webhooks/yookassa")
@@ -339,6 +259,24 @@ async def yookassa_payment_status(request: Request):
     tenant = str(checkout.get("tenant_id") or "")
     if plan not in ("starter", "pro", "business") or not tenant:
         raise HTTPException(status_code=422, detail="Invalid checkout session")
+
+    # Validate the provider's authoritative payment amount against the exact
+    # server-created checkout before allowing any payment/refund event to
+    # mutate subscription state. Missing legacy expectations fail closed.
+    expected_currency = str(checkout.get("expected_currency") or "").upper()
+    provider_amount = payment.get("amount") or {}
+    try:
+        expected_amount = Decimal(str(checkout.get("expected_amount")))
+        actual_amount = Decimal(str(provider_amount.get("value")))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Checkout amount validation failed")
+    if (
+        expected_currency != "RUB"
+        or str(provider_amount.get("currency") or "").upper() != expected_currency
+        or expected_amount <= 0
+        or actual_amount != expected_amount
+    ):
+        raise HTTPException(status_code=422, detail="Checkout amount/currency mismatch")
 
     payment_method = payment.get("payment_method") or {}
     payment_method_id = payment_method.get("id") if payment_method.get("saved") else None

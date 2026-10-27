@@ -47,21 +47,8 @@ class TestP2Hardening(unittest.TestCase):
         self.assertIn(SupabaseRequestError("expired", 401).status_code, (400,401,403))
 
     def test_billing_modules_are_importable_without_live_charge(self):
-        import billing, tbank_billing
+        import billing
         self.assertTrue(hasattr(billing, "create_checkout"))
-        self.assertTrue(hasattr(tbank_billing, "create_checkout"))
-
-    @patch("tbank_billing._cfg", side_effect=lambda name, default="": {
-        "SUPABASE_SERVICE_ROLE_KEY": "key",
-        "SUPABASE_URL": "https://example.supabase.co",
-    }.get(name, default))
-    @patch("tbank_billing.requests.post")
-    def test_tbank_checkout_storage_failure_is_not_silent(self, post_mock, cfg_mock):
-        post_mock.return_value.ok = False
-        post_mock.return_value.text = "db unavailable"
-        import tbank_billing
-        with self.assertRaises(RuntimeError):
-            tbank_billing._save_checkout("tenant", "order", "payment", "pro")
 
     @patch("webmcp_tools.data_load")
     def test_webmcp_content_plan_is_allowlisted(self, load_mock):

@@ -2,6 +2,7 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 import json, io, datetime, csv, requests, base64, re, tempfile, os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from max_features import product_search, catalog_metrics, auto_content_bundle, planner_suggestions, knowledge_answer
 from ai_seller import ai_sales_reply, sales_followup
@@ -550,22 +551,7 @@ try:
     payment_id=st.query_params.get("payment_id")
     checkout_id=st.query_params.get("checkout_id")
     billing_return=st.query_params.get("billing")
-    if billing_return == "tbank_return" and not st.session_state.get("tbank_verified"):
-        from tbank_billing import get_state, get_checkout_by_order
-        order_id=st.query_params.get("order_id")
-        tenant_id=str(st.session_state.get("saas_tenant_id") or "")
-        checkout=get_checkout_by_order(str(order_id), tenant_id) if order_id and tenant_id else None
-        pid=str((checkout or {}).get("provider_payment_id") or "")
-        payment=get_state(pid) if pid else {}
-        status=payment.get("Status")
-        plan=str((checkout or {}).get("plan") or "").lower()
-        if status in ("CONFIRMED","AUTHORIZED") and plan in ("starter","pro","business") and pid:
-            activate_paid_subscription(plan,pid,None,provider="tbank",tenant=tenant_id)
-            st.session_state["tbank_verified"]=True
-            st.success(f"Оплата Т‑Банка подтверждена. Тариф {plan.upper()} активирован.")
-        elif status:
-            st.info(f"Статус платежа Т‑Банк: {status}.")
-    elif (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
+    if (payment_id or checkout_id) and billing_return == "return" and not st.session_state.get("billing_verified"):
         from billing import get_checkout_by_order, get_payment
         if checkout_id:
             checkout=get_checkout_by_order(str(checkout_id))
@@ -574,13 +560,38 @@ try:
             payment_id=str(checkout["provider_payment_id"])
         payment=get_payment(payment_id)
         if payment.get("status") == "succeeded" and payment.get("paid"):
-            plan=str((payment.get("metadata") or {}).get("plan") or st.session_state.get("billing_plan") or "").lower()
-            tenant=str((payment.get("metadata") or {}).get("tenant_id") or st.session_state.get("saas_tenant_id") or "")
-            if plan in ("starter","pro","business") and tenant == str(st.session_state.get("saas_tenant_id")):
+            plan=str((payment.get("metadata") or {}).get("plan") or "").lower()
+            tenant=str((payment.get("metadata") or {}).get("tenant_id") or "")
+            expected_currency=str(checkout.get("expected_currency") or "").upper() if checkout_id else ""
+            amount=payment.get("amount") or {}
+            try:
+                actual_amount=Decimal(str(amount.get("value")))
+                expected_amount=Decimal(str(checkout.get("expected_amount"))) if checkout_id else Decimal("-1")
+            except (InvalidOperation, TypeError, ValueError):
+                actual_amount=Decimal("-1")
+                expected_amount=Decimal("-2")
+            amount_matches=(
+                checkout_id
+                and expected_currency == "RUB"
+                and str(amount.get("currency") or "").upper() == expected_currency
+                and actual_amount == expected_amount
+                and actual_amount > 0
+            )
+            if (
+                checkout_id
+                and amount_matches
+                and plan in ("starter","pro","business")
+                and plan == str(checkout.get("plan") or "").lower()
+                and tenant == str(checkout.get("tenant_id") or "")
+                and tenant == str(st.session_state.get("saas_tenant_id"))
+                and str(checkout.get("provider_payment_id")) == str(payment_id)
+            ):
                 method_id=(payment.get("payment_method") or {}).get("id")
                 activate_paid_subscription(plan,payment_id,method_id,provider="yookassa",tenant=tenant)
                 st.session_state["billing_verified"]=True
                 st.success(f"Оплата подтверждена. Тариф {plan.upper()} активирован.")
+            else:
+                st.warning("Платёж получен, но данные checkout не совпали. Тариф не активирован; требуется проверка.")
         elif payment.get("status") == "canceled":
             st.warning("Платёж отменён.")
 except Exception as e:
