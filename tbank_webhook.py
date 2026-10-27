@@ -124,11 +124,13 @@ async def readyz():
             f"{url}/rest/v1/billing_checkout_sessions",
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
             params={
-                "select": "id",
+                "select": "id,expected_amount,expected_currency",
                 "provider": "eq.yookassa",
-                "or": "(expected_amount.is.null,expected_currency.is.null,expected_currency.eq.,expected_amount.lte.0)",
                 "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
-                "limit": "1",
+                # Inspect all ordinary rows in one bounded response. If more
+                # than 1000 are present, fail closed rather than assume the
+                # omitted rows are safe.
+                "limit": "1001",
             },
             timeout=3,
         )
@@ -140,8 +142,18 @@ async def readyz():
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
         if not isinstance(legacy_rows, list):
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
-        if legacy_rows:
-            raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
+        if len(legacy_rows) > 1000:
+            raise HTTPException(status_code=503, detail="Legacy YooKassa checkout review exceeds readiness limit")
+        for legacy_row in legacy_rows:
+            expected_amount = legacy_row.get("expected_amount") if isinstance(legacy_row, dict) else None
+            expected_currency = legacy_row.get("expected_currency") if isinstance(legacy_row, dict) else None
+            try:
+                amount_value = Decimal(str(expected_amount))
+                invalid_amount = not amount_value.is_finite() or amount_value <= 0
+            except (InvalidOperation, TypeError, ValueError):
+                invalid_amount = True
+            if expected_amount is None or invalid_amount or not str(expected_currency or "").strip():
+                raise HTTPException(status_code=503, detail="Legacy YooKassa checkouts require provider reconciliation")
     except HTTPException:
         raise
     except requests.RequestException:
