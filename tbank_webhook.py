@@ -124,12 +124,10 @@ async def readyz():
             f"{url}/rest/v1/billing_checkout_sessions",
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
             params={
-                "select": "id,expected_amount,expected_currency",
+                "select": "id,expected_amount,expected_currency,status",
                 "provider": "eq.yookassa",
-                "status": "not.in.(confirmed,refunded,reversed,canceled,cancelled,rejected,refund_pending,refund_canceled,partial_refunded,partial_reversed)",
-                # Inspect all ordinary rows in one bounded response. If more
-                # than 1000 are present, fail closed rather than assume the
-                # omitted rows are safe.
+                # Inspect a bounded response and classify terminal states locally
+                # so NULL status values cannot silently bypass a PostgREST filter.
                 "limit": "1001",
             },
             timeout=3,
@@ -144,9 +142,19 @@ async def readyz():
             raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
         if len(legacy_rows) > 1000:
             raise HTTPException(status_code=503, detail="Legacy YooKassa checkout review exceeds readiness limit")
+        terminal_checkout_statuses = {
+            "confirmed", "refunded", "reversed", "canceled", "cancelled",
+            "rejected", "refund_pending", "refund_canceled",
+            "partial_refunded", "partial_reversed",
+        }
         for legacy_row in legacy_rows:
-            expected_amount = legacy_row.get("expected_amount") if isinstance(legacy_row, dict) else None
-            expected_currency = legacy_row.get("expected_currency") if isinstance(legacy_row, dict) else None
+            if not isinstance(legacy_row, dict):
+                raise HTTPException(status_code=503, detail="Legacy checkout status is unavailable")
+            row_status = str(legacy_row.get("status") or "").strip().lower()
+            if row_status in terminal_checkout_statuses:
+                continue
+            expected_amount = legacy_row.get("expected_amount")
+            expected_currency = legacy_row.get("expected_currency")
             try:
                 amount_value = Decimal(str(expected_amount))
                 invalid_amount = not amount_value.is_finite() or amount_value <= 0
