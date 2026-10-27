@@ -153,8 +153,9 @@ class WebhookSecurityTests(unittest.TestCase):
         self.assertEqual(result["tbank"], "configured")
         self.assertEqual(result["yookassa"], "disabled")
         get.assert_called_once_with(
-            "https://example.supabase.co/rest/v1/",
+            "https://example.supabase.co/rest/v1/billing_checkout_sessions",
             headers={"apikey": "x", "Authorization": "Bearer x"},
+            params={"select": "id", "limit": "0"},
             timeout=3,
         )
 
@@ -170,7 +171,7 @@ class WebhookSecurityTests(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             asyncio.run(tbank_webhook.readyz())
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("Webhook storage is unavailable", str(ctx.exception))
+        self.assertIn("Webhook storage schema is unavailable", str(ctx.exception))
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
