@@ -105,13 +105,16 @@ async def readyz():
     # Check that Supabase's REST endpoint is reachable and accepts these
     # credentials. Keep the timeout short and never expose provider responses.
     try:
+        # Probe the billing table actually required by webhook processing,
+        # not merely the Supabase host root. limit=0 avoids reading tenant data.
         storage_check = requests.get(
-            f"{url}/rest/v1/",
+            f"{url}/rest/v1/billing_checkout_sessions",
             headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            params={"select": "id", "limit": "0"},
             timeout=3,
         )
         if not storage_check.ok:
-            raise HTTPException(status_code=503, detail="Webhook storage is unavailable")
+            raise HTTPException(status_code=503, detail="Webhook storage schema is unavailable")
     except HTTPException:
         raise
     except requests.RequestException:
