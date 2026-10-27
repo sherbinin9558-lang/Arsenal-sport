@@ -180,7 +180,7 @@ def _payment_matches_checkout(payment, checkout):
         received = Decimal(str(actual.get("value"))).quantize(Decimal("0.01"))
     except (InvalidOperation, TypeError, ValueError):
         return False
-    return expected.is_finite() and received.is_finite() and expected >= 0 and received == expected and actual_currency == expected_currency
+    return expected.is_finite() and received.is_finite() and expected > 0 and received == expected and actual_currency == expected_currency
 
 def _checkout_by_payment(payment_id):
     url, _ = _supabase()
