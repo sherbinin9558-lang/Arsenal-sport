@@ -20,7 +20,7 @@ as $has_unresolved_legacy_yookassa_checkouts$
                or expected_amount::text in ('NaN', 'Infinity', '-Infinity')
                or expected_amount <= 0
                or expected_currency is null
-               or btrim(expected_currency) = ''
+               or regexp_replace(expected_currency, '[[:space:]]', '', 'g') = ''
            )
            and lower(coalesce(status, '')) not in (
                'confirmed',
