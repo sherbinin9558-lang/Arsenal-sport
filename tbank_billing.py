@@ -26,7 +26,7 @@ def _save_checkout(tenant_id, order_id, payment_id, plan):
         timeout=15,
     )
     if not r.ok:
-        raise RuntimeError(f"Не удалось сохранить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось сохранить checkout-сессию в Supabase.")
 
 def configured():
     return bool(TERMINAL_KEY and PASSWORD and PUBLIC_URL)
@@ -152,6 +152,6 @@ def get_checkout_by_order(order_id, tenant_id):
         params={"select":"tenant_id,provider_payment_id,plan,status","provider":"eq.tbank",
                 "provider_order_id":f"eq.{order_id}","tenant_id":f"eq.{tenant_id}","limit":"1"}, timeout=15)
     if not r.ok:
-        raise RuntimeError(f"Не удалось получить checkout-сессию: {r.text}")
+        raise RuntimeError("Не удалось получить checkout-сессию из Supabase.")
     rows=r.json()
     return rows[0] if rows else None
