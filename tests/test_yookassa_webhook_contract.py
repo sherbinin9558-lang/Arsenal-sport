@@ -120,9 +120,9 @@ def test_legacy_confirmed_checkout_can_process_verified_refund(monkeypatch):
 
 
 def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
-    monkeypatch.setattr(billing, 'provider_api_configured', lambda: True)
     monkeypatch.setattr(billing, 'SHOP_ID', 'test-shop')
     monkeypatch.setattr(billing, 'SECRET_KEY', 'test-secret')
+    monkeypatch.setattr(billing, 'PUBLIC_URL', '')
     response = SimpleNamespace(ok=False, text='PRIVATE_PROVIDER_SECRET', json=lambda: {'description': 'PRIVATE_PROVIDER_SECRET'})
     call = Mock(return_value=response)
     monkeypatch.setattr(billing.requests, 'get', call)
