@@ -92,14 +92,16 @@ async def readyz():
     url, key = _supabase()
     if not url or not key:
         raise HTTPException(status_code=503, detail="Webhook storage is not configured")
-    yookassa_ready = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
-    if not yookassa_ready:
-        raise HTTPException(status_code=503, detail="Webhook provider authentication is not configured")
+    # YooKassa notifications do not require a custom shared Bearer secret.
+    # The handler verifies the authoritative payment/refund state through the
+    # YooKassa API; the optional extra secret is checked when configured.
+    extra_secret_configured = bool(_env("YOOKASSA_WEBHOOK_SECRET"))
     return {
         "ok": True,
         "service": "billing-webhook",
         "supabase": "configured",
-        "yookassa": "configured" if yookassa_ready else "disabled",
+        "yookassa": "provider_state_verification",
+        "extra_webhook_secret": "configured" if extra_secret_configured else "not_configured",
     }
 
 
