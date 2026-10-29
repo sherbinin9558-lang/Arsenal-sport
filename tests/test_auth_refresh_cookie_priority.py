@@ -26,6 +26,13 @@ class FakeCookieController:
     def get(self, name):
         return self.values.get(name)
 
+    def set(self, name, value, **kwargs):
+        # Model a browser cookie write that survives a full Streamlit session reset.
+        self.values[name] = value
+
+    def remove(self, name, **kwargs):
+        self.values.pop(name, None)
+
 
 class FakeStreamlit:
     def __init__(self, session_state):
@@ -134,6 +141,45 @@ class RefreshCookiePriorityTests(unittest.TestCase):
                 })
 
         persist.assert_called_once_with("new-rotated-refresh-token")
+
+    def test_consecutive_hard_reload_restores_session_with_each_rotated_cookie(self):
+        # Each hard reload starts with a new Streamlit session_state, while the
+        # browser cookie jar survives. Every successful refresh rotates the token.
+        browser_cookie_jar = {"saas_refresh_token": "refresh-token-0"}
+        refresh_inputs = []
+        controller = FakeCookieController(browser_cookie_jar)
+
+        def rotate_token(presented_token):
+            refresh_inputs.append(presented_token)
+            generation = len(refresh_inputs)
+            return {
+                "access_token": f"access-token-{generation}",
+                "refresh_token": f"refresh-token-{generation}",
+                "user": {"id": "user-1", "email": "test@example.com"},
+            }
+
+        with patch.object(saas_core, "_auth_cookies", return_value=controller), patch.object(
+            saas_core, "refresh_session", side_effect=rotate_token
+        ), patch.object(
+            saas_core, "user_tenants", return_value=[{"id": "tenant-1", "name": "Test Store"}]
+        ), patch.object(saas_core, "_set_identity"), patch.object(
+            saas_core, "_record_auth_timing"
+        ):
+            for generation in (1, 2, 3):
+                # A hard reload discards Streamlit's in-memory auth state.
+                state = {}
+                fake_st = FakeStreamlit(state)
+                with patch.object(saas_core, "st", fake_st):
+                    self.assertTrue(saas_core._auth_bootstrap_gate())
+                    self.assertEqual(state.get("saas_access_token"), f"access-token-{generation}")
+                    self.assertEqual(
+                        browser_cookie_jar["saas_refresh_token"], f"refresh-token-{generation}"
+                    )
+
+        self.assertEqual(
+            refresh_inputs,
+            ["refresh-token-0", "refresh-token-1", "refresh-token-2"],
+        )
 
     def test_confirmed_invalid_token_does_not_request_hydration_retry(self):
         state = {"_saas_cookie_probe_count": 1, "_saas_cookie_restore_failed": True}
