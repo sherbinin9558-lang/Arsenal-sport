@@ -10,7 +10,7 @@ _SENTRY = None
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         payload = {'ts': datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00','Z'), 'level': record.levelname, 'logger': record.name, 'message': record.getMessage()}
-        for key in ('event','operation','duration_ms','component','status','error_type'):
+        for key in ('event','operation','duration_ms','component','status','error_type','outcome'):
             value = getattr(record, key, None)
             if value is not None: payload[key] = value
         if record.exc_info: payload['exception'] = {'type': record.exc_info[0].__name__, 'message': str(record.exc_info[1])}
