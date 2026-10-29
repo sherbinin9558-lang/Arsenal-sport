@@ -77,6 +77,24 @@ class CookieRestoreDiagnosticsTests(unittest.TestCase):
         self.assertEqual(timing.call_args.args[0], "validate_session_total")
         self.assertEqual(outcome.call_args.args, ("session_restore", "cookie_restored"))
 
+    def test_auth_outcome_is_preserved_by_json_formatter(self):
+        import json
+        import logging
+        from observability import JsonFormatter
+
+        record = logging.LogRecord(
+            "test", logging.INFO, __file__, 1,
+            "authentication stage outcome", (), None,
+        )
+        record.event = "auth_outcome"
+        record.operation = "session_restore"
+        record.outcome = "cookie_restored"
+
+        payload = json.loads(JsonFormatter().format(record))
+        self.assertEqual(payload["event"], "auth_outcome")
+        self.assertEqual(payload["operation"], "session_restore")
+        self.assertEqual(payload["outcome"], "cookie_restored")
+
 
 if __name__ == "__main__":
     unittest.main()
