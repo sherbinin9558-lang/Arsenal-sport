@@ -263,6 +263,9 @@ def _restore_session_from_cookie():
     try:
         restored = _establish_session(refresh_session(refresh_token))
         outcome = "restored" if restored else "not_restored"
+        if restored:
+            st.session_state.pop("_saas_cookie_probe_count", None)
+            st.session_state.pop("_saas_cookie_restore_failed", None)
         return restored
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
