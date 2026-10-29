@@ -115,6 +115,26 @@ class RefreshCookiePriorityTests(unittest.TestCase):
         self.assertEqual(state.get("saas_access_token"), "restored-access-token")
         self.assertEqual(state.get("_saas_cookie_probe_count"), 2)
 
+    def test_rotated_refresh_token_is_persisted_before_user_lookup(self):
+        # Supabase may invalidate the previous refresh token immediately after
+        # rotation. A later user lookup can fail, so persistence must happen
+        # before any downstream request that could abort session restoration.
+        state = {}
+        fake_st = FakeStreamlit(state)
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_persist_refresh_token"
+        ) as persist, patch.object(
+            saas_core, "get_user", side_effect=RuntimeError("temporary lookup failure")
+        ):
+            with self.assertRaises(RuntimeError):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+
+        persist.assert_called_once_with("new-rotated-refresh-token")
+
     def test_confirmed_invalid_token_does_not_request_hydration_retry(self):
         state = {"_saas_cookie_probe_count": 1, "_saas_cookie_restore_failed": True}
         fake_st = FakeStreamlit(state)
