@@ -258,25 +258,30 @@ def _restore_session_from_cookie():
     if not refresh_token:
         _record_auth_timing("cookie_restore_no_token", started_restore)
         return False
+    started_establish = time.perf_counter()
+    outcome = "error"
     try:
-        started_establish = time.perf_counter()
         restored = _establish_session(refresh_session(refresh_token))
-        _record_auth_timing("establish_session_total", started_establish)
-        st.session_state.pop("_saas_cookie_probe_count", None)
-        st.session_state.pop("_saas_cookie_restore_failed", None)
-        _record_auth_timing("cookie_restore_total", started_restore)
+        outcome = "restored" if restored else "not_restored"
         return restored
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
+            outcome = "invalid_refresh_token"
             _clear_refresh_token()
             st.session_state["_saas_cookie_restore_failed"] = True
             st.session_state.pop("_saas_cookie_probe_count", None)
             return False
+        outcome = "supabase_request_error"
         st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
     except Exception as e:
+        outcome = "unexpected_error"
         st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
+    finally:
+        _record_auth_timing("establish_session_total", started_establish)
+        _record_auth_timing("cookie_restore_total", started_restore)
+        _record_auth_outcome("cookie_restore", outcome)
 
 def _restore_session_from_access_token():
     token = st.session_state.get("saas_access_token")
@@ -423,6 +428,20 @@ def _record_auth_timing(operation, started):
         logger().info(
             "authentication stage completed",
             extra={"event": "auth_timing", "operation": operation, "duration_ms": duration_ms},
+        )
+    except Exception:
+        pass
+
+
+def _record_auth_outcome(operation, outcome):
+    """Log an allow-listed auth result without recording credentials or identity."""
+    if outcome not in {"restored", "not_restored", "invalid_refresh_token", "supabase_request_error", "unexpected_error", "error"}:
+        outcome = "error"
+    try:
+        from observability import logger
+        logger().info(
+            "authentication stage outcome",
+            extra={"event": "auth_outcome", "operation": operation, "outcome": outcome},
         )
     except Exception:
         pass
