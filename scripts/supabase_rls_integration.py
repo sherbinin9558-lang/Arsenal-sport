@@ -12,6 +12,7 @@ import os
 import sys
 import uuid
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -111,8 +112,28 @@ def jwt_subject(token: str) -> str:
         raise AssertionError(f"Unable to decode authenticated JWT subject: {exc}") from exc
 
 
+def validate_supabase_target(url: str) -> None:
+    """Fail closed unless this integration suite targets the isolated test project."""
+    expected_ref = "qibncofxwuhasekwyffs"
+    parsed = urlparse(url)
+    valid = (
+        parsed.scheme == "https"
+        and parsed.hostname == f"{expected_ref}.supabase.co"
+        and parsed.port in (None, 443)
+        and parsed.username is None
+        and parsed.password is None
+    )
+    if not valid:
+        raise RuntimeError(
+            "Refusing RLS integration tests: SUPABASE_URL is not the approved isolated test project."
+        )
+
+
 def main() -> int:
     url = env("SUPABASE_URL")
+    # Validate before reading credentials or constructing an API client; this protects
+    # direct/local script execution as well as the GitHub Actions workflow.
+    validate_supabase_target(url)
     anon_key = env("SUPABASE_ANON_KEY")
     service_key = env("SUPABASE_SERVICE_ROLE_KEY")
     admin = Api(url, service_key)

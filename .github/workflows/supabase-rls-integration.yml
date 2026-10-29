@@ -15,12 +15,14 @@ permissions:
 
 jobs:
   rls-integration:
-    environment: production
+    environment: supabase-test
     runs-on: ubuntu-latest
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Pin destructive integration tests to the isolated ShopPilot AI Test project.
+      SUPABASE_EXPECTED_PROJECT_REF: qibncofxwuhasekwyffs
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,10 +31,31 @@ jobs:
       - name: Require Supabase integration-test credentials
         run: |
           missing=0
-          [ -n "$SUPABASE_URL" ] || { echo "::error::Missing required production secret: SUPABASE_URL"; missing=1; }
-          [ -n "$SUPABASE_ANON_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_ANON_KEY"; missing=1; }
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_SERVICE_ROLE_KEY"; missing=1; }
+          [ -n "$SUPABASE_URL" ] || { echo "::error::Missing required Supabase test URL"; missing=1; }
+          [ -n "$SUPABASE_ANON_KEY" ] || { echo "::error::Missing required Supabase test anon key"; missing=1; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Missing required Supabase test service-role key"; missing=1; }
           [ "$missing" -eq 0 ]
+      - name: Refuse non-test Supabase project
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          from urllib.parse import urlparse
+
+          expected = os.environ["SUPABASE_EXPECTED_PROJECT_REF"]
+          parsed = urlparse(os.environ["SUPABASE_URL"])
+          valid = (
+              parsed.scheme == "https"
+              and parsed.hostname == f"{expected}.supabase.co"
+              and parsed.port in (None, 443)
+              and parsed.username is None
+              and parsed.password is None
+          )
+          if not valid:
+              print("::error::Refusing RLS integration tests: SUPABASE_URL is not the approved isolated test project.")
+              sys.exit(1)
+          print("Supabase target guard passed for the approved isolated test project.")
+          PY
       - name: Install test dependency
         run: pip install "requests>=2.32.0"
       - name: Run real authenticated RLS matrix
