@@ -81,19 +81,39 @@ class RefreshCookiePriorityTests(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_delayed_cookie_recovery_succeeds_on_second_execution(self):
-        state = {"_saas_cookie_probe_count": 1}
+    def test_delayed_cookie_hydration_restores_on_second_gate_execution(self):
+        # Simulate the browser component being empty on the first Streamlit run,
+        # then receiving the valid cookie before the single permitted rerun.
+        state = {}
+        controller = FakeCookieController({})
         fake_st = FakeStreamlit(state)
+
+        def restore_from_cookie():
+            token = saas_core._read_refresh_token()
+            if not token:
+                return False
+            # Model the successful downstream session restoration only after the
+            # actual cookie reader returns the hydrated browser token.
+            state["saas_access_token"] = "restored-access-token"
+            return True
+
         with patch.object(saas_core, "st", fake_st), patch.object(
-            saas_core, "_restore_session_from_cookie", side_effect=[False, True]
-        ), patch.object(saas_core, "CookieController", new=FakeCookieController):
+            saas_core, "_auth_cookies", return_value=controller
+        ), patch.object(
+            saas_core, "_restore_session_from_cookie", side_effect=restore_from_cookie
+        ):
             with self.assertRaises(RerunRequested):
                 saas_core._auth_bootstrap_gate()
 
-            state["_saas_cookie_probe_count"] = 2
+            self.assertEqual(state.get("_saas_cookie_probe_count"), 1)
+            self.assertNotIn("saas_access_token", state)
+
+            controller.values["saas_refresh_token"] = "hydrated-valid-token"
             result = saas_core._auth_bootstrap_gate()
 
         self.assertTrue(result)
+        self.assertEqual(state.get("saas_access_token"), "restored-access-token")
+        self.assertEqual(state.get("_saas_cookie_probe_count"), 2)
 
     def test_confirmed_invalid_token_does_not_request_hydration_retry(self):
         state = {"_saas_cookie_probe_count": 1, "_saas_cookie_restore_failed": True}
