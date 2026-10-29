@@ -294,9 +294,13 @@ def _restore_session_from_access_token():
     if st.session_state.get("saas_user_id") and (time.time() - last) < 60:
         return True
     try:
+        started_user = time.perf_counter()
         user = get_user(token)
+        _record_auth_timing("access_token_resolve_user", started_user)
         selected_tenant_id = st.session_state.get("saas_tenant_id")
+        started_membership = time.perf_counter()
         tenants = user_tenants(token,user.get("id"))
+        _record_auth_timing("access_token_membership_lookup", started_membership)
         # Reuse the membership response instead of issuing a duplicate query.
         tenant = None
         if tenants:
@@ -494,7 +498,22 @@ def request_password_reset(email):
     return _request("POST","/auth/v1/recover",json=payload)
 
 def validate_session():
-    return _restore_session_from_access_token() or _restore_session_from_cookie()
+    # Measure the full restore path, including the fast access-token path and
+    # the cookie-refresh fallback, so hard-reload latency can be attributed.
+    started = time.perf_counter()
+    try:
+        restored = _restore_session_from_access_token()
+        if restored:
+            _record_auth_outcome("session_restore", "access_token_restored")
+            return True
+        restored = _restore_session_from_cookie()
+        _record_auth_outcome("session_restore", "cookie_restored" if restored else "not_restored")
+        return restored
+    except Exception:
+        _record_auth_outcome("session_restore", "unexpected_error")
+        raise
+    finally:
+        _record_auth_timing("validate_session_total", started)
 
 def _rest_get(path,token,params=None,headers=None): return _request("GET",path,token=token,headers=headers,params=params or {})
 
