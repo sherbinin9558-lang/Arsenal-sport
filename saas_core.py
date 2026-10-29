@@ -197,7 +197,11 @@ def _clear_refresh_token():
             pass
 
 def refresh_session(refresh_token):
-    return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+    started = time.perf_counter()
+    try:
+        return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+    finally:
+        _record_auth_timing("supabase_refresh_token", started)
 
 def _establish_session(result):
     # A successful explicit login/signup starts a fresh auth lifecycle.
@@ -247,13 +251,20 @@ def _establish_session(result):
     return True
 
 def _restore_session_from_cookie():
+    started_restore = time.perf_counter()
+    started_cookie = time.perf_counter()
     refresh_token = _read_refresh_token()
+    _record_auth_timing("cookie_read", started_cookie)
     if not refresh_token:
+        _record_auth_timing("cookie_restore_no_token", started_restore)
         return False
     try:
+        started_establish = time.perf_counter()
         restored = _establish_session(refresh_session(refresh_token))
+        _record_auth_timing("establish_session_total", started_establish)
         st.session_state.pop("_saas_cookie_probe_count", None)
         st.session_state.pop("_saas_cookie_restore_failed", None)
+        _record_auth_timing("cookie_restore_total", started_restore)
         return restored
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
