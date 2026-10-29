@@ -11,10 +11,13 @@ class RerunRequested(Exception):
 
 
 class FakeCookieController:
-    def __init__(self, values):
+    def __init__(self, values, refresh_error=None):
         self.values = values
+        self.refresh_error = refresh_error
 
     def refresh(self):
+        if self.refresh_error:
+            raise self.refresh_error
         return None
 
     def getAll(self):
@@ -44,6 +47,20 @@ class RefreshCookiePriorityTests(unittest.TestCase):
             token = saas_core._read_refresh_token()
 
         self.assertEqual(token, "current-rotated-token")
+
+    def test_refresh_failure_does_not_return_cached_stale_token(self):
+        state = {"_saas_cookie_probe_count": 0}
+        controller = FakeCookieController(
+            {"saas_refresh_token": "stale-token"},
+            refresh_error=RuntimeError("component not hydrated"),
+        )
+        fake_st = FakeStreamlit(state)
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_auth_cookies", return_value=controller
+        ):
+            token = saas_core._read_refresh_token()
+
+        self.assertIsNone(token)
 
     def test_empty_first_probe_requests_one_rerun_for_cookie_hydration(self):
         state = {"_saas_cookie_probe_count": 1}
