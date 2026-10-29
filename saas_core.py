@@ -143,7 +143,11 @@ def _read_refresh_token():
     try:
         cookies.refresh()
     except Exception:
-        pass
+        # A failed refresh means the component snapshot may be stale (for
+        # example, another tab may already have rotated the shared token).
+        # Do not authenticate with that cached value or risk clearing a newer
+        # valid browser cookie after Supabase rejects it.
+        return None
 
     try:
         all_cookies = cookies.getAll() or {}
