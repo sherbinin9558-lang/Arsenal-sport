@@ -206,6 +206,14 @@ def _establish_session(result):
     token = result.get("access_token")
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
+    # Persist the newly rotated refresh token immediately. Supabase may
+    # invalidate the previous refresh token as soon as this refresh succeeds;
+    # later user/membership lookups can be slow or fail, so delaying persistence
+    # until after those requests can strand the browser with an already-invalid
+    # cookie and make the next hard reload fall back to login.
+    refresh_token = result.get("refresh_token")
+    if refresh_token:
+        _persist_refresh_token(refresh_token)
     started_user = time.perf_counter()
     user = result.get("user") or get_user(token)
     _record_auth_timing("resolve_user", started_user)
@@ -232,9 +240,6 @@ def _establish_session(result):
         return True
     if not tenant:
         raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-    refresh_token = result.get("refresh_token")
-    if refresh_token:
-        _persist_refresh_token(refresh_token)
     _set_identity(user, tenant)
     st.session_state["saas_last_validated_at"] = time.time()
     st.session_state.pop("_saas_cookie_probe_attempts", None)
