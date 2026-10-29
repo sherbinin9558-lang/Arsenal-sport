@@ -51,6 +51,32 @@ class CookieRestoreDiagnosticsTests(unittest.TestCase):
         outcome.assert_called_once_with("cookie_restore", "unexpected_error")
         self.assertNotIn("secret detail", str(outcome.call_args))
 
+    def test_validate_session_records_full_duration_for_access_token_path(self):
+        with (
+            patch.object(saas_core, "_restore_session_from_access_token", return_value=True),
+            patch.object(saas_core, "_restore_session_from_cookie") as cookie_restore,
+            patch.object(saas_core, "_record_auth_timing") as timing,
+            patch.object(saas_core, "_record_auth_outcome") as outcome,
+        ):
+            self.assertTrue(saas_core.validate_session())
+
+        cookie_restore.assert_not_called()
+        timing.assert_called_once()
+        self.assertEqual(timing.call_args.args[0], "validate_session_total")
+        outcome.assert_called_once_with("session_restore", "access_token_restored")
+
+    def test_validate_session_records_cookie_fallback_path(self):
+        with (
+            patch.object(saas_core, "_restore_session_from_access_token", return_value=False),
+            patch.object(saas_core, "_restore_session_from_cookie", return_value=True),
+            patch.object(saas_core, "_record_auth_timing") as timing,
+            patch.object(saas_core, "_record_auth_outcome") as outcome,
+        ):
+            self.assertTrue(saas_core.validate_session())
+
+        self.assertEqual(timing.call_args.args[0], "validate_session_total")
+        self.assertEqual(outcome.call_args.args, ("session_restore", "cookie_restored"))
+
 
 if __name__ == "__main__":
     unittest.main()
