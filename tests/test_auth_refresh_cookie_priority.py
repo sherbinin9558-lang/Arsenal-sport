@@ -38,6 +38,16 @@ class RefreshCookiePriorityTests(unittest.TestCase):
 
         self.assertEqual(token, "current-rotated-token")
 
+    def test_bootstrap_returns_login_state_instead_of_waiting_forever(self):
+        state = {"_saas_cookie_probe_count": 1}
+        fake_st = FakeStreamlit(state)
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_restore_session_from_cookie", return_value=False
+        ), patch.object(saas_core, "CookieController", new=FakeCookieController):
+            result = saas_core._auth_bootstrap_gate()
+
+        self.assertFalse(result)
+
     def test_defers_when_cookie_component_has_not_hydrated(self):
         state = {}
         controller = FakeCookieController({})
