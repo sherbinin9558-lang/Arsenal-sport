@@ -78,6 +78,43 @@ class RefreshCookiePriorityTests(unittest.TestCase):
             with self.assertRaises(RerunRequested):
                 saas_core._auth_bootstrap_gate()
 
+    def test_cookie_component_refresh_exception_can_recover_on_single_retry(self):
+        # CookieController can throw while its browser-side state is still
+        # hydrating. The bounded gate retry should permit a later successful
+        # component read rather than treating the first exception as logout.
+        state = {}
+        controller = FakeCookieController(
+            {"saas_refresh_token": "hydrated-refresh-token"},
+            refresh_error=RuntimeError("component not hydrated"),
+        )
+        fake_st = FakeStreamlit(state)
+
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_auth_cookies", return_value=controller
+        ), patch.object(
+            saas_core, "refresh_session",
+            return_value={
+                "access_token": "restored-access-token",
+                "refresh_token": "rotated-refresh-token",
+                "user": {"id": "user-1", "email": "test@example.com"},
+            }
+        ), patch.object(
+            saas_core, "user_tenants",
+            return_value=[{"id": "tenant-1", "name": "Test Store"}]
+        ), patch.object(saas_core, "_set_identity"), patch.object(
+            saas_core, "_record_auth_timing"
+        ):
+            with self.assertRaises(RerunRequested):
+                saas_core._auth_bootstrap_gate()
+
+            self.assertEqual(state.get("_saas_cookie_probe_count"), 1)
+            controller.refresh_error = None
+            self.assertTrue(saas_core._auth_bootstrap_gate())
+            self.assertEqual(state.get("saas_access_token"), "restored-access-token")
+            self.assertEqual(
+                controller.values["saas_refresh_token"], "rotated-refresh-token"
+            )
+
     def test_second_empty_probe_falls_back_to_login_without_another_rerun(self):
         state = {"_saas_cookie_probe_count": 2}
         fake_st = FakeStreamlit(state)
