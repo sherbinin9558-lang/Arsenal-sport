@@ -197,7 +197,11 @@ def _clear_refresh_token():
             pass
 
 def refresh_session(refresh_token):
-    return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+    started = time.perf_counter()
+    try:
+        return _request("POST","/auth/v1/token?grant_type=refresh_token",json={"refresh_token":refresh_token})
+    finally:
+        _record_auth_timing("supabase_refresh_token", started)
 
 def _establish_session(result):
     # A successful explicit login/signup starts a fresh auth lifecycle.
@@ -247,25 +251,40 @@ def _establish_session(result):
     return True
 
 def _restore_session_from_cookie():
+    started_restore = time.perf_counter()
+    started_cookie = time.perf_counter()
     refresh_token = _read_refresh_token()
+    _record_auth_timing("cookie_read", started_cookie)
     if not refresh_token:
+        _record_auth_timing("cookie_restore_no_token", started_restore)
         return False
+    started_establish = time.perf_counter()
+    outcome = "error"
     try:
         restored = _establish_session(refresh_session(refresh_token))
-        st.session_state.pop("_saas_cookie_probe_count", None)
-        st.session_state.pop("_saas_cookie_restore_failed", None)
+        outcome = "restored" if restored else "not_restored"
+        if restored:
+            st.session_state.pop("_saas_cookie_probe_count", None)
+            st.session_state.pop("_saas_cookie_restore_failed", None)
         return restored
     except SupabaseRequestError as e:
         if e.status_code in (400,401,403):
+            outcome = "invalid_refresh_token"
             _clear_refresh_token()
             st.session_state["_saas_cookie_restore_failed"] = True
             st.session_state.pop("_saas_cookie_probe_count", None)
             return False
+        outcome = "supabase_request_error"
         st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
     except Exception as e:
+        outcome = "unexpected_error"
         st.session_state["saas_auth_error"] = _safe_auth_error(e)
         return False
+    finally:
+        _record_auth_timing("establish_session_total", started_establish)
+        _record_auth_timing("cookie_restore_total", started_restore)
+        _record_auth_outcome("cookie_restore", outcome)
 
 def _restore_session_from_access_token():
     token = st.session_state.get("saas_access_token")
@@ -275,9 +294,13 @@ def _restore_session_from_access_token():
     if st.session_state.get("saas_user_id") and (time.time() - last) < 60:
         return True
     try:
+        started_user = time.perf_counter()
         user = get_user(token)
+        _record_auth_timing("access_token_resolve_user", started_user)
         selected_tenant_id = st.session_state.get("saas_tenant_id")
+        started_membership = time.perf_counter()
         tenants = user_tenants(token,user.get("id"))
+        _record_auth_timing("access_token_membership_lookup", started_membership)
         # Reuse the membership response instead of issuing a duplicate query.
         tenant = None
         if tenants:
@@ -417,6 +440,20 @@ def _record_auth_timing(operation, started):
         pass
 
 
+def _record_auth_outcome(operation, outcome):
+    """Log an allow-listed auth result without recording credentials or identity."""
+    if outcome not in {"restored", "not_restored", "invalid_refresh_token", "supabase_request_error", "unexpected_error", "error"}:
+        outcome = "error"
+    try:
+        from observability import logger
+        logger().info(
+            "authentication stage outcome",
+            extra={"event": "auth_outcome", "operation": operation, "outcome": outcome},
+        )
+    except Exception:
+        pass
+
+
 def sign_in(email,password):
     _check_auth_attempt_limit(email)
     _check_global_auth_attempt_limit(email)
@@ -461,7 +498,22 @@ def request_password_reset(email):
     return _request("POST","/auth/v1/recover",json=payload)
 
 def validate_session():
-    return _restore_session_from_access_token() or _restore_session_from_cookie()
+    # Measure the full restore path, including the fast access-token path and
+    # the cookie-refresh fallback, so hard-reload latency can be attributed.
+    started = time.perf_counter()
+    try:
+        restored = _restore_session_from_access_token()
+        if restored:
+            _record_auth_outcome("session_restore", "access_token_restored")
+            return True
+        restored = _restore_session_from_cookie()
+        _record_auth_outcome("session_restore", "cookie_restored" if restored else "not_restored")
+        return restored
+    except Exception:
+        _record_auth_outcome("session_restore", "unexpected_error")
+        raise
+    finally:
+        _record_auth_timing("validate_session_total", started)
 
 def _rest_get(path,token,params=None,headers=None): return _request("GET",path,token=token,headers=headers,params=params or {})
 
