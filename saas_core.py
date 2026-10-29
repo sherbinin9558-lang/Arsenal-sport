@@ -118,65 +118,51 @@ def _auth_cookies():
         return None
 
 def _read_refresh_token():
-    """Read the latest refresh token without a long blocking poll.
+    """Read the browser's current refresh token, preferring the live cookie component.
 
-    CookieController is the source of truth for the client cookie because
     Supabase rotates refresh tokens after a successful refresh. Streamlit's
-    request-cookie snapshot can briefly contain the previous token on a fresh
-    rerun. Refresh the controller once, then allow a short propagation window.
+    request-cookie snapshot may still contain the previous token on a hard
+    reload, so it must not override a newer value from CookieController.
 
-    The first page execution after a hard browser reload can happen before the
-    client-side CookieController component has returned its cookie value. We
-    record that first probe so the auth gate can wait for the component's
-    automatic rerun instead of flashing the login screen.
+    CookieController hydrates asynchronously after a page reload. When it is
+    available but has not supplied a token yet, defer the first probe and let
+    Streamlit rerun before deciding that no session exists.
     """
-    # Fast path: on a fresh browser request Streamlit already exposes the
-    # current request cookies. Use that before mounting the client-side
-    # CookieController component. This keeps the public/anonymous startup
-    # independent from a third-party component handshake.
-    try:
-        request_token = st.context.cookies.get(_AUTH_COOKIE)
-        if request_token:
-            return str(request_token)
-    except Exception:
-        pass
+    cookies = _auth_cookies()
+    if cookies is None:
+        # Compatibility path only when the browser cookie component is absent.
+        try:
+            request_token = st.context.cookies.get(_AUTH_COOKIE)
+            return str(request_token) if request_token else None
+        except Exception:
+            return None
 
     probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
     st.session_state["_saas_cookie_probe_count"] = min(probe_count + 1, 2)
 
-    cookies = _auth_cookies()
-    if cookies is not None:
-        try:
-            cookies.refresh()
-        except Exception:
-            pass
-
-        # Do not sleep between cookie probes. This function runs during normal
-        # Streamlit reruns, including button clicks, so even a small client-side
-        # wait becomes visible as input latency. The request-cookie fast path above
-        # remains the primary path; the controller is queried immediately as a
-        # best-effort fallback.
-        try:
-            all_cookies = cookies.getAll() or {}
-            token = all_cookies.get(_AUTH_COOKIE)
-            if token:
-                return str(token)
-        except Exception:
-            pass
-        try:
-            token = cookies.get(_AUTH_COOKIE)
-            if token:
-                return str(token)
-        except Exception:
-            pass
-
-    # Compatibility fallback when the component is unavailable.
     try:
-        token = st.context.cookies.get(_AUTH_COOKIE)
+        cookies.refresh()
+    except Exception:
+        pass
+
+    try:
+        all_cookies = cookies.getAll() or {}
+        token = all_cookies.get(_AUTH_COOKIE)
         if token:
             return str(token)
     except Exception:
         pass
+
+    try:
+        token = cookies.get(_AUTH_COOKIE)
+        if token:
+            return str(token)
+    except Exception:
+        pass
+
+    # Do not fall back to Streamlit's potentially stale request snapshot when
+    # CookieController exists: it can contain a refresh token already rotated
+    # by Supabase. The auth bootstrap gate will allow one client-side rerun.
     return None
 
 def _persist_refresh_token(refresh_token):
