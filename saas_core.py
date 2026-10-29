@@ -1155,13 +1155,12 @@ def render_onboarding():
         except Exception as e: st.error(f"Не удалось сохранить настройки магазина: {e}")
 
 def _auth_bootstrap_gate():
-    """Restore a cookie-backed session without blocking the Streamlit script.
+    """Restore a cookie-backed session with one bounded hydration retry.
 
-    CookieController may hydrate asynchronously after a hard reload. Never
-    return a pending state here: require_saas_access() handles pending states
-    with st.stop(), which can leave the app stuck if the component does not
-    trigger another rerun. If the cookie is not available in this execution,
-    render login; a later normal rerun can retry restoration.
+    CookieController can hydrate asynchronously after a hard reload. If the
+    first probe is empty, request one Streamlit rerun so the component can
+    expose the browser cookie. Never retry indefinitely. Explicit logout and
+    confirmed invalid tokens bypass this retry.
     """
     if st.session_state.get("saas_access_token"):
         return True
@@ -1172,7 +1171,20 @@ def _auth_bootstrap_gate():
         st.session_state.pop("saas_auth_error", None)
         return False
 
-    return bool(_restore_session_from_cookie())
+    restored = _restore_session_from_cookie()
+    if restored:
+        return True
+
+    probe_count = int(st.session_state.get("_saas_cookie_probe_count", 0) or 0)
+    if (
+        CookieController is not None
+        and probe_count == 1
+        and not st.session_state.get("_saas_cookie_restore_failed")
+        and not st.session_state.get("_saas_logout_completed")
+    ):
+        st.rerun()
+        return None
+    return False
 
 
 def require_saas_access():
