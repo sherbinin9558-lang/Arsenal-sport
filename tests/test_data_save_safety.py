@@ -242,10 +242,15 @@ class ModularUiRegressionTests(unittest.TestCase):
         self.assertIn("request_token = st.context.cookies.get(_AUTH_COOKIE)", source)
         from saas_core import _auth_bootstrap_gate
         gate_source = inspect.getsource(_auth_bootstrap_gate)
-        self.assertIn("probes <= 1", gate_source)
+        self.assertIn("Never", gate_source)
+        # A first empty cookie probe gets one bounded rerun so the component
+        # can hydrate; subsequent empty probes fall through to the login path.
+        self.assertIn("restored = _restore_session_from_cookie()", gate_source)
+        self.assertIn("probe_count == 1", gate_source)
+        self.assertIn("st.rerun()", gate_source)
         self.assertIn("return None", gate_source)
+        self.assertIn('st.session_state.get("_saas_logout_completed")', gate_source)
         self.assertNotIn("time.sleep(0.15)", gate_source)
-        self.assertNotIn("st.rerun()", gate_source)
 
     def test_refresh_failure_uses_current_login_without_legacy_red_error(self):
         source = (Path(__file__).resolve().parents[1] / "saas_core.py").read_text(encoding="utf-8")
