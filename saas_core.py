@@ -593,6 +593,23 @@ def login_ui():
         """
         <style>
         /* Public SaaS shell: hide Streamlit/developer chrome from customers. */
+        /* Public login/logout state must not leave the authenticated workspace sidebar visible. */
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarCollapseButton"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            pointer-events: none !important;
+        }
+        [data-testid="stAppViewContainer"] .main {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 0 !important;
+        }
+
         #MainMenu,
         [data-testid="stToolbar"],
         [data-testid="stDecoration"],
