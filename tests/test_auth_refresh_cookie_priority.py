@@ -26,6 +26,13 @@ class FakeCookieController:
     def get(self, name):
         return self.values.get(name)
 
+    def set(self, name, value, **kwargs):
+        # Model a browser cookie write that survives a full Streamlit session reset.
+        self.values[name] = value
+
+    def remove(self, name, **kwargs):
+        self.values.pop(name, None)
+
 
 class FakeStreamlit:
     def __init__(self, session_state):
@@ -71,6 +78,43 @@ class RefreshCookiePriorityTests(unittest.TestCase):
             with self.assertRaises(RerunRequested):
                 saas_core._auth_bootstrap_gate()
 
+    def test_cookie_component_refresh_exception_can_recover_on_single_retry(self):
+        # CookieController can throw while its browser-side state is still
+        # hydrating. The bounded gate retry should permit a later successful
+        # component read rather than treating the first exception as logout.
+        state = {}
+        controller = FakeCookieController(
+            {"saas_refresh_token": "hydrated-refresh-token"},
+            refresh_error=RuntimeError("component not hydrated"),
+        )
+        fake_st = FakeStreamlit(state)
+
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_auth_cookies", return_value=controller
+        ), patch.object(
+            saas_core, "refresh_session",
+            return_value={
+                "access_token": "restored-access-token",
+                "refresh_token": "rotated-refresh-token",
+                "user": {"id": "user-1", "email": "test@example.com"},
+            }
+        ), patch.object(
+            saas_core, "user_tenants",
+            return_value=[{"id": "tenant-1", "name": "Test Store"}]
+        ), patch.object(saas_core, "_set_identity"), patch.object(
+            saas_core, "_record_auth_timing"
+        ):
+            with self.assertRaises(RerunRequested):
+                saas_core._auth_bootstrap_gate()
+
+            self.assertEqual(state.get("_saas_cookie_probe_count"), 1)
+            controller.refresh_error = None
+            self.assertTrue(saas_core._auth_bootstrap_gate())
+            self.assertEqual(state.get("saas_access_token"), "restored-access-token")
+            self.assertEqual(
+                controller.values["saas_refresh_token"], "rotated-refresh-token"
+            )
+
     def test_second_empty_probe_falls_back_to_login_without_another_rerun(self):
         state = {"_saas_cookie_probe_count": 2}
         fake_st = FakeStreamlit(state)
@@ -114,6 +158,65 @@ class RefreshCookiePriorityTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(state.get("saas_access_token"), "restored-access-token")
         self.assertEqual(state.get("_saas_cookie_probe_count"), 2)
+
+    def test_rotated_refresh_token_is_persisted_before_user_lookup(self):
+        # Supabase may invalidate the previous refresh token immediately after
+        # rotation. A later user lookup can fail, so persistence must happen
+        # before any downstream request that could abort session restoration.
+        state = {}
+        fake_st = FakeStreamlit(state)
+        with patch.object(saas_core, "st", fake_st), patch.object(
+            saas_core, "_persist_refresh_token"
+        ) as persist, patch.object(
+            saas_core, "get_user", side_effect=RuntimeError("temporary lookup failure")
+        ):
+            with self.assertRaises(RuntimeError):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+
+        persist.assert_called_once_with("new-rotated-refresh-token")
+
+    def test_consecutive_hard_reload_restores_session_with_each_rotated_cookie(self):
+        # Each hard reload starts with a new Streamlit session_state, while the
+        # browser cookie jar survives. Every successful refresh rotates the token.
+        browser_cookie_jar = {"saas_refresh_token": "refresh-token-0"}
+        refresh_inputs = []
+        controller = FakeCookieController(browser_cookie_jar)
+
+        def rotate_token(presented_token):
+            refresh_inputs.append(presented_token)
+            generation = len(refresh_inputs)
+            return {
+                "access_token": f"access-token-{generation}",
+                "refresh_token": f"refresh-token-{generation}",
+                "user": {"id": "user-1", "email": "test@example.com"},
+            }
+
+        with patch.object(saas_core, "_auth_cookies", return_value=controller), patch.object(
+            saas_core, "refresh_session", side_effect=rotate_token
+        ), patch.object(
+            saas_core, "user_tenants", return_value=[{"id": "tenant-1", "name": "Test Store"}]
+        ), patch.object(saas_core, "_set_identity"), patch.object(
+            saas_core, "_record_auth_timing"
+        ):
+            for generation in (1, 2, 3):
+                # A hard reload discards Streamlit's in-memory auth state.
+                state = {}
+                fake_st = FakeStreamlit(state)
+                with patch.object(saas_core, "st", fake_st):
+                    self.assertTrue(saas_core._auth_bootstrap_gate())
+                    self.assertEqual(state.get("saas_access_token"), f"access-token-{generation}")
+                    self.assertEqual(
+                        browser_cookie_jar["saas_refresh_token"], f"refresh-token-{generation}"
+                    )
+
+        self.assertEqual(
+            refresh_inputs,
+            ["refresh-token-0", "refresh-token-1", "refresh-token-2"],
+        )
 
     def test_confirmed_invalid_token_does_not_request_hydration_retry(self):
         state = {"_saas_cookie_probe_count": 1, "_saas_cookie_restore_failed": True}
