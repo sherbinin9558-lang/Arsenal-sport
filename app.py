@@ -885,6 +885,39 @@ section[data-testid="stSidebar"] hr {{border-color:rgba(151,165,205,.18)!importa
 </style>
 """, unsafe_allow_html=True)
 
+# Restore readable light surfaces when the user disables the dark Command Center.
+if not dark_mode:
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {background:linear-gradient(180deg,#fff 0%,#f4f6fb 100%) !important;border-right:1px solid #e1e6ef !important;}
+        section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {color:#20283a !important;}
+        section[data-testid="stSidebar"] .sidebar-brand-title,
+        section[data-testid="stSidebar"] .sidebar-quick-title,
+        section[data-testid="stSidebar"] .sidebar-max-title,
+        section[data-testid="stSidebar"] .sidebar-quick-grid b {color:#20283a !important;}
+        section[data-testid="stSidebar"] .sidebar-brand-version,
+        section[data-testid="stSidebar"] .sidebar-brand-tagline,
+        section[data-testid="stSidebar"] .sidebar-max-text,
+        section[data-testid="stSidebar"] .sidebar-max-kicker,
+        section[data-testid="stSidebar"] .sidebar-quick-kicker,
+        section[data-testid="stSidebar"] .sidebar-quick-grid span,
+        section[data-testid="stSidebar"] .sidebar-quick-note {color:#596579 !important;}
+        section[data-testid="stSidebar"] .sidebar-max,
+        section[data-testid="stSidebar"] .sidebar-quick-overview {background:linear-gradient(145deg,#fff,#f0f3fa) !important;border:1px solid #dce3ee !important;box-shadow:0 8px 22px rgba(25,31,45,.06) !important;}
+        section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"],
+        section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] {background:#f5f7fb !important;border-color:#dce3ee !important;}
+        section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"] *,
+        section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] * {color:#20283a !important;}
+        section[data-testid="stSidebar"] hr {border-color:#e1e6ef !important;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 brand_logo_col, brand_title_col = st.columns([0.075, 0.925])
 with brand_logo_col:
     st.image("assets/shoppilot_logo.png", width=42)
