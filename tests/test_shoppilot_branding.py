@@ -138,5 +138,17 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertNotIn("78%", dashboard)
 
 
+    def test_dark_visual_system_overrides_legacy_light_text_colors(self):
+        visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
+        self.assertIn(".stApp h1,.stApp h2,.stApp h3", visual)
+        self.assertIn("[data-testid=\"stMarkdownContainer\"] p", visual)
+        self.assertIn("color:var(--sp-text)!important", visual)
+
+    def test_sidebar_help_block_is_valid_python(self):
+        import ast
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        ast.parse(source)
+
+
 if __name__ == "__main__":
     unittest.main()
