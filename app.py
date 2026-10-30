@@ -16,6 +16,7 @@ from asset_store import load_logo_bytes, save_logo_bytes
 from p3_suite import (create_notification, notifications, mark_notification_read, create_task, update_task, task_metrics, crm_pipeline, queue_agent_action, approve_agent_action, instagram_queue, advanced_analytics, run_notification_automation, crm_insights, update_instagram_draft)
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
+from ui.navigation import apply_workspace_navigation_styles
 from ui.settings import render_settings
 from ui.legal import render_legal
 from production_ops import observability_snapshot, provider_health
@@ -811,6 +812,7 @@ button[aria-label*="Прокрут"] {
 </style>
 """, unsafe_allow_html=True)
 
+apply_workspace_navigation_styles(st)
 _tabs = list(st.tabs(tab_labels, on_change="rerun", key="main_workspace_tabs"))
 
 # Streamlit's AppTest has had tab-collection edge cases across releases.
