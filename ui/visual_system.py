@@ -30,12 +30,15 @@ section[data-testid="stSidebar"] [data-testid="stAlert"] *{color:#e8f2ff!importa
 .st-key-main_workspace_tabs [data-baseweb="tab"]{flex:0 0 auto!important;min-height:40px!important;padding:0 13px!important;border:1px solid transparent!important;border-radius:9px!important;color:#d5e7fc!important;font-weight:750!important;background:transparent!important}
 .st-key-main_workspace_tabs [data-baseweb="tab"][aria-selected="true"]{color:#fff!important;background:linear-gradient(110deg,#1760a5,#267fc1)!important;border-color:rgba(135,197,255,.45)!important;box-shadow:0 4px 14px rgba(0,0,0,.18)!important}
 /* Wide hero: the existing robot asset is displayed at the right, copy at the left. */
-.dashboard-hero{min-height:245px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:clamp(22px,2.8vw,36px)!important;border:1px solid rgba(115,177,240,.42)!important;border-radius:19px!important;background:linear-gradient(112deg,#10427c 0%,#10508e 54%,#173b70 100%)!important;box-shadow:0 14px 34px rgba(0,0,0,.2)!important}
+/* Single banner wrapper matches the approved laptop reference. */
+.st-key-dashboard_hero_shell{padding:14px 16px!important;border:1px solid rgba(115,177,240,.42)!important;border-radius:20px!important;background:linear-gradient(112deg,#10427c 0%,#10508e 54%,#173b70 100%)!important;box-shadow:0 14px 34px rgba(0,0,0,.2)!important;overflow:hidden!important}
+.st-key-dashboard_hero_shell [data-testid="stHorizontalBlock"]{align-items:center!important;gap:14px!important}
+.dashboard-hero{min-height:220px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:clamp(12px,1.8vw,24px)!important;background:transparent!important;border:0!important;box-shadow:none!important}
 .dashboard-hero-kicker{color:#b9dcff!important;font-size:.65rem!important;letter-spacing:.17em!important;font-weight:850!important}
 .dashboard-hero-title{color:#fff!important;font-size:clamp(1.8rem,3vw,2.7rem)!important;line-height:1.04!important;letter-spacing:-.045em!important;font-weight:900!important}
 .dashboard-hero-gradient{color:#e6f3ff!important;background:none!important}
 .dashboard-hero-text{color:#d7eaff!important;font-size:.92rem!important;line-height:1.5!important;max-width:560px!important}
-.st-key-shoppilot_hero_art{min-height:245px!important;display:flex!important;align-items:stretch!important;justify-content:center!important}
+.st-key-shoppilot_hero_art{min-height:220px!important;display:flex!important;align-items:stretch!important;justify-content:center!important}
 .st-key-shoppilot_hero_art img{width:100%!important;height:100%!important;min-height:220px!important;max-height:300px!important;object-fit:cover!important;border-radius:17px!important;border:1px solid rgba(137,190,245,.4)!important;box-shadow:0 14px 30px rgba(0,0,0,.22)!important}
 /* Guide and first-run panels retain the same blue family. */
 .owner-guide-card,.first-run-card{margin:1rem 0!important;padding:18px 20px!important;border:1px solid var(--sp-line)!important;border-radius:16px!important;background:linear-gradient(145deg,#102b52,#12345f)!important;box-shadow:0 8px 22px rgba(0,0,0,.12)!important}
@@ -61,8 +64,8 @@ section[data-testid="stSidebar"] [data-testid="stAlert"] *{color:#e8f2ff!importa
 .section-title{color:#fff!important;font-size:clamp(1.5rem,2.3vw,2.1rem)!important;font-weight:900!important}
 .section-subtitle{color:#c1d5ed!important}
 :focus-visible{outline:2px solid #8dccff!important;outline-offset:2px!important}
-@media(max-width:900px){.block-container{padding:.8rem 1rem 2rem!important}.dashboard-hero{min-height:190px!important}.st-key-shoppilot_hero_art{min-height:170px!important}.st-key-shoppilot_hero_art img{min-height:160px!important;max-height:220px!important}}
-@media(max-width:640px){.dashboard-hero{min-height:0!important;padding:19px 16px!important;border-radius:15px!important}.dashboard-hero-title{font-size:1.8rem!important}.owner-guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.st-key-main_workspace_tabs [data-baseweb="tab"]{min-height:42px!important;padding:0 10px!important}}
+@media(max-width:900px){.block-container{padding:.8rem 1rem 2rem!important}.st-key-dashboard_hero_shell{padding:10px!important}.dashboard-hero{min-height:190px!important}.st-key-shoppilot_hero_art{min-height:170px!important}.st-key-shoppilot_hero_art img{min-height:160px!important;max-height:220px!important}}
+@media(max-width:640px){.st-key-dashboard_hero_shell{padding:9px!important}.dashboard-hero{min-height:0!important;padding:19px 16px!important;border-radius:15px!important}.dashboard-hero-title{font-size:1.8rem!important}.owner-guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.st-key-main_workspace_tabs [data-baseweb="tab"]{min-height:42px!important;padding:0 10px!important}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 </style>
 """
