@@ -737,7 +737,7 @@ def render_max():
                         st.rerun()
 
     elif section == "Автоматизация":
-        st.subheader("🚀 Центр автоматизации AI Agent Content Manager")
+        st.subheader("🚀 Центр автоматизации ShopPilot AI")
         st.caption("Бесплатный локальный контур: массовые фото, контент, склад, план на 30 дней, массовое редактирование и аналитика.")
 
         auto_tab1, auto_tab2, auto_tab3, auto_tab4 = st.tabs(["📸 Фото", "✍️ Контент", "📦 Каталог", "📊 Аналитика"])
