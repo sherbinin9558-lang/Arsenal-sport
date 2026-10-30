@@ -14,6 +14,10 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertNotIn("AI Agent Content Manager", source)
         self.assertNotIn("AI AGENT CONTENT MANAGER", source)
         self.assertNotIn("ai_agent_content_manager", source.casefold())
+        self.assertIn("#ShopPilotAI", source)
+        self.assertIn("shoppilot_reel.mp4", source)
+        self.assertIn("Контент-студия", source)
+        self.assertIn("План публикаций", source)
         self.assertIn('brand_title_color = "#f4f6ff" if dark_mode else "#171a21"', source)
 
     def test_settings_and_max_use_current_product_brand(self):
