@@ -778,6 +778,34 @@ div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:rel
 .sidebar-quick-grid b{display:block;font-size:1.05rem;line-height:1;color:#171a21;}
 .sidebar-quick-grid span{display:block;margin-top:3px;font-size:.62rem;color:#727a89;}
 .sidebar-quick-note{margin-top:9px;font-size:.62rem;line-height:1.35;color:#727a89;}
+/* ShopPilot sidebar snapshot: match the dark Command Center surface. */
+section[data-testid="stSidebar"] .sidebar-quick-overview {
+    background: linear-gradient(145deg, #111a33 0%, #1b2140 100%) !important;
+    border: 1px solid rgba(151, 133, 255, .42) !important;
+    box-shadow: 0 10px 26px rgba(4, 8, 22, .28) !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-kicker {
+    color: #b7a7ff !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-title {
+    color: #f4f6ff !important;
+    font-size: 1.02rem !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid > div {
+    background: rgba(255, 255, 255, .055) !important;
+    border: 1px solid rgba(174, 187, 216, .2) !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid b {
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid span,
+section[data-testid="stSidebar"] .sidebar-quick-note {
+    color: #c3cbed !important;
+    opacity: 1 !important;
+}
 
 .stButton>button{border-radius:12px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:700;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease;}.stButton>button:hover{transform:translateY(-1px);border-color:#5b5ce2;box-shadow:0 8px 20px rgba(30,35,55,.14);}button[kind="primary"]{background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;box-shadow:0 8px 22px rgba(91,92,226,.22)!important;}button[kind="primary"]:hover{box-shadow:0 11px 28px rgba(91,92,226,.30)!important;}
 div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;}button[data-baseweb="tab"]{border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;}button[data-baseweb="tab"] *{color:#252b3a!important;opacity:1!important;}button[data-baseweb="tab"][aria-selected="true"]{background:transparent!important;color:#4c1d95!important;border-color:transparent!important;}button[data-baseweb="tab"][aria-selected="true"] *{color:#4c1d95!important;opacity:1!important;}
