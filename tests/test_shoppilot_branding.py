@@ -19,6 +19,10 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn("Контент-студия", source)
         self.assertIn("План публикаций", source)
         self.assertIn('brand_title_color = "#f4f6ff" if dark_mode else "#171a21"', source)
+        self.assertIn("section[data-testid=\\"stSidebar\\"] .sidebar-quick-overview", source)
+        self.assertIn("background: linear-gradient(145deg, #111a33 0%, #1b2140 100%)", source)
+        self.assertIn("color: #f4f6ff !important", source)
+        self.assertIn("color: #c3cbed !important", source)
 
     def test_settings_and_max_use_current_product_brand(self):
         settings = (ROOT / "ui" / "settings.py").read_text(encoding="utf-8")
