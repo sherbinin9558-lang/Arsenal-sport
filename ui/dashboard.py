@@ -49,6 +49,14 @@ def _apply_client_first_layout():
         .owner-guide-grid span { display: block !important; font-size: .7rem !important; line-height: 1.35 !important; color: #6b7280 !important; }
         .owner-guide-note { margin-top: 9px !important; font-size: .72rem !important; line-height: 1.4 !important; color: #697386 !important; }
         /* ShopPilot command-center treatment. Data and actions remain native Streamlit. */
+        .dashboard-hero { min-height: 300px !important; display:flex !important; flex-direction:column !important; justify-content:center !important; padding:30px 26px !important; }
+        .dashboard-hero-title { font-size:clamp(2rem,3.4vw,3.35rem) !important; line-height:1.02 !important; margin-top:18px !important; }
+        .dashboard-hero-gradient { background:linear-gradient(90deg,#67d5ff,#8290ff,#c18cff); -webkit-background-clip:text; background-clip:text; color:transparent !important; }
+        .dashboard-hero-text { margin-top:16px !important; max-width:440px !important; }
+        .st-key-shoppilot_hero_art { height:100% !important; min-height:300px !important; display:flex !important; align-items:center !important; justify-content:center !important; }
+        .st-key-shoppilot_hero_art img { max-height:330px !important; width:100% !important; object-fit:cover !important; border-radius:18px !important; border:1px solid rgba(145,164,255,.25) !important; }
+        @media(max-width:768px){ .dashboard-hero{min-height:0!important;padding:23px 19px!important}.dashboard-hero-title{font-size:2.1rem!important}.st-key-shoppilot_hero_art{min-height:0!important}.st-key-shoppilot_hero_art img{max-height:230px!important} }
+
         .dashboard-hero {
             position: relative !important;
             isolation: isolate !important;
@@ -275,14 +283,20 @@ def render_dashboard(
     except Exception:
         ai_next = []
     
-    st.markdown(
-        f'<div class="dashboard-hero">'
-        f'<div class="dashboard-hero-kicker">SHOPPILOT AI · COMMAND CENTER</div>'
-        f'<div class="dashboard-hero-title">Добро пожаловать в {safe_store_name}</div>'
-        f'<div class="dashboard-hero-text">MAX смотрит на каталог, контент и продажи и помогает решить следующую задачу — без лишней рутины.</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    hero_copy, hero_art = st.columns([1.08, 0.92], gap="small")
+    with hero_copy:
+        st.markdown(
+            '<div class="dashboard-hero">'
+            '<div class="dashboard-hero-kicker">SHOPPILOT AI · SMART COMMERCE PLATFORM</div>'
+            '<div class="dashboard-hero-title">Робот трудится —<br><span class="dashboard-hero-gradient">ты отдыхаешь.</span></div>'
+            '<div class="dashboard-hero-text">Твой магазин. Твои каналы. Один интеллектуальный центр управления.</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with hero_art:
+        with st.container(key="shoppilot_hero_art"):
+            st.image("assets/shoppilot_robot.jpg", width="stretch")
+    st.caption(f"Рабочее пространство: {safe_store_name}")
 
     
     st.markdown(
