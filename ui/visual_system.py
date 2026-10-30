@@ -28,7 +28,7 @@ section[data-testid="stSidebar"] [data-testid="stAlert"] *{color:#e8f2ff!importa
 .st-key-main_workspace_tabs{margin:.35rem 0 1.1rem!important}
 .st-key-main_workspace_tabs [data-baseweb="tab-list"]{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:5px!important;padding:6px!important;border-radius:13px!important;background:#0d2445!important;border:1px solid var(--sp-line)!important}
 .st-key-main_workspace_tabs [data-baseweb="tab"]{flex:0 0 auto!important;min-height:40px!important;padding:0 13px!important;border:1px solid transparent!important;border-radius:9px!important;color:#d5e7fc!important;font-weight:750!important;background:transparent!important}
-.st-key-main_workspace_tabs [data-baseweb="tab"][aria-selected="true"]{color:#fff!important;background:linear-gradient(110deg,#1760a5,#267fc1)!important;border-color:rgba(135,197,255,.45)!important;box-shadow:0 4px 14px rgba(0,0,0,.18)!important}
+.st-key-main_workspace_tabs [data-baseweb="tab"][aria-selected="true"],.st-key-main_workspace_tabs [data-baseweb="tab"][aria-selected="true"] *{color:#fff!important;background:linear-gradient(110deg,#1760a5,#267fc1)!important;border-color:rgba(135,197,255,.45)!important;box-shadow:0 4px 14px rgba(0,0,0,.18)!important}
 /* Wide hero: the existing robot asset is displayed at the right, copy at the left. */
 /* Single banner wrapper matches the approved laptop reference. */
 .st-key-dashboard_hero_shell{padding:14px 16px!important;border:1px solid rgba(115,177,240,.42)!important;border-radius:20px!important;background:linear-gradient(112deg,#10427c 0%,#10508e 54%,#173b70 100%)!important;box-shadow:0 14px 34px rgba(0,0,0,.2)!important;overflow:hidden!important}
@@ -70,6 +70,8 @@ section[data-testid="stSidebar"] [data-testid="stAlert"] *{color:#e8f2ff!importa
 </style>
 """
 
-def apply_shoppilot_visual_system(streamlit_module):
-    """Apply the dark blue Command Center presentation without changing widget behavior."""
+def apply_shoppilot_visual_system(streamlit_module, dark_mode=True):
+    """Apply the approved dark Command Center only when the dark theme is selected."""
+    if not dark_mode:
+        return
     streamlit_module.markdown(SHOPPILOT_VISUAL_CSS, unsafe_allow_html=True)
