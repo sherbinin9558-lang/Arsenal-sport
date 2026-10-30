@@ -106,6 +106,11 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn("apply_shoppilot_visual_system(st, dark_mode=dark_mode)", app)
         self.assertIn("if not dark_mode:", visual)
         self.assertIn('aria-selected="true"] *{color:#fff!important', visual)
+        # Disabling dark mode must restore a light sidebar after the premium
+        # dark sidebar rules are injected earlier in app.py.
+        self.assertIn("if not dark_mode:", app)
+        self.assertIn("background:linear-gradient(180deg,#fff 0%,#f4f6fb 100%)", app)
+        self.assertIn("color:#20283a !important", app)
 
 
     def test_dashboard_preserves_legacy_workflows_and_robot_banner(self):
