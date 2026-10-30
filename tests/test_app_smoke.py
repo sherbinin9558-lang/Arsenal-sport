@@ -50,6 +50,16 @@ class AppSmokeTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
+    def test_dashboard_escapes_tenant_controlled_html(self):
+        from ui.dashboard import _safe_tenant_label
+
+        payload = '<img src=x onerror=alert(1)> & "tenant"'
+        escaped = _safe_tenant_label(payload)
+        self.assertNotIn("<img", escaped)
+        self.assertIn("&lt;img", escaped)
+        self.assertIn("&amp;", escaped)
+        self.assertIn("&quot;tenant&quot;", escaped)
+
     def test_main_page_renders(self):
         at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
         self.assertEqual([e.value for e in at.exception], [])
