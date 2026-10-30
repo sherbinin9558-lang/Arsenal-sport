@@ -1,6 +1,8 @@
 """SaaS foundation: Supabase Auth + multi-tenant Postgres via PostgREST."""
 
+import base64
 import copy, hashlib, json, os, re, time
+from pathlib import Path
 from collections import defaultdict, deque
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -616,6 +618,13 @@ def login_ui():
             gap: 14px;
             margin-bottom: 18px;
         }
+        .public-logo-image {
+            width: 48px;
+            height: 48px;
+            flex: 0 0 48px;
+            object-fit: contain;
+            display: block;
+        }
         .public-logo {
             width: 48px;
             height: 48px;
@@ -725,7 +734,8 @@ def login_ui():
                 gap: 11px;
                 margin-bottom: 14px;
             }
-            .public-logo {
+            .public-logo,
+            .public-logo-image {
                 width: 42px;
                 height: 42px;
                 flex-basis: 42px;
@@ -766,11 +776,22 @@ def login_ui():
     # Authentication calls below report provider failures; avoid a blocking
     # synchronous health probe while rendering the public login screen.
 
+    logo_path = Path(__file__).resolve().parent / "assets" / "shoppilot_logo.png"
+    try:
+        logo_data = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+        logo_markup = (
+            f'<img class="public-logo-image" src="data:image/png;base64,{logo_data}" '
+            'alt="ShopPilot AI">'
+        )
+    except OSError:
+        # Keep the login usable if a deployment is missing the optional brand asset.
+        logo_markup = '<div class="public-logo">SS</div>'
+
     st.markdown(
         '<div class="public-shell">'
         '<div class="public-brand">'
-        '<div class="public-logo">AI</div>'
-        '<div><div class="public-brand-name">AI Agent Content Manager</div>'
+        f'{logo_markup}'
+        '<div><div class="public-brand-name">ShopPilot AI</div>'
         '<div class="public-brand-caption">AI BUSINESS PLATFORM</div></div>'
         '</div>'
         '<div class="public-hero">'

@@ -180,7 +180,7 @@ def _max_session_cached(cache_key, ttl_seconds, loader, spinner_text=None):
     return value
 
 
-@st.dialog("⚡ AI Agent Content Manager MAX", width="large")
+@st.dialog("⚡ ShopPilot AI MAX", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
     current_revision = int(st.session_state.get("_app_data_revision", 0) or 0)
@@ -737,7 +737,7 @@ def render_max():
                         st.rerun()
 
     elif section == "Автоматизация":
-        st.subheader("🚀 Центр автоматизации AI Agent Content Manager")
+        st.subheader("🚀 Центр автоматизации ShopPilot AI")
         st.caption("Бесплатный локальный контур: массовые фото, контент, склад, план на 30 дней, массовое редактирование и аналитика.")
 
         auto_tab1, auto_tab2, auto_tab3, auto_tab4 = st.tabs(["📸 Фото", "✍️ Контент", "📦 Каталог", "📊 Аналитика"])

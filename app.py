@@ -125,7 +125,7 @@ from card_generator import generate_card
 
 # ==================== ТЕКСТЫ ====================
 def make_hashtags(name, brand, category):
-    base = ["#ai_agent_content_manager", "#спорт", "#экипировка", "#новинка"]
+    base = ["#ShopPilotAI", "#спорт", "#экипировка", "#новинка"]
     extra = {
         "Футболка": ["#футболка", "#tshirt"],
         "Кроссовки": ["#кроссовки", "#sneakers"],
@@ -149,7 +149,7 @@ def gen_instagram(p, tone):
     tags = make_hashtags(n, b, category)
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "Новая позиция в AI Agent Content Manager — " + n,
+        "Официальный": "Новая позиция в вашем магазине — " + n,
         "Дружеский": "🔥 Забирайте новинку: " + n,
         "Продающий": "🔥 " + n + " — экипировка для тех, кто выбирает по делу!"
     }
@@ -164,7 +164,7 @@ def gen_instagram(p, tone):
 
 ⚙️ {specs}
 
-📩 Напишите нам в сообщения AI Agent Content Manager — поможем подобрать размер и оформить заказ.
+📩 Напишите нам в сообщения магазина — поможем подобрать размер и оформить заказ.
 
 {tags}"""
 
@@ -177,9 +177,9 @@ def gen_telegram(p, tone):
     color = p.get('color','уточняйте')
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "🏆 Новое поступление в AI Agent Content Manager",
+        "Официальный": "🏆 Новое поступление в вашем магазине",
         "Дружеский": "🎉 Ребята, смотрите, что приехало!",
-        "Продающий": "🔥 НОВИНКА В AI AGENT CONTENT MANAGER"
+        "Продающий": "🔥 НОВИНКА В ВАШЕМ МАГАЗИНЕ"
     }
     return f"""{heads.get(tone, heads["Официальный"])}
 
@@ -292,7 +292,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         api_url = _telegram_api(token, "sendVideo")
 
         files = {
-            "video": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")
+            "video": ("shoppilot_reel.mp4", video_bytes, "video/mp4")
         }
         data = {
             "chat_id": channel,
@@ -332,7 +332,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         try:
             doc_resp = requests.post(
                 _telegram_api(token, "sendDocument"),
-                files={"document": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")},
+                files={"document": ("shoppilot_reel.mp4", video_bytes, "video/mp4")},
                 data={
                     "chat_id": channel,
                     "caption": caption,
@@ -373,7 +373,7 @@ def publish_reel_to_vk(video_bytes, caption):
         params = {
             "access_token": token,
             "v": api_version,
-            "name": "AI Agent Content Manager Reels",
+            "name": "Reels",
             "description": caption[:4096],
             "is_private": 0,
             "wallpost": 1,
@@ -412,7 +412,7 @@ def render_platform_admin():
         '<div class="dashboard-hero">'
         '<div class="dashboard-hero-kicker">PLATFORM OWNER</div>'
         '<div class="dashboard-hero-title">Админ-панель платформы</div>'
-        '<div class="dashboard-hero-text">Управление магазинами, тарифами, подписками и аккаунтами AI Agent Content Manager.</div>'
+        '<div class="dashboard-hero-text">Управление магазинами, тарифами, подписками и аккаунтами ShopPilot AI.</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -527,7 +527,7 @@ from ui.max import render_max
 
 
 # ==================== ИНТЕРФЕЙС ====================
-st.set_page_config(page_title="AI Agent Content Manager", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="ShopPilot AI", page_icon="assets/shoppilot_logo.png", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
@@ -538,6 +538,23 @@ border:1px solid #d7ff72!important;
 box-shadow:0 0 0 1px rgba(184,255,0,.55),0 0 18px rgba(184,255,0,.42)!important;
 font-weight:900!important;
 }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.sidebar-brand {padding:4px 2px 14px!important;margin:0!important}
+.sidebar-brand-title {font-size:1.48rem!important;font-weight:900!important;letter-spacing:-.04em!important;color:#f4f6ff!important;line-height:1.05!important}
+.sidebar-brand-version {font-size:.58rem!important;letter-spacing:.16em!important;font-weight:800!important;color:#9eafd5!important;margin-top:7px!important}
+.sidebar-brand-tagline {font-size:.69rem!important;color:#c3cbed!important;margin-top:9px!important;line-height:1.35!important}
+.sidebar-max {border:1px solid rgba(151,133,255,.48)!important;background:linear-gradient(135deg,#171c37,#29204b)!important;box-shadow:0 12px 30px rgba(15,17,40,.24)!important}
+.sidebar-max-kicker {color:#b7a7ff!important;letter-spacing:.15em!important}
+.sidebar-max-title {color:#fff!important}
+.sidebar-max-text {color:#c3cbed!important}
+button[key="sidebar_max"],.st-key-mobile_max_launcher button {background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important;border:1px solid #9caeff!important;box-shadow:0 7px 22px rgba(103,119,255,.22)!important}
+.main-brand-title {font-size:1.2rem;font-weight:900;letter-spacing:-.035em;color:#f4f6ff;line-height:1.1}
+.main-brand-subtitle {font-size:.58rem;letter-spacing:.12em;font-weight:750;color:#9eafd5;margin-top:5px}
+@media(max-width:768px){.main-brand-title{font-size:1.05rem}.main-brand-subtitle{font-size:.52rem;letter-spacing:.06em}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -590,10 +607,16 @@ except Exception as e:
 
 with st.sidebar:
     # MAX is intentionally the first high-visibility action.
+    st.image("assets/shoppilot_logo.png", width=54)
     st.markdown(
-        '<div class="sidebar-max"><div class="sidebar-max-kicker">AI AGENT CONTENT MANAGER</div>'
+        '<div class="sidebar-brand">'
+        '<div class="sidebar-brand-title">ShopPilot AI</div>'
+        '<div class="sidebar-brand-version">SMART COMMERCE PLATFORM</div>'
+        '<div class="sidebar-brand-tagline">Робот трудится — ты отдыхаешь</div>'
+        '</div>'
+        '<div class="sidebar-max"><div class="sidebar-max-kicker">AI POWERED</div>'
         '<div class="sidebar-max-title">⚡ MAX</div>'
-        '<div class="sidebar-max-text">Центр управления магазином</div></div>',
+        '<div class="sidebar-max-text">Интеллектуальный центр управления</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -605,15 +628,7 @@ with st.sidebar:
     _max_sidebar_launcher()
     st.markdown("---")
 
-    st.markdown(
-        '<div class="sidebar-brand">'
-        '<div class="sidebar-brand-kicker">AI AGENT</div>'
-        '<div class="sidebar-brand-title">Content Manager</div>'
-        '<div class="sidebar-brand-line"></div>'
-        '<div class="sidebar-brand-version">CONTENT STUDIO · v2.7 MAX</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+
     dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
     st.markdown("---")
 
@@ -627,7 +642,7 @@ with st.sidebar:
 
             **2. Проверьте каталог.** Перейдите в **▦ Каталог** и убедитесь, что товар появился. При необходимости откройте карточку и исправьте данные.
 
-            **3. Подготовьте контент.** В **✎ Тексты** выберите товар и нажмите **«Сгенерировать тексты»**. Проверьте результат перед использованием. Для видео откройте **▶ Видео** и следуйте подсказкам на экране.
+            **3. Подготовьте контент.** В **✎ Контент-студия** выберите товар и нажмите **«Сгенерировать тексты»**. Проверьте результат перед использованием. Для видео откройте **▶ Видео** и следуйте подсказкам на экране.
 
             ### Планирование и результаты
 
@@ -649,7 +664,7 @@ with st.sidebar:
             2. Прочитайте сообщение приложения и выполните указанное действие.
             3. Если проблема осталась, запишите название раздела и текст ошибки. Не прикладывайте пароли, ключи, токены или другие конфиденциальные данные.
 
-            **Совет:** новичку проще идти по порядку: **＋ Товар → ▦ Каталог → ✎ Тексты → ▶ Видео → ◷ План**. Чтобы открыть AI-помощника, нажмите **«⚡ Открыть MAX»** в верхней части левой панели.
+            **Совет:** новичку проще идти по порядку: **＋ Товар → ▦ Каталог → ✎ Контент-студия → ▶ Видео → ◷ План публикаций**. Чтобы открыть AI-помощника, нажмите **«⚡ Открыть MAX»** в верхней части левой панели.
             """
         )
 
@@ -776,9 +791,37 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="ai-workspace-label">AI-помощник магазина · быстрый доступ к аналитике, CRM и автоматизации</div>', unsafe_allow_html=True)
+brand_title_color = "#f4f6ff" if dark_mode else "#171a21"
+brand_subtitle_color = "#aebbd8" if dark_mode else "#596174"
+st.markdown(f"""
+<style>
+section[data-testid="stSidebar"] {{background:#080d1e!important;border-right:1px solid rgba(151,165,205,.18)!important}}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] label {{color:#dce4ff!important}}
+section[data-testid="stSidebar"] .sidebar-brand-title {{color:#f4f6ff!important}}
+section[data-testid="stSidebar"] .sidebar-brand-version {{color:#9eafd5!important}}
+section[data-testid="stSidebar"] .sidebar-brand-tagline {{color:#c3cbed!important}}
+section[data-testid="stSidebar"] .sidebar-max {{background:linear-gradient(135deg,#171c37,#29204b)!important;border-color:rgba(151,133,255,.48)!important}}
+section[data-testid="stSidebar"] .sidebar-max-kicker {{color:#b7a7ff!important}}
+section[data-testid="stSidebar"] .sidebar-max-title {{color:#fff!important}}
+section[data-testid="stSidebar"] .sidebar-max-text {{color:#c3cbed!important}}
+section[data-testid="stSidebar"] button[key="sidebar_max"] {{background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important}}
+.main-brand-title {{color:{brand_title_color}!important}}
+.main-brand-subtitle {{color:{brand_subtitle_color}!important}}
+</style>
+""", unsafe_allow_html=True)
 
-st.markdown('<p class="main-title">AI AGENT CONTENT MANAGER</p><div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
+brand_logo_col, brand_title_col = st.columns([0.075, 0.925])
+with brand_logo_col:
+    st.image("assets/shoppilot_logo.png", width=42)
+with brand_title_col:
+    st.markdown(
+        '<div class="main-brand-title">ShopPilot AI</div>'
+        '<div class="main-brand-subtitle">SMART COMMERCE PLATFORM · РОБОТ ТРУДИТСЯ — ТЫ ОТДЫХАЕШЬ</div>',
+        unsafe_allow_html=True,
+    )
+st.markdown('<div class="mobile-nav-hint">Разделы · листайте меню влево и вправо</div>', unsafe_allow_html=True)
 
 # Mobile/tablet fallback: MAX remains reachable even if the native sidebar drawer is closed.
 with st.container(key="mobile_max_launcher"):
@@ -787,8 +830,8 @@ with st.container(key="mobile_max_launcher"):
         render_max()
 
 base_tab_labels = [
-    "⌂ Главная", "＋ Товар", "▦ Каталог", "✎ Тексты", "▶ Видео",
-    "◷ План", "◉ Аналитика", "⚙ Настройки", "🧠 Центр", "⚖ Правовая"
+    "⌂ Обзор", "＋ Товар", "▦ Каталог", "✎ Контент-студия", "▶ Видео",
+    "◷ План публикаций", "◉ Аналитика", "⚙ Настройки", "🧠 Центр", "⚖ Правовая"
 ]
 _is_platform_admin = platform_admin_enabled()
 tab_labels = (["♛ АДМИН"] + base_tab_labels) if _is_platform_admin else base_tab_labels
@@ -1233,7 +1276,7 @@ if tab4.open:
 🎙️ "Размеры: {p.get('sizes','уточняйте')}. Цвет: {p.get('color','уточняйте')}"
 
 [25-30 сек] CTA
-📹 Логотип AI Agent Content Manager
+📹 Логотип ShopPilot AI
 💬 "Заказывайте!"
 🎙️ "Ссылка в шапке профиля!"
 
@@ -1640,7 +1683,7 @@ SETTINGS_FILE = Path("settings.json")
 DEFAULT_SETTINGS = {
     "language": "Русский",
     "onboarding_complete": True,
-    "store_name": "AI Agent Content Manager",
+    "store_name": "Мой магазин",
     "city": "Краснодар",
     "delivery": "По России",
     "telegram": "",
@@ -1654,9 +1697,9 @@ DEFAULT_SETTINGS = {
     "return_policy": "Возврат и обмен — по действующим правилам магазина.",
     "delivery_methods": "Самовывоз, доставка по Краснодару, отправка по России",
     "delivery_terms": "",
-    "content_signature": "AI Agent Content Manager — спортивная одежда, обувь и экипировка",
+    "content_signature": "Мой магазин — спортивная одежда, обувь и экипировка",
     "cta": "Напишите нам — поможем выбрать товар и оформить заказ.",
-    "hashtags": "#ai_agent_content_manager #спорт #экипировка",
+    "hashtags": "#shoppilotai #спорт #экипировка",
     "ai_seller_instructions": "Отвечай дружелюбно и по делу. Уточняй товар, размер и город. Не придумывай наличие, цену или характеристики.",
     "notification_contact": "",
     "card_template": "Dark Premium",
