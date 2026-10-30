@@ -16,7 +16,7 @@ on:
 permissions:
   contents: read
 
-# Serialize runs per ref; a PR validation must never cancel a main deployment.
+# Separate refs: PR validation cannot cancel a main deployment.
 concurrency:
   group: shoppilot-pages-${{ github.ref }}
   cancel-in-progress: false
@@ -46,14 +46,15 @@ jobs:
             echo "::error::Symbolic links are not allowed in the preview artifact."
             exit 1
           fi
-          if grep -RInE --include='*.html' --include='*.css' --include='*.js' '(https?://|url\([[:space:]]*['"'"'"]?//|@import[[:space:]]+url\()' design-preview; then
-            echo "::error::External resource reference found in shipped preview assets."
+          # Scan every shipped regular file, including .mjs and future asset types.
+          if find design-preview -type f -print0 | xargs -0 grep -IInE 'https?://|url\([[:space:]]*["'"'"'"]?//' ; then
+            echo "::error::External URL reference found in shipped preview assets."
             exit 1
           fi
 
   deploy:
-    name: Deploy isolated static preview
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    name: Deploy isolated static preview
     needs: validate
     runs-on: ubuntu-latest
     permissions:
