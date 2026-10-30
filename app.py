@@ -17,6 +17,7 @@ from p3_suite import (create_notification, notifications, mark_notification_read
 from ui.catalog import render_catalog
 from ui.dashboard import render_dashboard
 from ui.navigation import apply_workspace_navigation_styles
+from ui.visual_system import apply_shoppilot_visual_system
 from ui.settings import render_settings
 from ui.legal import render_legal
 from production_ops import observability_snapshot, provider_health
@@ -606,90 +607,92 @@ except Exception as e:
 
 
 with st.sidebar:
-    # MAX is intentionally the first high-visibility action.
-    st.image("assets/shoppilot_logo.png", width=54)
-    st.markdown(
-        '<div class="sidebar-brand">'
-        '<div class="sidebar-brand-title">ShopPilot AI</div>'
-        '<div class="sidebar-brand-version">SMART COMMERCE PLATFORM</div>'
-        '<div class="sidebar-brand-tagline">Робот трудится — ты отдыхаешь</div>'
-        '</div>'
-        '<div class="sidebar-max"><div class="sidebar-max-kicker">AI POWERED</div>'
-        '<div class="sidebar-max-title">⚡ MAX</div>'
-        '<div class="sidebar-max-text">Интеллектуальный центр управления</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    def _max_sidebar_launcher():
-        if st.button("⚡ Открыть MAX", width="stretch", type="primary", key="sidebar_max"):
-            st.session_state["open_max"] = True
-            render_max()
-
-    _max_sidebar_launcher()
-    st.markdown("---")
-
-
-    dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
-    st.markdown("---")
-
-    # Short, customer-facing help; do not expose configuration or secret values.
-    with st.expander("📘 Как пользоваться приложением", expanded=False):
+    # Branded sidebar layout: visual grouping only; existing controls and handlers remain intact.
+    with st.container(key="sidebar_identity"):
+        st.image("assets/shoppilot_logo.png", width=54)
         st.markdown(
-            """
-            ### Начните с трёх шагов
-
-            **1. Добавьте товар.** Откройте **＋ Товар**, загрузите фотографию, укажите название и заполните известные характеристики. Сохраните карточку.
-
-            **2. Проверьте каталог.** Перейдите в **▦ Каталог** и убедитесь, что товар появился. При необходимости откройте карточку и исправьте данные.
-
-            **3. Подготовьте контент.** В **✎ Контент-студия** выберите товар и нажмите **«Сгенерировать тексты»**. Проверьте результат перед использованием. Для видео откройте **▶ Видео** и следуйте подсказкам на экране.
-
-            ### Планирование и результаты
-
-            - **◷ План** — создавайте и отслеживайте задачи контента. Если список пуст, сначала добавьте товары.
-            - **◉ Аналитика** — изучайте показатели по данным, которые доступны для вашего магазина.
-            - **🧠 Центр** — дополнительные инструменты и рекомендации.
-            - **⚙ Настройки** — параметры магазина и доступные подключения.
-            - **⚖ Правовая** — правовая информация сервиса.
-
-            ### Публикация в соцсетях
-
-            Созданный текст или ролик **не означает, что публикация уже отправлена**. Перед публикацией проверьте содержимое и выбранную площадку. Автоматическая отправка доступна только для поддерживаемых и настроенных подключений; следуйте подсказкам приложения.
-
-            Не отправляйте другим людям пароли, ключи доступа, коды подтверждения или содержимое технических настроек. Если подключение не работает, откройте **⚙ Настройки** и проверьте его статус, не публикуя секретные данные в чате.
-
-            ### Если возникла проблема
-
-            1. Проверьте, что открыт нужный магазин и сохранены изменения.
-            2. Прочитайте сообщение приложения и выполните указанное действие.
-            3. Если проблема осталась, запишите название раздела и текст ошибки. Не прикладывайте пароли, ключи, токены или другие конфиденциальные данные.
-
-            **Совет:** новичку проще идти по порядку: **＋ Товар → ▦ Каталог → ✎ Контент-студия → ▶ Видео → ◷ План публикаций**. Чтобы открыть AI-помощника, нажмите **«⚡ Открыть MAX»** в верхней части левой панели.
-            """
+            '<div class="sidebar-brand">'
+            '<div class="sidebar-brand-title">ShopPilot AI</div>'
+            '<div class="sidebar-brand-version">SMART COMMERCE PLATFORM</div>'
+            '<div class="sidebar-brand-tagline">Робот трудится — ты отдыхаешь</div>'
+            '</div>',
+            unsafe_allow_html=True,
         )
 
-    # Useful store snapshot stays near the top; account controls move below Telegram.
-    render_sidebar_overview()
-
-    # Display the Telegram value saved for this tenant, never the platform-wide
-    # TELEGRAM_CHANNEL secret. A saved username is configuration, not proof that
-    # a bot/channel integration is connected.
-    try:
-        _tenant_settings = data_load_sidebar_settings()
-        _tenant_settings = (
-            _tenant_settings[0]
-            if _tenant_settings and isinstance(_tenant_settings[0], dict)
-            else {}
+    with st.container(key="sidebar_max_card"):
+        st.markdown(
+            '<div class="sidebar-max"><div class="sidebar-max-kicker">AI POWERED</div>'
+            '<div class="sidebar-max-title">⚡ MAX</div>'
+            '<div class="sidebar-max-text">Интеллектуальный центр управления</div></div>',
+            unsafe_allow_html=True,
         )
-        _tenant_telegram = str(_tenant_settings.get("telegram") or "").strip()
-        if _tenant_telegram:
-            st.info(f"📡 Telegram магазина: {_tenant_telegram}")
-        else:
+
+        def _max_sidebar_launcher():
+            if st.button("⚡ Открыть MAX", width="stretch", type="primary", key="sidebar_max"):
+                st.session_state["open_max"] = True
+                render_max()
+
+        _max_sidebar_launcher()
+
+    with st.container(key="sidebar_preferences"):
+        dark_mode = st.toggle("🌙 Тёмная тема", value=True, key="theme_toggle")
+
+        # Short, customer-facing help; do not expose configuration or secret values.
+        with st.expander("📘 Как пользоваться приложением", expanded=False):
+            st.markdown(
+                """
+                ### Начните с трёх шагов
+
+                **1. Добавьте товар.** Откройте **＋ Товар**, загрузите фотографию, укажите название и заполните известные характеристики. Сохраните карточку.
+
+                **2. Проверьте каталог.** Перейдите в **▦ Каталог** и убедитесь, что товар появился. При необходимости откройте карточку и исправьте данные.
+
+                **3. Подготовьте контент.** В **✎ Контент-студия** выберите товар и нажмите **«Сгенерировать тексты»**. Проверьте результат перед использованием. Для видео откройте **▶ Видео** и следуйте подсказкам на экране.
+
+                ### Планирование и результаты
+
+                - **◷ План** — создавайте и отслеживайте задачи контента. Если список пуст, сначала добавьте товары.
+                - **◉ Аналитика** — изучайте показатели по данным, которые доступны для вашего магазина.
+                - **🧠 Центр** — дополнительные инструменты и рекомендации.
+                - **⚙ Настройки** — параметры магазина и доступные подключения.
+                - **⚖ Правовая** — правовая информация сервиса.
+
+                ### Публикация в соцсетях
+
+                Созданный текст или ролик **не означает, что публикация уже отправлена**. Перед публикацией проверьте содержимое и выбранную площадку. Автоматическая отправка доступна только для поддерживаемых и настроенных подключений; следуйте подсказкам приложения.
+
+                Не отправляйте другим людям пароли, ключи доступа, коды подтверждения или содержимое технических настроек. Если подключение не работает, откройте **⚙ Настройки** и проверьте его статус, не публикуя секретные данные в чате.
+
+                ### Если возникла проблема
+
+                1. Проверьте, что открыт нужный магазин и сохранены изменения.
+                2. Прочитайте сообщение приложения и выполните указанное действие.
+                3. Если проблема осталась, запишите название раздела и текст ошибки. Не прикладывайте пароли, ключи, токены или другие конфиденциальные данные.
+
+                **Совет:** новичку проще идти по порядку: **＋ Товар → ▦ Каталог → ✎ Контент-студия → ▶ Видео → ◷ План публикаций**. Чтобы открыть AI-помощника, нажмите **«⚡ Открыть MAX»** в верхней части левой панели.
+                """
+            )
+
+    with st.container(key="sidebar_store_context"):
+        # Live store snapshot and tenant-scoped Telegram status.
+        render_sidebar_overview()
+        try:
+            _tenant_settings = data_load_sidebar_settings()
+            _tenant_settings = (
+                _tenant_settings[0]
+                if _tenant_settings and isinstance(_tenant_settings[0], dict)
+                else {}
+            )
+            _tenant_telegram = str(_tenant_settings.get("telegram") or "").strip()
+            if _tenant_telegram:
+                st.info(f"📡 Telegram магазина: {_tenant_telegram}")
+            else:
+                st.info("📡 Telegram магазина не указан")
+        except Exception:
             st.info("📡 Telegram магазина не указан")
-    except Exception:
-        st.info("📡 Telegram магазина не указан")
 
-    render_account_bar()
+    with st.container(key="sidebar_account"):
+        render_account_bar()
 
 
 
@@ -778,6 +781,34 @@ div[data-testid="stDialog"] [role="dialog"]{display:block!important;position:rel
 .sidebar-quick-grid b{display:block;font-size:1.05rem;line-height:1;color:#171a21;}
 .sidebar-quick-grid span{display:block;margin-top:3px;font-size:.62rem;color:#727a89;}
 .sidebar-quick-note{margin-top:9px;font-size:.62rem;line-height:1.35;color:#727a89;}
+/* ShopPilot sidebar snapshot: match the dark Command Center surface. */
+section[data-testid="stSidebar"] .sidebar-quick-overview {
+    background: linear-gradient(145deg, #111a33 0%, #1b2140 100%) !important;
+    border: 1px solid rgba(151, 133, 255, .42) !important;
+    box-shadow: 0 10px 26px rgba(4, 8, 22, .28) !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-kicker {
+    color: #b7a7ff !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-title {
+    color: #f4f6ff !important;
+    font-size: 1.02rem !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid > div {
+    background: rgba(255, 255, 255, .055) !important;
+    border: 1px solid rgba(174, 187, 216, .2) !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid b {
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] .sidebar-quick-grid span,
+section[data-testid="stSidebar"] .sidebar-quick-note {
+    color: #c3cbed !important;
+    opacity: 1 !important;
+}
 
 .stButton>button{border-radius:12px;border:1px solid #303747;background:#171c26;color:#f5f7fa;font-weight:700;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease;}.stButton>button:hover{transform:translateY(-1px);border-color:#5b5ce2;box-shadow:0 8px 20px rgba(30,35,55,.14);}button[kind="primary"]{background:linear-gradient(135deg,#756be8,#897dff)!important;border:0!important;color:#fff!important;box-shadow:0 8px 22px rgba(91,92,226,.22)!important;}button[kind="primary"]:hover{box-shadow:0 11px 28px rgba(91,92,226,.30)!important;}
 div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5px;border-radius:14px;border:1px solid transparent!important;display:flex!important;visibility:visible!important;opacity:1!important;}button[data-baseweb="tab"]{border-radius:10px;color:#252b3a!important;font-weight:800;visibility:visible!important;opacity:1!important;min-height:40px;background:transparent!important;border-color:transparent!important;}button[data-baseweb="tab"] *{color:#252b3a!important;opacity:1!important;}button[data-baseweb="tab"][aria-selected="true"]{background:transparent!important;color:#4c1d95!important;border-color:transparent!important;}button[data-baseweb="tab"][aria-selected="true"] *{color:#4c1d95!important;opacity:1!important;}
@@ -807,10 +838,85 @@ section[data-testid="stSidebar"] .sidebar-max-kicker {{color:#b7a7ff!important}}
 section[data-testid="stSidebar"] .sidebar-max-title {{color:#fff!important}}
 section[data-testid="stSidebar"] .sidebar-max-text {{color:#c3cbed!important}}
 section[data-testid="stSidebar"] button[key="sidebar_max"] {{background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important}}
+/* Unified premium ShopPilot sidebar, persistent in both app themes. */
+section[data-testid="stSidebar"] {{background:radial-gradient(ellipse at 15% 0%,rgba(86,105,196,.18),transparent 42%),linear-gradient(180deg,#080d1e 0%,#0c142b 55%,#080d1e 100%)!important;border-right:1px solid rgba(151,165,205,.2)!important}}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {{color:#dce4ff!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_identity {{padding:10px 10px 14px!important;border-bottom:1px solid rgba(151,165,205,.16)!important;margin-bottom:12px!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_identity img {{filter:drop-shadow(0 8px 18px rgba(92,117,255,.24))}}
+section[data-testid="stSidebar"] .sidebar-brand-title {{font-size:1.55rem!important;letter-spacing:-.045em!important;color:#f7f8ff!important}}
+section[data-testid="stSidebar"] .sidebar-brand-version {{color:#9eafd5!important;letter-spacing:.14em!important}}
+section[data-testid="stSidebar"] .sidebar-brand-tagline {{color:#c3cbed!important;font-size:.72rem!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_max_card {{padding:0 2px 13px!important;border-bottom:1px solid rgba(151,165,205,.16)!important;margin-bottom:12px!important}}
+section[data-testid="stSidebar"] .sidebar-max {{padding:15px!important;border-radius:17px!important;background:linear-gradient(145deg,rgba(44,54,104,.72),rgba(22,28,61,.96))!important;border:1px solid rgba(151,133,255,.42)!important;box-shadow:0 14px 32px rgba(0,0,0,.2)!important}}
+section[data-testid="stSidebar"] .sidebar-max-kicker {{color:#b7a7ff!important;font-size:.62rem!important;letter-spacing:.17em!important}}
+section[data-testid="stSidebar"] .sidebar-max-title {{color:#fff!important;font-size:1.34rem!important}}
+section[data-testid="stSidebar"] .sidebar-max-text {{color:#c3cbed!important}}
+section[data-testid="stSidebar"] button[key="sidebar_max"] {{min-height:44px!important;border-radius:12px!important;background:linear-gradient(105deg,#79c9ff,#9a83ff)!important;color:#091128!important;border:1px solid rgba(198,205,255,.55)!important;box-shadow:0 8px 20px rgba(89,105,230,.22)!important;font-weight:850!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_preferences {{padding:0 4px 13px!important;border-bottom:1px solid rgba(151,165,205,.16)!important;margin-bottom:12px!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"] {{border:1px solid rgba(151,165,205,.2)!important;border-radius:13px!important;background:rgba(255,255,255,.035)!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"] summary,
+section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"] details {{color:#e1e7ff!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_store_context {{padding:0 2px 13px!important;border-bottom:1px solid rgba(151,165,205,.16)!important;margin-bottom:12px!important}}
+section[data-testid="stSidebar"] .sidebar-quick-overview {{background:linear-gradient(145deg,#111a33 0%,#1b2140 100%)!important;border:1px solid rgba(151,133,255,.42)!important;box-shadow:0 10px 26px rgba(4,8,22,.28)!important}}
+section[data-testid="stSidebar"] .sidebar-quick-kicker {{color:#b7a7ff!important;opacity:1!important}}
+section[data-testid="stSidebar"] .sidebar-quick-title {{color:#f4f6ff!important;font-size:1.02rem!important;opacity:1!important}}
+section[data-testid="stSidebar"] .sidebar-quick-grid > div {{background:rgba(255,255,255,.055)!important;border:1px solid rgba(174,187,216,.2)!important}}
+section[data-testid="stSidebar"] .sidebar-quick-grid b {{color:#fff!important;opacity:1!important}}
+section[data-testid="stSidebar"] .sidebar-quick-grid span,
+section[data-testid="stSidebar"] .sidebar-quick-note {{color:#c3cbed!important;opacity:1!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] {{background:rgba(36,49,91,.55)!important;border:1px solid rgba(133,157,255,.24)!important;border-radius:12px!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] * {{color:#dce4ff!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_account {{padding:0 4px 10px!important}}
+section[data-testid="stSidebar"] .st-key-sidebar_account button {{border-radius:11px!important}}
+section[data-testid="stSidebar"] [data-testid="stToggle"] label,
+section[data-testid="stSidebar"] [data-baseweb="checkbox"] label {{color:#dce4ff!important;text-shadow:none!important}}
+section[data-testid="stSidebar"] hr {{border-color:rgba(151,165,205,.18)!important}}
+@media(max-width:768px) {{
+ section[data-testid="stSidebar"] .st-key-sidebar_identity {{padding:7px 8px 11px!important}}
+ section[data-testid="stSidebar"] .sidebar-brand-title {{font-size:1.42rem!important}}
+ section[data-testid="stSidebar"] .sidebar-max {{padding:12px!important}}
+ section[data-testid="stSidebar"] .st-key-sidebar_store_context {{padding-bottom:10px!important}}
+}}
 .main-brand-title {{color:{brand_title_color}!important}}
 .main-brand-subtitle {{color:{brand_subtitle_color}!important}}
 </style>
 """, unsafe_allow_html=True)
+
+# Restore readable light surfaces when the user disables the dark Command Center.
+if not dark_mode:
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {background:linear-gradient(180deg,#fff 0%,#f4f6fb 100%) !important;border-right:1px solid #e1e6ef !important;}
+        section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {color:#20283a !important;}
+        section[data-testid="stSidebar"] .sidebar-brand-title,
+        section[data-testid="stSidebar"] .sidebar-quick-title,
+        section[data-testid="stSidebar"] .sidebar-max-title,
+        section[data-testid="stSidebar"] .sidebar-quick-grid b {color:#20283a !important;}
+        section[data-testid="stSidebar"] .sidebar-brand-version,
+        section[data-testid="stSidebar"] .sidebar-brand-tagline,
+        section[data-testid="stSidebar"] .sidebar-max-text,
+        section[data-testid="stSidebar"] .sidebar-max-kicker,
+        section[data-testid="stSidebar"] .sidebar-quick-kicker,
+        section[data-testid="stSidebar"] .sidebar-quick-grid span,
+        section[data-testid="stSidebar"] .sidebar-quick-note {color:#596579 !important;}
+        section[data-testid="stSidebar"] .sidebar-max,
+        section[data-testid="stSidebar"] .sidebar-quick-overview {background:linear-gradient(145deg,#fff,#f0f3fa) !important;border:1px solid #dce3ee !important;box-shadow:0 8px 22px rgba(25,31,45,.06) !important;}
+        section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"],
+        section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] {background:#f5f7fb !important;border-color:#dce3ee !important;}
+        section[data-testid="stSidebar"] .st-key-sidebar_preferences [data-testid="stExpander"] *,
+        section[data-testid="stSidebar"] .st-key-sidebar_store_context [data-testid="stAlert"] * {color:#20283a !important;}
+        section[data-testid="stSidebar"] hr {border-color:#e1e6ef !important;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 brand_logo_col, brand_title_col = st.columns([0.075, 0.925])
 with brand_logo_col:
@@ -856,6 +962,7 @@ button[aria-label*="Прокрут"] {
 """, unsafe_allow_html=True)
 
 apply_workspace_navigation_styles(st)
+apply_shoppilot_visual_system(st, dark_mode=dark_mode)
 _tabs = list(st.tabs(tab_labels, on_change="rerun", key="main_workspace_tabs"))
 
 # Streamlit's AppTest has had tab-collection edge cases across releases.

@@ -11,170 +11,23 @@ def _safe_tenant_label(value):
 
 
 def _apply_client_first_layout():
-    """Tighten global layout without changing application behavior."""
+    """Apply spacing only; the shared visual system owns all dashboard styling."""
     st.markdown(
         """
         <style>
-        /* Client-first layout: reduce dead space and establish a clear top edge. */
-        .block-container {
-            padding-top: 1.05rem !important;
-            padding-bottom: 2rem !important;
-        }
-        section[data-testid="stSidebar"] > div:first-child {
-            padding-top: .85rem !important;
-        }
-        section[data-testid="stSidebar"] .block-container {
-            padding-top: .75rem !important;
-        }
-        .main-title {
-            margin-top: 4px !important;
-            margin-bottom: 8px !important;
-        }
-        .dashboard-hero {
-            margin-top: 0 !important;
-        }
-        .owner-guide-card {
-            margin: 0 0 14px !important;
-            padding: 15px 18px !important;
-            border: 1px solid #e2e5ee !important;
-            border-radius: 16px !important;
-            background: linear-gradient(135deg, #ffffff 0%, #f7f7ff 100%) !important;
-            box-shadow: 0 6px 22px rgba(37, 31, 82, .05) !important;
-        }
-        .owner-guide-kicker { font-size: .68rem !important; font-weight: 900 !important; letter-spacing: .12em !important; color: #5b4bd6 !important; margin-bottom: 4px !important; }
-        .owner-guide-title { font-size: 1rem !important; font-weight: 850 !important; color: #21164d !important; margin-bottom: 10px !important; }
-        .owner-guide-grid { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
-        .owner-guide-grid > div { padding: 9px 10px !important; border-radius: 11px !important; background: rgba(255,255,255,.78) !important; border: 1px solid #e8e9f1 !important; }
-        .owner-guide-grid b { display: block !important; font-size: .76rem !important; color: #26203f !important; margin-bottom: 2px !important; }
-        .owner-guide-grid span { display: block !important; font-size: .7rem !important; line-height: 1.35 !important; color: #6b7280 !important; }
-        .owner-guide-note { margin-top: 9px !important; font-size: .72rem !important; line-height: 1.4 !important; color: #697386 !important; }
-        /* ShopPilot command-center treatment. Data and actions remain native Streamlit. */
-        .dashboard-hero { min-height: 300px !important; display:flex !important; flex-direction:column !important; justify-content:center !important; padding:30px 26px !important; }
-        .dashboard-hero-title { font-size:clamp(2rem,3.4vw,3.35rem) !important; line-height:1.02 !important; margin-top:18px !important; }
-        .dashboard-hero-gradient { background:linear-gradient(90deg,#67d5ff,#8290ff,#c18cff); -webkit-background-clip:text; background-clip:text; color:transparent !important; }
-        .dashboard-hero-text { margin-top:16px !important; max-width:440px !important; }
-        .st-key-shoppilot_hero_art { height:100% !important; min-height:300px !important; display:flex !important; align-items:center !important; justify-content:center !important; }
-        .st-key-shoppilot_hero_art img { max-height:330px !important; width:100% !important; object-fit:cover !important; border-radius:18px !important; border:1px solid rgba(145,164,255,.25) !important; }
-        @media(max-width:768px){ .dashboard-hero{min-height:0!important;padding:23px 19px!important}.dashboard-hero-title{font-size:2.1rem!important}.st-key-shoppilot_hero_art{min-height:0!important}.st-key-shoppilot_hero_art img{max-height:230px!important} }
-
-        .dashboard-hero {
-            position: relative !important;
-            isolation: isolate !important;
-            overflow: hidden !important;
-            padding: 28px 30px !important;
-            min-height: 176px !important;
-            border: 1px solid rgba(145, 164, 255, .34) !important;
-            border-radius: 22px !important;
-            background:
-                radial-gradient(circle at 88% 18%, rgba(144, 115, 255, .28), transparent 29%),
-                radial-gradient(circle at 68% 100%, rgba(83, 155, 255, .16), transparent 34%),
-                linear-gradient(118deg, #0a1020 0%, #121d3a 58%, #211a3e 100%) !important;
-            box-shadow: 0 18px 46px rgba(10, 14, 29, .18) !important;
-        }
-        .dashboard-hero::after {
-            content: "";
-            position: absolute;
-            z-index: -1;
-            width: 190px;
-            height: 190px;
-            right: 7%;
-            top: -76px;
-            border: 1px solid rgba(178, 191, 255, .15);
-            border-radius: 50%;
-            box-shadow: 0 0 0 22px rgba(178, 191, 255, .035), 0 0 0 48px rgba(178, 191, 255, .025);
-            pointer-events: none;
-        }
-        .dashboard-hero-kicker {
-            color: #b9c8ff !important;
-            font-size: .66rem !important;
-            letter-spacing: .18em !important;
-            font-weight: 850 !important;
-        }
-        .dashboard-hero-title {
-            color: #f7f8ff !important;
-            font-size: clamp(1.65rem, 3vw, 2.45rem) !important;
-            font-weight: 900 !important;
-            letter-spacing: -.045em !important;
-            line-height: 1.08 !important;
-        }
-        .dashboard-hero-text {
-            color: #c0cbe5 !important;
-            max-width: 760px !important;
-            font-size: .94rem !important;
-            line-height: 1.55 !important;
-        }
-        .owner-guide-card {
-            border-color: #dce2f1 !important;
-            background: linear-gradient(135deg, #ffffff 0%, #f5f6ff 100%) !important;
-        }
-        .owner-guide-grid > div {
-            transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
-        }
-        .owner-guide-grid > div:hover {
-            transform: translateY(-2px);
-            border-color: #b8c5f5 !important;
-            box-shadow: 0 8px 20px rgba(44, 58, 110, .07);
-        }
-        @media (max-width: 768px) {
-            .dashboard-hero { min-height: 0 !important; padding: 21px 19px !important; border-radius: 18px !important; }
-            .dashboard-hero::after { right: -90px; top: -100px; }
-            .dashboard-hero-title { font-size: 1.55rem !important; }
-            .dashboard-hero-text { font-size: .86rem !important; max-width: 100% !important; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .owner-guide-grid > div { transition: none !important; }
-            .owner-guide-grid > div:hover { transform: none !important; }
-        }
-        /* Keep the main navigation close to the product heading. */
-        div[data-baseweb="tab-list"] {
-            margin-top: 0 !important;
-            margin-bottom: 10px !important;
-        }
-        /* Dialog: content should start near the title, not deep below it. */
-        div[data-testid="stDialog"] [role="dialog"] {
-            padding-top: 10px !important;
-        }
+        .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; }
+        section[data-testid="stSidebar"] > div:first-child { padding-top: .85rem !important; }
+        .main-title { margin-top: 4px !important; margin-bottom: 8px !important; }
+        div[data-baseweb="tab-list"] { margin-top: 0 !important; margin-bottom: 10px !important; }
+        div[data-testid="stDialog"] [role="dialog"] { padding-top: 10px !important; }
         div[data-testid="stDialog"] [role="dialog"] .block-container {
-            padding-top: .25rem !important;
-            padding-bottom: 1.25rem !important;
+            padding-top: .25rem !important; padding-bottom: 1.25rem !important;
         }
-        div[data-testid="stDialog"] [role="dialog"] .max-ai-plan {
-            margin-top: 4px !important;
-        }
-        /* Sidebar hierarchy: brand -> MAX -> status, with no artificial air. */
-        section[data-testid="stSidebar"] .sidebar-brand {
-            margin-top: 0 !important;
-            margin-bottom: 3px !important;
-            padding-top: 0 !important;
-        }
-        section[data-testid="stSidebar"] .sidebar-max {
-            margin-top: 0 !important;
-            margin-bottom: 7px !important;
-        }
-        @media (max-width: 768px) {
-            .block-container {
-                padding-top: .55rem !important;
-                padding-bottom: 1.25rem !important;
-            }
-            section[data-testid="stSidebar"] > div:first-child {
-                padding-top: .55rem !important;
-            }
-            .main-title {
-                margin-top: 2px !important;
-                margin-bottom: 6px !important;
-            }
-            .owner-guide-card { margin-bottom: 10px !important; padding: 12px 13px !important; }
-            .owner-guide-title { font-size: .92rem !important; margin-bottom: 8px !important; }
-            .owner-guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px !important; }
-            .owner-guide-grid > div { padding: 8px !important; }
-            .owner-guide-grid span { font-size: .68rem !important; }
-            .owner-guide-note { font-size: .69rem !important; margin-top: 8px !important; }
-            div[data-baseweb="tab-list"] {
-                margin-bottom: 7px !important;
-            }
-            div[data-testid="stDialog"] [role="dialog"] {
-                padding-top: 6px !important;
-            }
+        @media(max-width:768px) {
+            .block-container { padding-top: .55rem !important; padding-bottom: 1.25rem !important; }
+            section[data-testid="stSidebar"] > div:first-child { padding-top: .55rem !important; }
+            .main-title { margin-top: 2px !important; margin-bottom: 6px !important; }
+            div[data-baseweb="tab-list"] { margin-bottom: 7px !important; }
         }
         </style>
         """,
@@ -283,36 +136,23 @@ def render_dashboard(
     except Exception:
         ai_next = []
     
-    hero_copy, hero_art = st.columns([1.08, 0.92], gap="small")
-    with hero_copy:
-        st.markdown(
-            '<div class="dashboard-hero">'
-            '<div class="dashboard-hero-kicker">SHOPPILOT AI · SMART COMMERCE PLATFORM</div>'
-            '<div class="dashboard-hero-title">Робот трудится —<br><span class="dashboard-hero-gradient">ты отдыхаешь.</span></div>'
-            '<div class="dashboard-hero-text">Твой магазин. Твои каналы. Один интеллектуальный центр управления.</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with hero_art:
-        with st.container(key="shoppilot_hero_art"):
-            st.image("assets/shoppilot_robot.jpg", width="stretch")
-    st.caption(f"Рабочее пространство: {safe_store_name}")
+    # One integrated hero surface: copy and robot image share the same banner.
+    with st.container(key="dashboard_hero_shell"):
+        hero_copy, hero_art = st.columns([1.08, 0.92], gap="small", vertical_alignment="center")
+        with hero_copy:
+            st.markdown(
+                '<div class="dashboard-hero">'
+                '<div class="dashboard-hero-kicker">SHOPPILOT AI · SMART COMMERCE PLATFORM</div>'
+                '<div class="dashboard-hero-title">Робот трудится —<br><span class="dashboard-hero-gradient">ты отдыхаешь.</span></div>'
+                '<div class="dashboard-hero-text">Твой магазин. Твои каналы. Один интеллектуальный центр управления.</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        with hero_art:
+            with st.container(key="shoppilot_hero_art"):
+                st.image("assets/shoppilot_robot.jpg", width="stretch")
 
     
-    st.markdown(
-        '<div class="owner-guide-card">'
-        '<div class="owner-guide-kicker">КАК РАБОТАЕТ ПЛАТФОРМА</div>'
-        '<div class="owner-guide-title">Один рабочий центр вместо десятка разрозненных инструментов</div>'
-        '<div class="owner-guide-grid">'
-        '<div><b>1 · Каталог</b><span>Товары, остатки и карточки в одном месте.</span></div>'
-        '<div><b>2 · Контент</b><span>Тексты, Reels и контент-план без ручной рутины.</span></div>'
-        '<div><b>3 · Продажи</b><span>CRM, заявки и заказы связаны с магазином.</span></div>'
-        '<div><b>4 · AI</b><span>MAX анализирует данные и предлагает следующий шаг.</span></div>'
-        '</div>'
-        '<div class="owner-guide-note">Вы управляете бизнесом, а платформа берёт на себя повторяющиеся операции и помогает принимать решения.</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
     
     if first_run:
         st.markdown(
@@ -354,12 +194,12 @@ def render_dashboard(
                         except Exception as e:
                             st.error(f"Не удалось создать товар: {e}")
     else:
-        d1, d2, d3, d4, d5 = st.columns(5)
-        d1.metric("Продажи", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
-        d2.metric("Заявки", crm.get("total", 0))
-        d3.metric("Заказы", om.get("total", 0))
-        d4.metric("Конверсия", f'{cm["conversion"]:.1f}%')
-        d5.metric("Товаров", products_total)
+        st.markdown("### Панель управления")
+        d1, d2, d3, d4 = st.columns(4)
+        d1.metric("Товары", products_total, "В каталоге магазина")
+        d2.metric("Контент", wm.get("total", 0), "Материалов в плане")
+        d3.metric("Заявки", crm.get("total", 0), "Всего обращений")
+        d4.metric("Заказы", om.get("total", 0), "Всего заказов")
     
         q1, q2, q3 = st.columns(3)
         with q1:
@@ -376,6 +216,21 @@ def render_dashboard(
             st.markdown("### Состояние")
             st.write(f"Каталог: **{products_total}** товаров")
             st.write(f"Заявки: **{crm.get('total',0)}** · Заказы: **{om.get('total',0)}**")
+    
+    st.markdown(
+        '<div class="owner-guide-card">'
+        '<div class="owner-guide-kicker">КАК РАБОТАЕТ ПЛАТФОРМА</div>'
+        '<div class="owner-guide-title">Один рабочий центр вместо десятка разрозненных инструментов</div>'
+        '<div class="owner-guide-grid">'
+        '<div><b>1 · Каталог</b><span>Товары, остатки и карточки в одном месте.</span></div>'
+        '<div><b>2 · Контент</b><span>Тексты, Reels и контент-план без ручной рутины.</span></div>'
+        '<div><b>3 · Продажи</b><span>CRM, заявки и заказы связаны с магазином.</span></div>'
+        '<div><b>4 · AI</b><span>MAX анализирует данные и предлагает следующий шаг.</span></div>'
+        '</div>'
+        '<div class="owner-guide-note">Вы управляете бизнесом, а платформа берёт на себя повторяющиеся операции и помогает принимать решения.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     
     st.markdown("---")
     left, right = st.columns(2)
@@ -407,6 +262,9 @@ def render_dashboard(
     a, b = st.columns(2)
     with a:
         st.markdown("### Продажи")
+        sales_kpi, conversion_kpi = st.columns(2)
+        sales_kpi.metric("Сумма заказов", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
+        conversion_kpi.metric("Конверсия", f'{cm["conversion"]:.1f}%')
         st.write(f'Активных заказов: **{om["active"]}**')
         st.write(f'Завершённых заказов: **{om["completed"]}**')
         st.write(f'Отменённых заказов: **{om["cancelled"]}**')
