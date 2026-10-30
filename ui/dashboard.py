@@ -4,6 +4,12 @@ from html import escape as escape_html
 import streamlit as st
 from saas_core import saas_enabled, data_load_keyset
 
+
+def _safe_tenant_label(value):
+    """Escape tenant-controlled text before inserting it into unsafe HTML."""
+    return escape_html(str(value or "Ваш магазин"), quote=True)
+
+
 def _apply_client_first_layout():
     """Tighten global layout without changing application behavior."""
     st.markdown(
@@ -262,7 +268,7 @@ def render_dashboard(
                 pass
 
     store_name = st.session_state.get("saas_tenant_name", "Ваш магазин")
-    safe_store_name = escape_html(str(store_name or "Ваш магазин"), quote=True)
+    safe_store_name = _safe_tenant_label(store_name)
     first_run = products_total == 0 and int(crm.get("total", 0) or 0) == 0 and int(om.get("total", 0) or 0) == 0
     try:
         ai_next = growth_recommendations(products, leads, orders, plan)
