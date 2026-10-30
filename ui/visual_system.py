@@ -6,7 +6,12 @@ SHOPPILOT_VISUAL_CSS = """
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"],[data-testid="stMainBlockContainer"]{background:linear-gradient(145deg,#071329 0%,#0b1d3a 48%,#0a1730 100%)!important;color:var(--sp-text)!important}
 .block-container{max-width:1540px!important;padding:1.1rem clamp(1rem,2.4vw,2.5rem) 2.5rem!important}
 [data-testid="stHeader"]{background:rgba(7,19,41,.94)!important}
-[data-testid="stMarkdownContainer"],[data-testid="stMarkdownContainer"] p,[data-testid="stMarkdownContainer"] li,[data-testid="stCaptionContainer"],label,[data-testid="stWidgetLabel"]{color:var(--sp-text)}
+[data-testid="stMarkdownContainer"],[data-testid="stMarkdownContainer"] p,[data-testid="stMarkdownContainer"] li,[data-testid="stCaptionContainer"],label,[data-testid="stWidgetLabel"]{color:var(--sp-text)!important}
+.stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp h5,.stApp h6,
+.stApp [data-testid="stMarkdownContainer"] strong,.stApp [data-testid="stMarkdownContainer"] b,
+.stApp [data-testid="stText"],.stApp [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stMarkdownContainer"] li,.stApp label,
+.stApp [data-testid="stWidgetLabel"],.stApp [data-testid="stCaptionContainer"]{color:var(--sp-text)!important}
 [data-testid="stCaptionContainer"]{color:var(--sp-muted)!important}
 /* Preserve the existing ShopPilot logo and its dark blue sidebar identity. */
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#071329 0%,#0c2142 58%,#071329 100%)!important;border-right:1px solid var(--sp-line)!important}
