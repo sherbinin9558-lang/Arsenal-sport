@@ -27,12 +27,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Validate preview when present
+      - name: Validate preview
         shell: bash
         run: |
           if [ ! -f design-preview/index.html ]; then
-            echo "Preview is introduced by its separate design PR; validation will run after that PR is merged."
-            exit 0
+            echo "::error::design-preview/index.html is missing. Merge PR #223 before this PR."
+            exit 1
           fi
           test -s design-preview/index.html
           grep -qi '<!doctype html' design-preview/index.html
