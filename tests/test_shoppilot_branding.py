@@ -15,6 +15,14 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertNotIn("AI AGENT CONTENT MANAGER", source)
         self.assertNotIn("ai_agent_content_manager", source.casefold())
 
+    def test_settings_and_max_use_current_product_brand(self):
+        settings = (ROOT / "ui" / "settings.py").read_text(encoding="utf-8")
+        max_ui = (ROOT / "ui" / "max.py").read_text(encoding="utf-8")
+        self.assertIn("ShopPilot AI", settings)
+        self.assertIn("ShopPilot AI", max_ui)
+        self.assertNotIn("AI Agent Content Manager", settings)
+        self.assertNotIn("AI Agent Content Manager", max_ui)
+
     def test_live_dashboard_uses_approved_tagline_and_robot_asset(self):
         source = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
         self.assertIn("Робот трудится", source)

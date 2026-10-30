@@ -125,7 +125,7 @@ from card_generator import generate_card
 
 # ==================== ТЕКСТЫ ====================
 def make_hashtags(name, brand, category):
-    base = ["#shoppilotai", "#спорт", "#экипировка", "#новинка"]
+    base = ["#ai_agent_content_manager", "#спорт", "#экипировка", "#новинка"]
     extra = {
         "Футболка": ["#футболка", "#tshirt"],
         "Кроссовки": ["#кроссовки", "#sneakers"],
@@ -292,7 +292,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         api_url = _telegram_api(token, "sendVideo")
 
         files = {
-            "video": ("shoppilot_ai_reel.mp4", video_bytes, "video/mp4")
+            "video": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")
         }
         data = {
             "chat_id": channel,
@@ -332,7 +332,7 @@ def publish_reel_to_telegram(video_bytes, caption):
         try:
             doc_resp = requests.post(
                 _telegram_api(token, "sendDocument"),
-                files={"document": ("shoppilot_ai_reel.mp4", video_bytes, "video/mp4")},
+                files={"document": ("ai_agent_content_manager_reel.mp4", video_bytes, "video/mp4")},
                 data={
                     "chat_id": channel,
                     "caption": caption,

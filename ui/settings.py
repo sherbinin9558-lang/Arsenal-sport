@@ -2,7 +2,7 @@
 import streamlit as st
 
 def render_settings(*, load_settings, save_settings, templates, get_logo, save_logo):
-    st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация AI Agent Content Manager для контента и работы магазина.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">STORE SETTINGS</div><div class="section-title">Настройки магазина</div><div class="section-subtitle">Основная информация вашего магазина для контента и работы в ShopPilot AI.</div>', unsafe_allow_html=True)
     settings = load_settings()
     st.markdown("### 🏪 Магазин")
     st.markdown("### 🖼️ Логотип магазина")
