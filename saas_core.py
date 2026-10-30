@@ -734,7 +734,8 @@ def login_ui():
                 gap: 11px;
                 margin-bottom: 14px;
             }
-            .public-logo {
+            .public-logo,
+            .public-logo-image {
                 width: 42px;
                 height: 42px;
                 flex-basis: 42px;
