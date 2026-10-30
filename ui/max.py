@@ -180,7 +180,7 @@ def _max_session_cached(cache_key, ttl_seconds, loader, spinner_text=None):
     return value
 
 
-@st.dialog("⚡ AI Agent Content Manager MAX", width="large")
+@st.dialog("⚡ ShopPilot AI MAX", width="large")
 def render_max():
     snap = st.session_state.get("max_data_snapshot")
     current_revision = int(st.session_state.get("_app_data_revision", 0) or 0)
