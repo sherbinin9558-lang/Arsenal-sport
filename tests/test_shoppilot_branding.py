@@ -9,10 +9,11 @@ class ShopPilotBrandingTests(unittest.TestCase):
     def test_live_app_uses_shop_pilot_product_brand(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('page_title="ShopPilot AI"', source)
-        self.assertIn("SHOPPILOT AI", source)
+        self.assertIn("ShopPilot AI", source)
         self.assertIn("Контент-студия", source)
         self.assertNotIn("AI Agent Content Manager", source)
         self.assertNotIn("AI AGENT CONTENT MANAGER", source)
+        self.assertNotIn("ai_agent_content_manager", source.casefold())
 
     def test_live_dashboard_uses_approved_tagline_and_robot_asset(self):
         source = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
