@@ -49,9 +49,7 @@ jobs:
 
           root = Path("design-preview")
           external = re.compile(
-              rb"https?://|url\\s*\\(\\s*['\\"]?//|"
-              rb"@import\\s+['\\"]?//|"
-              rb"(?:src|href)\\s*=\\s*['\\"]?//",
+              rb"""https?://|url\s*\(\s*['"]?//|@import\s+['"]?//|(?:src|href)\s*=\s*['"]?//""",
               re.IGNORECASE,
           )
           errors = []
@@ -67,7 +65,7 @@ jobs:
                   if external.search(data):
                       errors.append(f"External URL reference found: {path}")
           if errors:
-              print("\\n".join(errors), file=sys.stderr)
+              print("\n".join(errors), file=sys.stderr)
               raise SystemExit(1)
           print("Static preview validation: PASS")
           PY
