@@ -42,7 +42,9 @@ class ShopPilotBrandingTests(unittest.TestCase):
     def test_public_login_uses_shop_pilot_brand(self):
         source = (ROOT / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn('public-brand-name">ShopPilot AI</div>', source)
-        self.assertIn('public-logo">SS</div>', source)
+        self.assertIn('assets" / "shoppilot_logo.png', source)
+        self.assertIn('class="public-logo-image"', source)
+        self.assertIn('alt="ShopPilot AI"', source)
         self.assertNotIn('public-logo">AI</div>', source)
         self.assertNotIn('public-brand-name">AI Agent Content Manager', source)
 
