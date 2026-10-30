@@ -769,7 +769,7 @@ def login_ui():
     st.markdown(
         '<div class="public-shell">'
         '<div class="public-brand">'
-        '<div class="public-logo">AI</div>'
+        '<div class="public-logo">SS</div>'
         '<div><div class="public-brand-name">ShopPilot AI</div>'
         '<div class="public-brand-caption">AI BUSINESS PLATFORM</div></div>'
         '</div>'
