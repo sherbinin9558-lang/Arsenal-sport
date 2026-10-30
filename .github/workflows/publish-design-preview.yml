@@ -16,7 +16,7 @@ on:
 permissions:
   contents: read
 
-# Separate refs: PR validation cannot cancel a main deployment.
+# PR validation and main deployment use separate concurrency groups.
 concurrency:
   group: shoppilot-pages-${{ github.ref }}
   cancel-in-progress: false
@@ -42,16 +42,35 @@ jobs:
           grep -qi '<!doctype html' design-preview/index.html
           grep -q 'MAX' design-preview/index.html
           grep -Eqi 'демонстрац|demo data' design-preview/index.html
-          if find design-preview -type l -print -quit | grep -q .; then
-            echo "::error::Symbolic links are not allowed in the preview artifact."
-            exit 1
-          fi
-          # Scan every shipped regular file, including .mjs and future asset types.
-          # Catch absolute and protocol-relative HTML, CSS, and script URLs without rejecting local imports.
-          if find design-preview -type f -print0 | xargs -0 grep -IInEi 'https?://|url[[:space:]]*\([[:space:]]*.?//|@import[[:space:]]*.?//|[[:space:]](src|href)[[:space:]]*=[[:space:]]*.?//' ; then
-            echo "::error::External URL reference found in shipped preview assets."
-            exit 1
-          fi
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path("design-preview")
+          external = re.compile(
+              rb"https?://|url\\s*\\(\\s*['\\"]?//|"
+              rb"@import\\s+['\\"]?//|"
+              rb"(?:src|href)\\s*=\\s*['\\"]?//",
+              re.IGNORECASE,
+          )
+          errors = []
+          for path in root.rglob("*"):
+              if path.is_symlink():
+                  errors.append(f"Symbolic link is not allowed: {path}")
+              elif path.is_file():
+                  try:
+                      data = path.read_bytes()
+                  except OSError as exc:
+                      errors.append(f"Cannot read {path}: {exc}")
+                      continue
+                  if external.search(data):
+                      errors.append(f"External URL reference found: {path}")
+          if errors:
+              print("\\n".join(errors), file=sys.stderr)
+              raise SystemExit(1)
+          print("Static preview validation: PASS")
+          PY
 
   deploy:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
