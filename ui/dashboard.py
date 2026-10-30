@@ -283,19 +283,21 @@ def render_dashboard(
     except Exception:
         ai_next = []
     
-    hero_copy, hero_art = st.columns([1.08, 0.92], gap="small")
-    with hero_copy:
-        st.markdown(
-            '<div class="dashboard-hero">'
-            '<div class="dashboard-hero-kicker">SHOPPILOT AI · SMART COMMERCE PLATFORM</div>'
-            '<div class="dashboard-hero-title">Робот трудится —<br><span class="dashboard-hero-gradient">ты отдыхаешь.</span></div>'
-            '<div class="dashboard-hero-text">Твой магазин. Твои каналы. Один интеллектуальный центр управления.</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with hero_art:
-        with st.container(key="shoppilot_hero_art"):
-            st.image("assets/shoppilot_robot.jpg", width="stretch")
+    # One integrated hero surface: copy and robot image share the same banner.
+    with st.container(key="dashboard_hero_shell"):
+        hero_copy, hero_art = st.columns([1.08, 0.92], gap="small", vertical_alignment="center")
+        with hero_copy:
+            st.markdown(
+                '<div class="dashboard-hero">'
+                '<div class="dashboard-hero-kicker">SHOPPILOT AI · SMART COMMERCE PLATFORM</div>'
+                '<div class="dashboard-hero-title">Робот трудится —<br><span class="dashboard-hero-gradient">ты отдыхаешь.</span></div>'
+                '<div class="dashboard-hero-text">Твой магазин. Твои каналы. Один интеллектуальный центр управления.</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        with hero_art:
+            with st.container(key="shoppilot_hero_art"):
+                st.image("assets/shoppilot_robot.jpg", width="stretch")
     st.caption(f"Рабочее пространство: {safe_store_name}")
 
     
