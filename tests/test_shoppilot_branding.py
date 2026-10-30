@@ -28,6 +28,16 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn("render_sidebar_overview()", source)
         self.assertIn("render_account_bar()", source)
 
+    def test_full_visual_system_is_applied_without_replacing_navigation(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
+        self.assertIn("apply_shoppilot_visual_system(st)", source)
+        self.assertIn("main_workspace_tabs", source)
+        self.assertIn("sidebar_identity", source)
+        self.assertIn("dashboard-hero", visual)
+        self.assertIn("stMetric", visual)
+        self.assertIn("prefers-reduced-motion", visual)
+
     def test_settings_and_max_use_current_product_brand(self):
         settings = (ROOT / "ui" / "settings.py").read_text(encoding="utf-8")
         max_ui = (ROOT / "ui" / "max.py").read_text(encoding="utf-8")
