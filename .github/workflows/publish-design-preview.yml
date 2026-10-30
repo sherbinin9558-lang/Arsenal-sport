@@ -16,9 +16,10 @@ on:
 permissions:
   contents: read
 
+# Serialize runs per ref; a PR validation must never cancel a main deployment.
 concurrency:
-  group: shoppilot-pages
-  cancel-in-progress: true
+  group: shoppilot-pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -27,19 +28,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate preview
         shell: bash
         run: |
-          if [ ! -f design-preview/index.html ]; then
-            echo "::error::design-preview/index.html is missing. Merge PR #223 before this PR."
+          set -euo pipefail
+          if [ ! -d design-preview ] || [ ! -f design-preview/index.html ]; then
+            echo "::error::design-preview/index.html is missing."
             exit 1
           fi
           test -s design-preview/index.html
           grep -qi '<!doctype html' design-preview/index.html
           grep -q 'MAX' design-preview/index.html
           grep -Eqi 'демонстрац|demo data' design-preview/index.html
-          if grep -Eqi '(src|href)="https?://' design-preview/index.html; then
-            echo "External asset/link reference found; review before publishing."
+          if find design-preview -type l -print -quit | grep -q .; then
+            echo "::error::Symbolic links are not allowed in the preview artifact."
+            exit 1
+          fi
+          if grep -RInE --include='*.html' --include='*.css' --include='*.js' '(https?://|url\([[:space:]]*['"'"'"]?//|@import[[:space:]]+url\()' design-preview; then
+            echo "::error::External resource reference found in shipped preview assets."
             exit 1
           fi
 
@@ -58,6 +66,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload only design preview
