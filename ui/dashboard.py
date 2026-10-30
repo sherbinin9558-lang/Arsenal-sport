@@ -1,5 +1,6 @@
 """Dashboard UI. Keeps dashboard rendering outside the application entrypoint."""
 import datetime
+from html import escape as escape_html
 import streamlit as st
 from saas_core import saas_enabled, data_load_keyset
 
@@ -41,6 +42,75 @@ def _apply_client_first_layout():
         .owner-guide-grid b { display: block !important; font-size: .76rem !important; color: #26203f !important; margin-bottom: 2px !important; }
         .owner-guide-grid span { display: block !important; font-size: .7rem !important; line-height: 1.35 !important; color: #6b7280 !important; }
         .owner-guide-note { margin-top: 9px !important; font-size: .72rem !important; line-height: 1.4 !important; color: #697386 !important; }
+        /* ShopPilot command-center treatment. Data and actions remain native Streamlit. */
+        .dashboard-hero {
+            position: relative !important;
+            isolation: isolate !important;
+            overflow: hidden !important;
+            padding: 28px 30px !important;
+            min-height: 176px !important;
+            border: 1px solid rgba(145, 164, 255, .34) !important;
+            border-radius: 22px !important;
+            background:
+                radial-gradient(circle at 88% 18%, rgba(144, 115, 255, .28), transparent 29%),
+                radial-gradient(circle at 68% 100%, rgba(83, 155, 255, .16), transparent 34%),
+                linear-gradient(118deg, #0a1020 0%, #121d3a 58%, #211a3e 100%) !important;
+            box-shadow: 0 18px 46px rgba(10, 14, 29, .18) !important;
+        }
+        .dashboard-hero::after {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            width: 190px;
+            height: 190px;
+            right: 7%;
+            top: -76px;
+            border: 1px solid rgba(178, 191, 255, .15);
+            border-radius: 50%;
+            box-shadow: 0 0 0 22px rgba(178, 191, 255, .035), 0 0 0 48px rgba(178, 191, 255, .025);
+            pointer-events: none;
+        }
+        .dashboard-hero-kicker {
+            color: #b9c8ff !important;
+            font-size: .66rem !important;
+            letter-spacing: .18em !important;
+            font-weight: 850 !important;
+        }
+        .dashboard-hero-title {
+            color: #f7f8ff !important;
+            font-size: clamp(1.65rem, 3vw, 2.45rem) !important;
+            font-weight: 900 !important;
+            letter-spacing: -.045em !important;
+            line-height: 1.08 !important;
+        }
+        .dashboard-hero-text {
+            color: #c0cbe5 !important;
+            max-width: 760px !important;
+            font-size: .94rem !important;
+            line-height: 1.55 !important;
+        }
+        .owner-guide-card {
+            border-color: #dce2f1 !important;
+            background: linear-gradient(135deg, #ffffff 0%, #f5f6ff 100%) !important;
+        }
+        .owner-guide-grid > div {
+            transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+        }
+        .owner-guide-grid > div:hover {
+            transform: translateY(-2px);
+            border-color: #b8c5f5 !important;
+            box-shadow: 0 8px 20px rgba(44, 58, 110, .07);
+        }
+        @media (max-width: 768px) {
+            .dashboard-hero { min-height: 0 !important; padding: 21px 19px !important; border-radius: 18px !important; }
+            .dashboard-hero::after { right: -90px; top: -100px; }
+            .dashboard-hero-title { font-size: 1.55rem !important; }
+            .dashboard-hero-text { font-size: .86rem !important; max-width: 100% !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .owner-guide-grid > div { transition: none !important; }
+            .owner-guide-grid > div:hover { transform: none !important; }
+        }
         /* Keep the main navigation close to the product heading. */
         div[data-baseweb="tab-list"] {
             margin-top: 0 !important;
@@ -192,6 +262,7 @@ def render_dashboard(
                 pass
 
     store_name = st.session_state.get("saas_tenant_name", "Ваш магазин")
+    safe_store_name = escape_html(str(store_name or "Ваш магазин"), quote=True)
     first_run = products_total == 0 and int(crm.get("total", 0) or 0) == 0 and int(om.get("total", 0) or 0) == 0
     try:
         ai_next = growth_recommendations(products, leads, orders, plan)
@@ -200,8 +271,8 @@ def render_dashboard(
     
     st.markdown(
         f'<div class="dashboard-hero">'
-        f'<div class="dashboard-hero-kicker">AI BUSINESS COMMAND CENTER</div>'
-        f'<div class="dashboard-hero-title">Добро пожаловать в {store_name}</div>'
+        f'<div class="dashboard-hero-kicker">SHOPPILOT AI · COMMAND CENTER</div>'
+        f'<div class="dashboard-hero-title">Добро пожаловать в {safe_store_name}</div>'
         f'<div class="dashboard-hero-text">MAX смотрит на каталог, контент и продажи и помогает решить следующую задачу — без лишней рутины.</div>'
         f'</div>',
         unsafe_allow_html=True,
