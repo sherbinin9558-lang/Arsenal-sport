@@ -194,6 +194,7 @@ def render_dashboard(
                         except Exception as e:
                             st.error(f"Не удалось создать товар: {e}")
     else:
+        st.markdown("### Панель управления")
         d1, d2, d3, d4 = st.columns(4)
         d1.metric("Товары", products_total, "В каталоге магазина")
         d2.metric("Контент", wm.get("total", 0), "Материалов в плане")
@@ -261,6 +262,9 @@ def render_dashboard(
     a, b = st.columns(2)
     with a:
         st.markdown("### Продажи")
+        sales_kpi, conversion_kpi = st.columns(2)
+        sales_kpi.metric("Сумма заказов", f'{om["amount"]:,.0f} ₽'.replace(",", " "))
+        conversion_kpi.metric("Конверсия", f'{cm["conversion"]:.1f}%')
         st.write(f'Активных заказов: **{om["active"]}**')
         st.write(f'Завершённых заказов: **{om["completed"]}**')
         st.write(f'Отменённых заказов: **{om["cancelled"]}**')
