@@ -635,7 +635,7 @@ with st.sidebar:
         _max_sidebar_launcher()
 
     with st.container(key="sidebar_preferences"):
-        dark_mode = st.toggle("🌙 Тёмная тема", value=False, key="theme_toggle")
+        dark_mode = st.toggle("🌙 Тёмная тема", value=True, key="theme_toggle")
 
         # Short, customer-facing help; do not expose configuration or secret values.
         with st.expander("📘 Как пользоваться приложением", expanded=False):
@@ -929,7 +929,7 @@ button[aria-label*="Прокрут"] {
 """, unsafe_allow_html=True)
 
 apply_workspace_navigation_styles(st)
-apply_shoppilot_visual_system(st)
+apply_shoppilot_visual_system(st, dark_mode=dark_mode)
 _tabs = list(st.tabs(tab_labels, on_change="rerun", key="main_workspace_tabs"))
 
 # Streamlit's AppTest has had tab-collection edge cases across releases.
