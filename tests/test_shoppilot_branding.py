@@ -39,6 +39,18 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn('st.session_state.get("saas_tenant_name"', source)
         self.assertIn("_safe_tenant_label(store_name)", source)
 
+    def test_public_login_uses_shop_pilot_brand(self):
+        source = (ROOT / "saas_core.py").read_text(encoding="utf-8")
+        self.assertIn('public-brand-name">ShopPilot AI</div>', source)
+        self.assertNotIn("public-brand-name">AI Agent Content Manager", source)
+
+    def test_generated_cards_use_shop_pilot_platform_watermark(self):
+        source = (ROOT / "card_generator.py").read_text(encoding="utf-8")
+        self.assertIn('"SHOPPILOT AI"', source)
+        self.assertIn('brand or "ShopPilot AI"', source)
+        self.assertNotIn("AI AGENT CONTENT MANAGER", source)
+        self.assertNotIn("AI Agent Content Manager", source)
+
 
 if __name__ == "__main__":
     unittest.main()
