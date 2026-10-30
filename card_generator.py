@@ -63,7 +63,7 @@ def _fit_text_lines(draw, text, font, max_w, max_lines=2):
     return lines
 
 def generate_card(image, name, brand, article, sizes, color, description, specs, category, template, logo_image=None):
-    # Единая профессиональная система AI Agent Content Manager с четырьмя визуальными направлениями.
+    # Единая профессиональная система ShopPilot AI с четырьмя визуальными направлениями.
     t = TEMPLATES.get(template, TEMPLATES["Dark Premium"])
     W, H = CARD_SIZE
     accent = t["accent"]
@@ -114,7 +114,7 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
         lr = logo_img.resize((logo_w, int(logo_img.height * ratio)), Image.Resampling.LANCZOS)
         canvas.paste(lr, (60, 48), lr)
     else:
-        draw.text((60, 55), "AI AGENT CONTENT MANAGER", font=get_font(36, True), fill=t["text"])
+        draw.text((60, 55), "SHOPPILOT AI", font=get_font(36, True), fill=t["text"])
 
     # Категория.
     cat = category.upper()
@@ -158,7 +158,7 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
     draw.rounded_rectangle((44, panel_y, W-44, H-44), radius=34, fill=panel_fill, outline=panel_outline, width=2)
     draw.line([(76, panel_y+38), (235, panel_y+38)], fill=accent, width=5)
 
-    brand_text = (brand or "AI AGENT CONTENT MANAGER").upper()
+    brand_text = (brand or "ShopPilot AI").upper()
     draw.text((76, panel_y+62), brand_text[:28], font=get_font(25, True), fill=t["sec"])
 
     title_font = fit_font(draw, (name or "ТОВАР").upper(), 860, max_size=58, min_size=34)
@@ -176,6 +176,6 @@ def generate_card(image, name, brand, article, sizes, color, description, specs,
     if meta_text:
         draw.text((76, H-108), meta_text[:70], font=get_font(22), fill=t["sec"])
 
-    draw.text((W-310, H-108), "AI AGENT CONTENT MANAGER", font=get_font(21, True), fill=accent)
+    draw.text((W-310, H-108), "SHOPPILOT AI", font=get_font(21, True), fill=accent)
     return canvas
 
