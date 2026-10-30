@@ -149,7 +149,7 @@ def gen_instagram(p, tone):
     tags = make_hashtags(n, b, category)
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "Новая позиция в ShopPilot AI — " + n,
+        "Официальный": "Новая позиция в вашем магазине — " + n,
         "Дружеский": "🔥 Забирайте новинку: " + n,
         "Продающий": "🔥 " + n + " — экипировка для тех, кто выбирает по делу!"
     }
@@ -164,7 +164,7 @@ def gen_instagram(p, tone):
 
 ⚙️ {specs}
 
-📩 Напишите нам в сообщения ShopPilot AI — поможем подобрать размер и оформить заказ.
+📩 Напишите нам в сообщения магазина — поможем подобрать размер и оформить заказ.
 
 {tags}"""
 
@@ -177,9 +177,9 @@ def gen_telegram(p, tone):
     color = p.get('color','уточняйте')
     emoji = CATEGORY_EMOJI.get(category, '📦')
     heads = {
-        "Официальный": "🏆 Новое поступление в ShopPilot AI",
+        "Официальный": "🏆 Новое поступление в вашем магазине",
         "Дружеский": "🎉 Ребята, смотрите, что приехало!",
-        "Продающий": "🔥 НОВИНКА В SHOPPILOT AI"
+        "Продающий": "🔥 НОВИНКА В ВАШЕМ МАГАЗИНЕ"
     }
     return f"""{heads.get(tone, heads["Официальный"])}
 
@@ -373,7 +373,7 @@ def publish_reel_to_vk(video_bytes, caption):
         params = {
             "access_token": token,
             "v": api_version,
-            "name": "ShopPilot AI Reels",
+            "name": "Reels",
             "description": caption[:4096],
             "is_private": 0,
             "wallpost": 1,
@@ -790,6 +790,25 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
 [data-testid="stSidebar"] [data-testid="stToggle"] label,[data-testid="stSidebar"] [data-baseweb="checkbox"] label{color:#b8ff00!important;text-shadow:0 0 7px rgba(184,255,0,.65)!important;}</style>""",
     unsafe_allow_html=True,
 )
+
+st.markdown("""
+<style>
+section[data-testid="stSidebar"] {background:#080d1e!important;border-right:1px solid rgba(151,165,205,.18)!important}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] label {color:#dce4ff!important}
+section[data-testid="stSidebar"] .sidebar-brand-title {color:#f4f6ff!important}
+section[data-testid="stSidebar"] .sidebar-brand-version {color:#9eafd5!important}
+section[data-testid="stSidebar"] .sidebar-brand-tagline {color:#c3cbed!important}
+section[data-testid="stSidebar"] .sidebar-max {background:linear-gradient(135deg,#171c37,#29204b)!important;border-color:rgba(151,133,255,.48)!important}
+section[data-testid="stSidebar"] .sidebar-max-kicker {color:#b7a7ff!important}
+section[data-testid="stSidebar"] .sidebar-max-title {color:#fff!important}
+section[data-testid="stSidebar"] .sidebar-max-text {color:#c3cbed!important}
+section[data-testid="stSidebar"] button[key="sidebar_max"] {background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important}
+.main-brand-title {color:#171a21!important}
+.main-brand-subtitle {color:#697386!important}
+</style>
+""", unsafe_allow_html=True)
 
 brand_logo_col, brand_title_col = st.columns([0.075, 0.925])
 with brand_logo_col:
