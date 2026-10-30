@@ -38,6 +38,19 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn("stMetric", visual)
         self.assertIn("prefers-reduced-motion", visual)
 
+
+    def test_dashboard_matches_dark_blue_reference_without_changing_brand_assets(self):
+        visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
+        dashboard = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        app = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("st-key-dashboard_hero_shell", visual)
+        self.assertIn("linear-gradient(112deg,#10427c", visual)
+        self.assertIn("background:linear-gradient(145deg,#123765", visual)
+        self.assertNotIn("--sp-canvas:#f2f5fb", visual)
+        self.assertIn('with st.container(key="dashboard_hero_shell")', dashboard)
+        self.assertIn('st.image("assets/shoppilot_robot.jpg"', dashboard)
+        self.assertIn('st.image("assets/shoppilot_logo.png"', app)
+
     def test_settings_and_max_use_current_product_brand(self):
         settings = (ROOT / "ui" / "settings.py").read_text(encoding="utf-8")
         max_ui = (ROOT / "ui" / "max.py").read_text(encoding="utf-8")
