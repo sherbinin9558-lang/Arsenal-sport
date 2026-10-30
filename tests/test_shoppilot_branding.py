@@ -42,7 +42,7 @@ class ShopPilotBrandingTests(unittest.TestCase):
     def test_public_login_uses_shop_pilot_brand(self):
         source = (ROOT / "saas_core.py").read_text(encoding="utf-8")
         self.assertIn('public-brand-name">ShopPilot AI</div>', source)
-        self.assertNotIn("public-brand-name">AI Agent Content Manager", source)
+        self.assertNotIn('public-brand-name">AI Agent Content Manager', source)
 
     def test_generated_cards_use_shop_pilot_platform_watermark(self):
         source = (ROOT / "card_generator.py").read_text(encoding="utf-8")
