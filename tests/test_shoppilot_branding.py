@@ -108,5 +108,30 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn('aria-selected="true"] *{color:#fff!important', visual)
 
 
+    def test_dashboard_preserves_legacy_workflows_and_robot_banner(self):
+        dashboard = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        required_existing_workflows = [
+            "### Контент и задачи",
+            "### Склад",
+            "### Продажи",
+            'with st.expander("🔗 Контент → продажи"',
+            'st.button("➕ Добавить товар"',
+            'st.button("📅 Добавить материал в план"',
+            'with st.form("dashboard_quick_add_form"',
+            'with st.form("dashboard_quick_plan_form"',
+            "### Состояние системы",
+            "growth_recommendations",
+            "attribution_loader",
+            'st.image("assets/shoppilot_robot.jpg"',
+        ]
+        for marker in required_existing_workflows:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, dashboard)
+
+        # The reference-only chart and completion ring are not backed by
+        # existing dashboard data, so do not introduce fabricated metrics.
+        self.assertNotIn("78%", dashboard)
+
+
 if __name__ == "__main__":
     unittest.main()
