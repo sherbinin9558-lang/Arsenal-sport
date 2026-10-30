@@ -39,6 +39,16 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", visual)
 
 
+    def test_dashboard_places_four_reference_kpis_before_secondary_guidance(self):
+        dashboard = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
+        self.assertIn('d1, d2, d3, d4 = st.columns(4)', dashboard)
+        self.assertIn('d1.metric("Товары", products_total', dashboard)
+        self.assertIn('d2.metric("Контент", wm.get("total", 0)', dashboard)
+        self.assertIn('d3.metric("Заявки", crm.get("total", 0)', dashboard)
+        self.assertIn('d4.metric("Заказы", om.get("total", 0)', dashboard)
+        self.assertLess(dashboard.index('d1.metric("Товары"'), dashboard.index('owner-guide-card'))
+        self.assertNotIn('st.caption(f"Рабочее пространство:', dashboard)
+
     def test_dashboard_matches_dark_blue_reference_without_changing_brand_assets(self):
         visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
         dashboard = (ROOT / "ui" / "dashboard.py").read_text(encoding="utf-8")
