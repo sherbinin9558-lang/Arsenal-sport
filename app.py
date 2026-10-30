@@ -791,22 +791,24 @@ div[data-baseweb="tab-list"]{gap:5px;background:transparent!important;padding:5p
     unsafe_allow_html=True,
 )
 
-st.markdown("""
+brand_title_color = "#f4f6ff" if dark_mode else "#171a21"
+brand_subtitle_color = "#aebbd8" if dark_mode else "#596174"
+st.markdown(f"""
 <style>
-section[data-testid="stSidebar"] {background:#080d1e!important;border-right:1px solid rgba(151,165,205,.18)!important}
+section[data-testid="stSidebar"] {{background:#080d1e!important;border-right:1px solid rgba(151,165,205,.18)!important}}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] *,
 section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-section[data-testid="stSidebar"] label {color:#dce4ff!important}
-section[data-testid="stSidebar"] .sidebar-brand-title {color:#f4f6ff!important}
-section[data-testid="stSidebar"] .sidebar-brand-version {color:#9eafd5!important}
-section[data-testid="stSidebar"] .sidebar-brand-tagline {color:#c3cbed!important}
-section[data-testid="stSidebar"] .sidebar-max {background:linear-gradient(135deg,#171c37,#29204b)!important;border-color:rgba(151,133,255,.48)!important}
-section[data-testid="stSidebar"] .sidebar-max-kicker {color:#b7a7ff!important}
-section[data-testid="stSidebar"] .sidebar-max-title {color:#fff!important}
-section[data-testid="stSidebar"] .sidebar-max-text {color:#c3cbed!important}
-section[data-testid="stSidebar"] button[key="sidebar_max"] {background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important}
-.main-brand-title {color:#171a21!important}
-.main-brand-subtitle {color:#697386!important}
+section[data-testid="stSidebar"] label {{color:#dce4ff!important}}
+section[data-testid="stSidebar"] .sidebar-brand-title {{color:#f4f6ff!important}}
+section[data-testid="stSidebar"] .sidebar-brand-version {{color:#9eafd5!important}}
+section[data-testid="stSidebar"] .sidebar-brand-tagline {{color:#c3cbed!important}}
+section[data-testid="stSidebar"] .sidebar-max {{background:linear-gradient(135deg,#171c37,#29204b)!important;border-color:rgba(151,133,255,.48)!important}}
+section[data-testid="stSidebar"] .sidebar-max-kicker {{color:#b7a7ff!important}}
+section[data-testid="stSidebar"] .sidebar-max-title {{color:#fff!important}}
+section[data-testid="stSidebar"] .sidebar-max-text {{color:#c3cbed!important}}
+section[data-testid="stSidebar"] button[key="sidebar_max"] {{background:linear-gradient(110deg,#78c9ff,#927cff)!important;color:#091128!important}}
+.main-brand-title {{color:{brand_title_color}!important}}
+.main-brand-subtitle {{color:{brand_subtitle_color}!important}}
 </style>
 """, unsafe_allow_html=True)
 
