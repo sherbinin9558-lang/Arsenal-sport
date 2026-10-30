@@ -31,7 +31,7 @@ class ShopPilotBrandingTests(unittest.TestCase):
     def test_full_visual_system_is_applied_without_replacing_navigation(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
-        self.assertIn("apply_shoppilot_visual_system(st)", source)
+        self.assertIn("apply_shoppilot_visual_system(st, dark_mode=dark_mode)", source)
         self.assertIn("main_workspace_tabs", source)
         self.assertIn("sidebar_identity", source)
         self.assertIn("dashboard-hero", visual)
