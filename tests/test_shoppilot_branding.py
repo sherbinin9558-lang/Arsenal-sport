@@ -46,8 +46,10 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertIn('d2.metric("Контент", wm.get("total", 0)', dashboard)
         self.assertIn('d3.metric("Заявки", crm.get("total", 0)', dashboard)
         self.assertIn('d4.metric("Заказы", om.get("total", 0)', dashboard)
-        self.assertLess(dashboard.index('d1.metric("Товары"'), dashboard.index('owner-guide-card'))
+        self.assertLess(dashboard.index('d1.metric("Товары"'), dashboard.index('st.markdown("---")'))
         self.assertNotIn('st.caption(f"Рабочее пространство:', dashboard)
+        self.assertIn('sales_kpi.metric("Сумма заказов"', dashboard)
+        self.assertIn('conversion_kpi.metric("Конверсия"', dashboard)
 
     def test_dashboard_matches_dark_blue_reference_without_changing_brand_assets(self):
         visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
