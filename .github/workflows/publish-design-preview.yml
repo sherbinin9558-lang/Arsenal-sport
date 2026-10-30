@@ -48,7 +48,7 @@ jobs:
           fi
           # Scan every shipped regular file, including .mjs and future asset types.
           # Catch absolute and protocol-relative HTML, CSS, and script URLs without rejecting local imports.
-          if find design-preview -type f -print0 | xargs -0 grep -IInEi 'https?://|url[[:space:]]*\\([[:space:]]*.?//|@import[[:space:]]*.?//|[[:space:]](src|href)[[:space:]]*=[[:space:]]*.?//' ; then
+          if find design-preview -type f -print0 | xargs -0 grep -IInEi 'https?://|url[[:space:]]*\([[:space:]]*.?//|@import[[:space:]]*.?//|[[:space:]](src|href)[[:space:]]*=[[:space:]]*.?//' ; then
             echo "::error::External URL reference found in shipped preview assets."
             exit 1
           fi
