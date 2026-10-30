@@ -99,5 +99,14 @@ class ShopPilotBrandingTests(unittest.TestCase):
         self.assertNotIn("AI Agent Content Manager", source)
 
 
+    def test_visual_system_respects_existing_theme_toggle(self):
+        app = (ROOT / "app.py").read_text(encoding="utf-8")
+        visual = (ROOT / "ui" / "visual_system.py").read_text(encoding="utf-8")
+        self.assertIn('dark_mode = st.toggle("🌙 Тёмная тема", value=True, key="theme_toggle")', app)
+        self.assertIn("apply_shoppilot_visual_system(st, dark_mode=dark_mode)", app)
+        self.assertIn("if not dark_mode:", visual)
+        self.assertIn('aria-selected="true"] *{color:#fff!important', visual)
+
+
 if __name__ == "__main__":
     unittest.main()
