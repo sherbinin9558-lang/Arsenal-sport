@@ -218,6 +218,12 @@ def _establish_session(result):
     token = result.get("access_token")
     if not token:
         raise SupabaseRequestError("Supabase не вернул access token.")
+    # Persist the rotated refresh token before downstream lookups. Supabase may
+    # invalidate the previous token immediately; if user or membership lookup
+    # then fails, the browser must still retain the newest refresh token.
+    refresh_token = result.get("refresh_token")
+    if refresh_token:
+        _persist_refresh_token(refresh_token)
     started_user = time.perf_counter()
     user = result.get("user") or get_user(token)
     _record_auth_timing("resolve_user", started_user)
