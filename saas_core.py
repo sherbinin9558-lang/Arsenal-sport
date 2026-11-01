@@ -250,9 +250,6 @@ def _establish_session(result):
         return True
     if not tenant:
         raise RuntimeError("Магазин не найден. Проверьте SaaS SQL-схему.")
-    refresh_token = result.get("refresh_token")
-    if refresh_token:
-        _persist_refresh_token(refresh_token)
     _set_identity(user, tenant)
     st.session_state["saas_last_validated_at"] = time.time()
     st.session_state.pop("_saas_cookie_probe_attempts", None)
