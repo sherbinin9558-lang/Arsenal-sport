@@ -32,6 +32,18 @@ class AuthHardeningTests(unittest.TestCase):
             with self.assertRaisesRegex(saas_core.SupabaseRequestError, "Слишком много"):
                 saas_core._check_global_auth_attempt_limit(email)
 
+    def test_rotated_refresh_token_is_persisted_before_user_lookup(self):
+        with patch.object(saas_core, "_persist_refresh_token") as persist, patch.object(
+            saas_core, "get_user", side_effect=RuntimeError("temporary lookup failure")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "temporary lookup failure"):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+        persist.assert_called_once_with("new-rotated-refresh-token")
+
     def test_auth_error_is_generic(self):
         self.assertEqual(
             saas_core._safe_auth_error(saas_core.SupabaseRequestError("secret backend detail", 401)),
