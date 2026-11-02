@@ -44,6 +44,47 @@ class AuthHardeningTests(unittest.TestCase):
                 })
         persist.assert_called_once_with("new-rotated-refresh-token")
 
+
+
+    def test_rotated_refresh_token_is_persisted_before_membership_lookup(self):
+        calls = []
+        def persist(token):
+            calls.append(("persist", token))
+            return True
+        def memberships(token, user_id):
+            calls.append(("memberships", user_id))
+            raise RuntimeError("temporary membership lookup failure")
+
+        with (patch.object(saas_core, "_persist_refresh_token", side_effect=persist),
+              patch.object(saas_core, "user_tenants", side_effect=memberships)):
+            with self.assertRaisesRegex(RuntimeError, "temporary membership lookup failure"):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": {"id": "user-123", "email": "user@example.com"},
+                })
+
+        self.assertEqual(calls, [
+            ("persist", "new-rotated-refresh-token"),
+            ("memberships", "user-123"),
+        ])
+
+    def test_session_restore_stops_when_rotated_token_cannot_be_persisted(self):
+        with (patch.object(saas_core, "_persist_refresh_token", return_value=False),
+              patch.object(saas_core, "get_user") as get_user,
+              patch.object(saas_core, "user_tenants") as user_tenants):
+            with self.assertRaisesRegex(
+                saas_core.SupabaseRequestError, "Не удалось сохранить токен"
+            ):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+
+        get_user.assert_not_called()
+        user_tenants.assert_not_called()
+
     def test_auth_error_is_generic(self):
         self.assertEqual(
             saas_core._safe_auth_error(saas_core.SupabaseRequestError("secret backend detail", 401)),
