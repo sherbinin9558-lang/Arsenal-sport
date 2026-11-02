@@ -182,23 +182,29 @@ def _read_refresh_token():
     return None
 
 def _persist_refresh_token(refresh_token):
+    """Request the rotated token be written to the browser cookie.
+
+    True means CookieController accepted the set operation; it does not prove
+    that the browser has completed the client-side write.
+    """
     if not refresh_token:
-        return
+        return False
     cookies = _auth_cookies()
-    if cookies is not None:
-        try:
-            expiry = datetime.now() + timedelta(days=_AUTH_COOKIE_DAYS)
-            cookies.set(
-                _AUTH_COOKIE,
-                str(refresh_token),
-                path="/",
-                expires=expiry,
-                secure=True,
-                same_site="lax",
-            )
-            return
-        except Exception:
-            pass
+    if cookies is None:
+        return False
+    try:
+        expiry = datetime.now() + timedelta(days=_AUTH_COOKIE_DAYS)
+        cookies.set(
+            _AUTH_COOKIE,
+            str(refresh_token),
+            path="/",
+            expires=expiry,
+            secure=True,
+            same_site="lax",
+        )
+        return True
+    except Exception:
+        return False
 
 def _clear_refresh_token():
     cookies = _auth_cookies()
@@ -222,8 +228,8 @@ def _establish_session(result):
     # invalidate the previous token immediately; if user or membership lookup
     # then fails, the browser must still retain the newest refresh token.
     refresh_token = result.get("refresh_token")
-    if refresh_token:
-        _persist_refresh_token(refresh_token)
+    if refresh_token and not _persist_refresh_token(refresh_token):
+        raise SupabaseRequestError("Не удалось сохранить токен обновления сессии.")
     started_user = time.perf_counter()
     user = result.get("user") or get_user(token)
     _record_auth_timing("resolve_user", started_user)
