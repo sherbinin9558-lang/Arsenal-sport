@@ -1,6 +1,6 @@
 import unittest
 from collections import defaultdict, deque
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import saas_core
 
@@ -87,7 +87,7 @@ class AuthHardeningTests(unittest.TestCase):
 
 
     def test_persist_refresh_token_reports_cookie_controller_acceptance(self):
-        controller = unittest.mock.Mock()
+        controller = Mock()
         with patch.object(saas_core, "_auth_cookies", return_value=controller):
             self.assertTrue(saas_core._persist_refresh_token("rotated-token"))
         controller.set.assert_called_once()
