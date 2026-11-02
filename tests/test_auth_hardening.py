@@ -85,6 +85,23 @@ class AuthHardeningTests(unittest.TestCase):
         get_user.assert_not_called()
         user_tenants.assert_not_called()
 
+
+    def test_persist_refresh_token_reports_cookie_controller_acceptance(self):
+        controller = unittest.mock.Mock()
+        with patch.object(saas_core, "_auth_cookies", return_value=controller):
+            self.assertTrue(saas_core._persist_refresh_token("rotated-token"))
+        controller.set.assert_called_once()
+
+    def test_persist_refresh_token_fails_when_cookie_controller_unavailable(self):
+        with patch.object(saas_core, "_auth_cookies", return_value=None):
+            self.assertFalse(saas_core._persist_refresh_token("rotated-token"))
+
+    def test_persist_refresh_token_fails_when_cookie_write_raises(self):
+        controller = unittest.mock.Mock()
+        controller.set.side_effect = RuntimeError("cookie write rejected")
+        with patch.object(saas_core, "_auth_cookies", return_value=controller):
+            self.assertFalse(saas_core._persist_refresh_token("rotated-token"))
+
     def test_auth_error_is_generic(self):
         self.assertEqual(
             saas_core._safe_auth_error(saas_core.SupabaseRequestError("secret backend detail", 401)),
