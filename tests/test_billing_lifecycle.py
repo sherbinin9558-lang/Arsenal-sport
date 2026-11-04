@@ -55,3 +55,9 @@ class BillingLifecycleSqlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class YooKassaOnlyProviderContractTests(unittest.TestCase):
+    def test_new_migration_restricts_provider_to_yookassa(self):
+        sql = open("supabase/migrations/20261104120000_yookassa_only_provider.sql", encoding="utf-8").read()
+        self.assertIn("if p_provider <> 'yookassa' then", sql)
