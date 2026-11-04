@@ -3,7 +3,7 @@ import unittest
 import asyncio
 from unittest.mock import Mock, patch
 
-import tbank_webhook
+import yookassa_webhook
 
 
 class WebhookSecurityTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class WebhookSecurityTests(unittest.TestCase):
         for payload in ([], "string", 42, None):
             with self.subTest(payload=payload):
                 with self.assertRaises(Exception) as ctx:
-                    asyncio.run(tbank_webhook._read_body(JsonRequest(payload)))
+                    asyncio.run(yookassa_webhook._read_body(JsonRequest(payload)))
                 self.assertEqual(getattr(ctx.exception, "status_code", None), 400)
                 self.assertIn("JSON object required", str(ctx.exception))
 
@@ -36,7 +36,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def json(self):
                 return {"PaymentId": "123"}
 
-        self.assertEqual(asyncio.run(tbank_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
+        self.assertEqual(asyncio.run(yookassa_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
 
     def test_security_headers_are_applied_by_real_middleware(self):
         async def run():
@@ -64,7 +64,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def call_next(_request):
                 return PlainTextResponse("ok")
 
-            middleware = tbank_webhook.SecurityHeadersMiddleware(tbank_webhook.app)
+            middleware = yookassa_webhook.SecurityHeadersMiddleware(yookassa_webhook.app)
             return await middleware.dispatch(request, call_next)
 
         response = asyncio.run(run())
@@ -86,13 +86,13 @@ class WebhookSecurityTests(unittest.TestCase):
         "YOO_KASSA_SHOP_ID": "shop",
         "YOO_KASSA_SECRET_KEY": "secret",
     }, clear=False)
-    @patch("tbank_webhook.requests.get")
+    @patch("yookassa_webhook.requests.get")
     def test_ready_requires_reachable_yookassa_and_supabase(self, get):
         get.return_value = Mock(ok=True)
         rpc_response = Mock(ok=True)
         rpc_response.json.return_value = False
-        with patch("tbank_webhook.requests.post", return_value=rpc_response):
-            result = asyncio.run(tbank_webhook.readyz())
+        with patch("yookassa_webhook.requests.post", return_value=rpc_response):
+            result = asyncio.run(yookassa_webhook.readyz())
         self.assertTrue(result["ok"])
         self.assertEqual(result["yookassa"], "configured")
 
@@ -104,7 +104,7 @@ class WebhookSecurityTests(unittest.TestCase):
     }, clear=False)
     def test_ready_rejects_missing_yookassa_credentials(self):
         with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
+            asyncio.run(yookassa_webhook.readyz())
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
         self.assertIn("YooKassa credentials are not configured", str(ctx.exception))
 
@@ -112,7 +112,7 @@ class WebhookSecurityTests(unittest.TestCase):
     def test_yookassa_rejects_wrong_optional_bearer(self):
         request = self._request(headers={"authorization": "Bearer wrong-secret"})
         with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.yookassa_payment_status(request))
+            asyncio.run(yookassa_webhook.yookassa_payment_status(request))
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
 
     def test_oversized_request_is_rejected_before_handler(self):
@@ -130,7 +130,7 @@ class WebhookSecurityTests(unittest.TestCase):
                 nonlocal downstream_called
                 downstream_called = True
 
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware(
                 {"type": "http", "headers": [
                     (b"content-length", str(middleware.MAX_BODY_BYTES + 1).encode("ascii"))
@@ -161,7 +161,7 @@ class WebhookSecurityTests(unittest.TestCase):
                 nonlocal downstream_called
                 downstream_called = True
 
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware(
                 {"type": "http", "headers": [(b"content-length", b"not-a-number")]},
                 receive,
@@ -179,8 +179,8 @@ class WebhookSecurityTests(unittest.TestCase):
         async def run():
             sent = []
             chunks = [
-                {"type": "http.request", "body": b"x" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2), "more_body": True},
-                {"type": "http.request", "body": b"y" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2 + 1), "more_body": False},
+                {"type": "http.request", "body": b"x" * (yookassa_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2), "more_body": True},
+                {"type": "http.request", "body": b"y" * (yookassa_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2 + 1), "more_body": False},
             ]
             async def receive():
                 return chunks.pop(0)
@@ -189,7 +189,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def downstream(scope, receive, send):
                 await receive()
                 await receive()
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware({"type": "http", "headers": []}, receive, send)
             return sent
         sent = asyncio.run(run())
@@ -204,14 +204,14 @@ class WebhookSecurityTests(unittest.TestCase):
             "event": "refund.succeeded",
             "object": {"id": "refund-1", "payment_id": "payment-1"},
         }
-        with patch.object(tbank_webhook, "_read_body", return_value=body), \
-             patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "10.00", "currency": "RUB"}}), \
-             patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
+        with patch.object(yookassa_webhook, "_read_body", return_value=body), \
+             patch.object(yookassa_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
+             patch.object(yookassa_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "10.00", "currency": "RUB"}}), \
+             patch.object(yookassa_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-1", "plan": "starter", "expected_amount": "10.00", "expected_currency": "RUB"
              }), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
-            response = asyncio.run(tbank_webhook.yookassa_payment_status(request))
+             patch.object(yookassa_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
+            response = asyncio.run(yookassa_webhook.yookassa_payment_status(request))
         self.assertEqual(response["status"], "refunded")
         self.assertEqual(response["payment_id"], "payment-1")
         self.assertEqual(process.call_args.args[2], "payment-1")
