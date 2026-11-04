@@ -47,7 +47,7 @@ from app_data import _growth_snapshot
 from max_features import product_search
 from ai_seller import ai_sales_reply, sales_followup
 from max_operator import audit_event, build_business_snapshot, can_execute, execute_write, plan_action
-from ai_usage import usage_summary
+from ai_usage import format_usage_summary_caption, usage_summary
 from saas_core import (
     activate_paid_subscription,
     can,
@@ -306,10 +306,7 @@ def render_max():
                 lambda: usage_summary(30),
                 "Загружаем сводку использования…",
             )
-            st.caption(
-                f"Экономика MAX за 30 дней: {usage['requests']} операций · "
-                f"оценочная AI-себестоимость {usage['cost_rub']:.4f} ₽"
-            )
+            st.caption(format_usage_summary_caption(usage, 30))
         except Exception:
             pass
 
