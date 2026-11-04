@@ -3,7 +3,7 @@ import unittest
 import asyncio
 from unittest.mock import Mock, patch
 
-import tbank_webhook
+import yookassa_webhook
 
 
 class WebhookSecurityTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class WebhookSecurityTests(unittest.TestCase):
         for payload in ([], "string", 42, None):
             with self.subTest(payload=payload):
                 with self.assertRaises(Exception) as ctx:
-                    asyncio.run(tbank_webhook._read_body(JsonRequest(payload)))
+                    asyncio.run(yookassa_webhook._read_body(JsonRequest(payload)))
                 self.assertEqual(getattr(ctx.exception, "status_code", None), 400)
                 self.assertIn("JSON object required", str(ctx.exception))
 
@@ -36,7 +36,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def json(self):
                 return {"PaymentId": "123"}
 
-        self.assertEqual(asyncio.run(tbank_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
+        self.assertEqual(asyncio.run(yookassa_webhook._read_body(JsonRequest())), {"PaymentId": "123"})
 
     def test_security_headers_are_applied_by_real_middleware(self):
         async def run():
@@ -64,7 +64,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def call_next(_request):
                 return PlainTextResponse("ok")
 
-            middleware = tbank_webhook.SecurityHeadersMiddleware(tbank_webhook.app)
+            middleware = yookassa_webhook.SecurityHeadersMiddleware(yookassa_webhook.app)
             return await middleware.dispatch(request, call_next)
 
         response = asyncio.run(run())
@@ -80,185 +80,39 @@ class WebhookSecurityTests(unittest.TestCase):
             with self.subTest(header=header):
                 self.assertEqual(response.headers.get(header), value)
 
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_configured_bearer_secret(self):
-        request = self._request(headers={"authorization": "Bearer unit-test-secret"})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}), \
-             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
-             }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
-            response = asyncio.run(tbank_webhook.payment_status(request))
-        self.assertEqual(response.body, b"OK")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.media_type, "text/plain")
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_accepts_provider_token_without_optional_bearer(self):
-        request = self._request(headers={})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123", "Token": "signed"}), \
-             patch.object(tbank_webhook, "_token", return_value="signed"), \
-             patch.object(tbank_webhook, "_checkout_by_payment", return_value={
-                 "tenant_id": "tenant-1",
-                 "plan": "starter",
-             }), \
-             patch.object(tbank_webhook, "get_state", return_value={"Status": "CONFIRMED"}), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}):
-            response = asyncio.run(tbank_webhook.payment_status(request))
-        self.assertEqual(response.body, b"OK")
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_rejects_invalid_optional_bearer(self):
-        request = self._request(headers={"authorization": "Bearer wrong"})
-        with self.assertRaises(Exception) as ctx:
-            tbank_webhook._verify_webhook_secret(request, "TBANK_WEBHOOK_SECRET")
-        self.assertIn("Unauthorized", str(ctx.exception))
-
-    @patch.dict(os.environ, {"TBANK_WEBHOOK_SECRET": "unit-test-secret"}, clear=False)
-    def test_tbank_rejects_missing_provider_auth_when_token_absent(self):
-        request = self._request(headers={})
-        with patch.object(tbank_webhook, "_read_body", return_value={"PaymentId": "123"}):
-            with self.assertRaises(Exception) as ctx:
-                asyncio.run(tbank_webhook.payment_status(request))
-        self.assertIn("Webhook authentication required", str(ctx.exception))
-
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "",
-        "TBANK_PASSWORD": "",
-        "YOOKASSA_WEBHOOK_SECRET": "",
-    }, clear=False)
-    def test_ready_requires_provider_configuration(self):
-        with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
-        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("provider authentication", str(ctx.exception))
-
-    @patch.dict(os.environ, {
-        "SUPABASE_URL": "https://example.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
-        "TBANK_WEBHOOK_SECRET": "",
-    }, clear=False)
-    @patch("tbank_webhook.requests.get")
-    def test_ready_accepts_tbank_provider_configuration_when_supabase_reachable(self, get):
-        schema_response = Mock(ok=True)
-        get.return_value = schema_response
-        rpc_response = Mock(ok=True)
-        rpc_response.json.return_value = False
-
-        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
-            result = asyncio.run(tbank_webhook.readyz())
-
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["supabase"], "reachable")
-        self.assertEqual(result["tbank"], "configured")
-        self.assertEqual(result["yookassa"], "disabled")
-        get.assert_called_once_with(
-            "https://example.supabase.co/rest/v1/billing_checkout_sessions",
-            headers={"apikey": "x", "Authorization": "Bearer x"},
-            params={"select": "id,expected_amount,expected_currency", "limit": "0"},
-            timeout=3,
-        )
-        post.assert_called_once_with(
-            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
-            headers={
-                "apikey": "x",
-                "Authorization": "Bearer x",
-                "Content-Type": "application/json",
-            },
-            json={},
-            timeout=3,
-        )
-
-    @patch.dict(os.environ, {
-        "SUPABASE_URL": "https://example.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
         "YOO_KASSA_SHOP_ID": "shop",
         "YOO_KASSA_SECRET_KEY": "secret",
     }, clear=False)
-    @patch("tbank_webhook.requests.get")
-    def test_ready_rejects_unresolved_legacy_yookassa_checkout(self, get):
+    @patch("yookassa_webhook.requests.get")
+    def test_ready_requires_reachable_yookassa_and_supabase(self, get):
         get.return_value = Mock(ok=True)
         rpc_response = Mock(ok=True)
-        rpc_response.json.return_value = True
-
-        with patch("tbank_webhook.requests.post", return_value=rpc_response) as post:
-            with self.assertRaises(Exception) as ctx:
-                asyncio.run(tbank_webhook.readyz())
-
-        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("Legacy YooKassa checkouts require provider reconciliation", str(ctx.exception))
-        self.assertNotIn("sensitive-checkout", str(ctx.exception))
-        post.assert_called_once_with(
-            "https://example.supabase.co/rest/v1/rpc/has_unresolved_legacy_yookassa_checkouts",
-            headers={
-                "apikey": "x",
-                "Authorization": "Bearer x",
-                "Content-Type": "application/json",
-            },
-            json={},
-            timeout=3,
-        )
+        rpc_response.json.return_value = False
+        with patch("yookassa_webhook.requests.post", return_value=rpc_response):
+            result = asyncio.run(yookassa_webhook.readyz())
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["yookassa"], "configured")
 
     @patch.dict(os.environ, {
         "SUPABASE_URL": "https://example.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
+        "YOO_KASSA_SHOP_ID": "",
+        "YOO_KASSA_SECRET_KEY": "",
     }, clear=False)
-    @patch("tbank_webhook.requests.get")
-    def test_ready_rejects_invalid_legacy_status_rpc_response(self, get):
-        get.return_value = Mock(ok=True)
-        rpc_response = Mock(ok=True)
-        rpc_response.json.return_value = {"has_unresolved": False}
-
-        with patch("tbank_webhook.requests.post", return_value=rpc_response):
-            with self.assertRaises(Exception) as ctx:
-                asyncio.run(tbank_webhook.readyz())
-
-        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("Legacy checkout status is unavailable", str(ctx.exception))
-
-    @patch.dict(os.environ, {
-        "SUPABASE_URL": "https://example.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
-    }, clear=False)
-    @patch("tbank_webhook.requests.get")
-    def test_ready_rejects_unavailable_supabase(self, get):
-        get.return_value.ok = False
+    def test_ready_rejects_missing_yookassa_credentials(self):
         with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
+            asyncio.run(yookassa_webhook.readyz())
         self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("Webhook storage schema is unavailable", str(ctx.exception))
-
-    @patch.dict(os.environ, {
-        "SUPABASE_URL": "https://example.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "x",
-        "TBANK_TERMINAL_KEY": "terminal",
-        "TBANK_PASSWORD": "password",
-    }, clear=False)
-    @patch("tbank_webhook.requests.get", side_effect=tbank_webhook.requests.RequestException("sensitive details"))
-    def test_ready_sanitizes_supabase_connection_errors(self, get):
-        with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.readyz())
-        self.assertEqual(getattr(ctx.exception, "status_code", None), 503)
-        self.assertIn("Webhook storage is unavailable", str(ctx.exception))
-        self.assertNotIn("sensitive details", str(ctx.exception))
+        self.assertIn("YooKassa credentials are not configured", str(ctx.exception))
 
     @patch.dict(os.environ, {"YOOKASSA_WEBHOOK_SECRET": "yoo-secret"}, clear=False)
     def test_yookassa_rejects_wrong_optional_bearer(self):
         request = self._request(headers={"authorization": "Bearer wrong-secret"})
         with self.assertRaises(Exception) as ctx:
-            asyncio.run(tbank_webhook.yookassa_payment_status(request))
+            asyncio.run(yookassa_webhook.yookassa_payment_status(request))
         self.assertEqual(getattr(ctx.exception, "status_code", None), 401)
 
     def test_oversized_request_is_rejected_before_handler(self):
@@ -276,7 +130,7 @@ class WebhookSecurityTests(unittest.TestCase):
                 nonlocal downstream_called
                 downstream_called = True
 
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware(
                 {"type": "http", "headers": [
                     (b"content-length", str(middleware.MAX_BODY_BYTES + 1).encode("ascii"))
@@ -307,7 +161,7 @@ class WebhookSecurityTests(unittest.TestCase):
                 nonlocal downstream_called
                 downstream_called = True
 
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware(
                 {"type": "http", "headers": [(b"content-length", b"not-a-number")]},
                 receive,
@@ -325,8 +179,8 @@ class WebhookSecurityTests(unittest.TestCase):
         async def run():
             sent = []
             chunks = [
-                {"type": "http.request", "body": b"x" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2), "more_body": True},
-                {"type": "http.request", "body": b"y" * (tbank_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2 + 1), "more_body": False},
+                {"type": "http.request", "body": b"x" * (yookassa_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2), "more_body": True},
+                {"type": "http.request", "body": b"y" * (yookassa_webhook.RequestSizeLimitMiddleware.MAX_BODY_BYTES // 2 + 1), "more_body": False},
             ]
             async def receive():
                 return chunks.pop(0)
@@ -335,7 +189,7 @@ class WebhookSecurityTests(unittest.TestCase):
             async def downstream(scope, receive, send):
                 await receive()
                 await receive()
-            middleware = tbank_webhook.RequestSizeLimitMiddleware(downstream)
+            middleware = yookassa_webhook.RequestSizeLimitMiddleware(downstream)
             await middleware({"type": "http", "headers": []}, receive, send)
             return sent
         sent = asyncio.run(run())
@@ -350,14 +204,14 @@ class WebhookSecurityTests(unittest.TestCase):
             "event": "refund.succeeded",
             "object": {"id": "refund-1", "payment_id": "payment-1"},
         }
-        with patch.object(tbank_webhook, "_read_body", return_value=body), \
-             patch.object(tbank_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "10.00", "currency": "RUB"}}), \
-             patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
+        with patch.object(yookassa_webhook, "_read_body", return_value=body), \
+             patch.object(yookassa_webhook, "get_refund", return_value={"status": "succeeded", "payment_id": "payment-1"}), \
+             patch.object(yookassa_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "10.00", "currency": "RUB"}}), \
+             patch.object(yookassa_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-1", "plan": "starter", "expected_amount": "10.00", "expected_currency": "RUB"
              }), \
-             patch.object(tbank_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
-            response = asyncio.run(tbank_webhook.yookassa_payment_status(request))
+             patch.object(yookassa_webhook, "_process_billing_event", return_value={"ok": True, "duplicate": False}) as process:
+            response = asyncio.run(yookassa_webhook.yookassa_payment_status(request))
         self.assertEqual(response["status"], "refunded")
         self.assertEqual(response["payment_id"], "payment-1")
         self.assertEqual(process.call_args.args[2], "payment-1")
