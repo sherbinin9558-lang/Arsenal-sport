@@ -19,7 +19,7 @@ jobs:
       - name: Install application dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt pytest
       - name: Compile billing webhook modules
-        run: python -m py_compile billing.py tbank_webhook.py
+        run: python -m py_compile billing.py yookassa_webhook.py
       - name: Test authoritative notification handling
         env:
           PYTHONPATH: .
