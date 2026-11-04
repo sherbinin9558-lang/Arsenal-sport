@@ -129,3 +129,15 @@ def usage_summary(days: int = 30) -> dict[str, Any]:
         "cost_rub": round(cost, 6),
         "by_operation": dict(by_operation),
     }
+
+
+def format_usage_summary_caption(usage: dict[str, Any], days: int = 30) -> str:
+    """Describe app-recorded usage without presenting estimates as provider bills."""
+    requests = max(0, int(usage.get("requests", 0) or 0))
+    cost = max(0.0, float(usage.get("cost_rub", 0.0) or 0.0))
+    period = max(1, min(int(days), 365))
+    return (
+        f"Учтённые приложением операции за {period} дней: {requests}. "
+        f"Расчётная стоимость по заданным тарифам: {cost:.4f} ₽. "
+        "Это оценка по записанным событиям, а не счёт или подтверждение расходов провайдера."
+    )
