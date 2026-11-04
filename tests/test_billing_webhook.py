@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-import tbank_webhook
+import yookassa_webhook
 
 
 class FakeResponse:
@@ -17,13 +17,13 @@ class FakeResponse:
 
 
 class BillingWebhookTests(unittest.TestCase):
-    @patch("tbank_webhook._supabase", return_value=("https://example.supabase.co", "test-service-key"))
-    @patch("tbank_webhook.requests.post")
+    @patch("yookassa_webhook._supabase", return_value=("https://example.supabase.co", "test-service-key"))
+    @patch("yookassa_webhook.requests.post")
     def test_process_billing_event_uses_atomic_rpc_and_payload_hash(self, post, _supabase):
         post.return_value = FakeResponse({"ok": True, "duplicate": False})
         payload = {"event": "payment.succeeded", "object": {"id": "123"}}
 
-        result = tbank_webhook._process_billing_event(
+        result = yookassa_webhook._process_billing_event(
             "yookassa",
             "yookassa:payment.succeeded:123:succeeded",
             "123",
@@ -46,12 +46,12 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertEqual(body["p_plan"], "pro")
         self.assertEqual(request["headers"]["Authorization"], "Bearer test-service-key")
 
-    @patch("tbank_webhook._supabase", return_value=("https://example.supabase.co", "test-service-key"))
-    @patch("tbank_webhook.requests.post")
+    @patch("yookassa_webhook._supabase", return_value=("https://example.supabase.co", "test-service-key"))
+    @patch("yookassa_webhook.requests.post")
     def test_process_billing_event_raises_on_rpc_failure(self, post, _supabase):
         post.return_value = FakeResponse({"message": "CHECKOUT_NOT_FOUND"}, ok=False)
         with self.assertRaises(RuntimeError):
-            tbank_webhook._process_billing_event(
+            yookassa_webhook._process_billing_event(
                 "yookassa",
                 "yookassa:payment.succeeded:123:succeeded",
                 "123",
@@ -68,14 +68,14 @@ class BillingWebhookTests(unittest.TestCase):
         payload = {"event": "payment.succeeded", "object": {"id": "payment-456"}}
 
         with patch.dict("os.environ", {"YOOKASSA_WEBHOOK_SECRET": "unit-yoo-secret"}, clear=False), \
-             patch.object(tbank_webhook, "_read_body", return_value=payload), \
-             patch.object(tbank_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "1490.00", "currency": "RUB"}}), \
-             patch.object(tbank_webhook, "_checkout_by_provider_payment", return_value={
+             patch.object(yookassa_webhook, "_read_body", return_value=payload), \
+             patch.object(yookassa_webhook, "get_payment", return_value={"status": "succeeded", "amount": {"value": "1490.00", "currency": "RUB"}}), \
+             patch.object(yookassa_webhook, "_checkout_by_provider_payment", return_value={
                  "tenant_id": "tenant-sensitive-654", "plan": "starter", "expected_amount": "1490.00", "expected_currency": "RUB"
              }), \
-             patch.object(tbank_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
+             patch.object(yookassa_webhook, "_process_billing_event", side_effect=RuntimeError("INTERNAL-YOO-SECRET")):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(tbank_webhook.yookassa_payment_status(request))
+                asyncio.run(yookassa_webhook.yookassa_payment_status(request))
 
         self.assertEqual(ctx.exception.status_code, 502)
         self.assertEqual(ctx.exception.detail, "Billing state transition failed")
@@ -83,7 +83,7 @@ class BillingWebhookTests(unittest.TestCase):
         self.assertNotIn("tenant-sensitive-654", str(ctx.exception.detail))
 
     def test_health_endpoint_is_present(self):
-        paths = {route.path for route in tbank_webhook.app.routes}
+        paths = {route.path for route in yookassa_webhook.app.routes}
         self.assertIn("/healthz", paths)
         self.assertIn("/readyz", paths)
 
