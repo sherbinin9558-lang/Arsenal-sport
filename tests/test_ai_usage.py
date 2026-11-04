@@ -1,6 +1,6 @@
 import unittest
 
-from ai_usage import estimate_cost_rub
+from ai_usage import estimate_cost_rub, format_usage_summary_caption
 
 
 class AiUsageTests(unittest.TestCase):
@@ -24,6 +24,13 @@ class AiUsageTests(unittest.TestCase):
                 os.environ.pop("AI_OUTPUT_RUB_PER_1K", None)
             else:
                 os.environ["AI_OUTPUT_RUB_PER_1K"] = old_out
+
+
+    def test_usage_caption_distinguishes_estimate_from_provider_bill(self):
+        caption = format_usage_summary_caption({"requests": 7, "cost_rub": 1.25}, 30)
+        self.assertIn("операции за 30 дней: 7", caption)
+        self.assertIn("1.2500 ₽", caption)
+        self.assertIn("не счёт", caption)
 
 
 if __name__ == "__main__":
