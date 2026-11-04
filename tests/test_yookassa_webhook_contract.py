@@ -5,23 +5,23 @@ from unittest.mock import Mock
 
 import pytest
 import billing
-import tbank_webhook
+import yookassa_webhook
 
 
 def invoke_webhook(monkeypatch, payload, headers=None):
     request = SimpleNamespace(headers=headers or {})
     async def read_body(_request):
         return payload
-    monkeypatch.setattr(tbank_webhook, '_read_body', read_body)
-    return asyncio.run(tbank_webhook.yookassa_payment_status(request))
+    monkeypatch.setattr(yookassa_webhook, '_read_body', read_body)
+    return asyncio.run(yookassa_webhook.yookassa_payment_status(request))
 
 
 def test_payment_notification_without_bearer_uses_authoritative_provider_status(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', 'optional-extra-secret')
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
     captured = {}
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
     result = invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-1', 'status': 'canceled'}})
     assert result['status'] == 'succeeded'
     assert captured['args'][3] == 'succeeded'
@@ -38,11 +38,11 @@ def test_wrong_optional_bearer_is_rejected(monkeypatch):
 def test_refund_notification_fetches_refund_and_uses_refund_id_for_idempotency(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', 'optional-extra-secret')
     refund_fetch = Mock(return_value={'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded'})
-    monkeypatch.setattr(tbank_webhook, 'get_refund', refund_fetch)
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
+    monkeypatch.setattr(yookassa_webhook, 'get_refund', refund_fetch)
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
     captured = {}
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
     result = invoke_webhook(monkeypatch, {'event': 'refund.succeeded', 'object': {'id': 'refund-77', 'payment_id': 'pay-1'}})
     refund_fetch.assert_called_once_with('refund-77')
     assert result['status'] == 'refunded'
@@ -52,11 +52,11 @@ def test_refund_notification_fetches_refund_and_uses_refund_id_for_idempotency(m
 
 def test_refund_status_from_notification_is_not_trusted(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
-    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: {'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'pending'})
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
+    monkeypatch.setattr(yookassa_webhook, 'get_refund', lambda _refund_id: {'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'pending'})
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
     captured = {}
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
     result = invoke_webhook(monkeypatch, {'event': 'refund.succeeded', 'object': {'id': 'refund-77', 'payment_id': 'pay-1', 'status': 'succeeded'}})
     assert result['status'] == 'refund_pending'
     assert captured['args'][3] == 'refund_pending'
@@ -64,9 +64,9 @@ def test_refund_status_from_notification_is_not_trusted(monkeypatch):
 
 def test_refund_for_another_payment_is_rejected(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
-    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: {'id': 'refund-77', 'payment_id': 'different-payment', 'status': 'succeeded'})
+    monkeypatch.setattr(yookassa_webhook, 'get_refund', lambda _refund_id: {'id': 'refund-77', 'payment_id': 'different-payment', 'status': 'succeeded'})
     process = Mock()
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', process)
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', process)
     with pytest.raises(Exception) as exc:
         invoke_webhook(monkeypatch, {'event': 'refund.succeeded', 'object': {'id': 'refund-77', 'payment_id': 'pay-1'}})
     assert getattr(exc.value, 'status_code', None) == 400
@@ -95,19 +95,19 @@ def test_get_payment_works_without_checkout_return_url(monkeypatch):
 
 def test_legacy_confirmed_checkout_can_process_verified_refund(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
-    monkeypatch.setattr(tbank_webhook, 'get_refund', lambda _refund_id: {
+    monkeypatch.setattr(yookassa_webhook, 'get_refund', lambda _refund_id: {
         'id': 'refund-legacy', 'payment_id': 'pay-legacy', 'status': 'succeeded',
     })
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {
         'id': 'pay-legacy', 'status': 'succeeded',
         'amount': {'value': '1490.00', 'currency': 'RUB'},
     })
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
         'tenant_id': 'tenant-a', 'plan': 'pro', 'status': 'confirmed',
         'expected_amount': None, 'expected_currency': None,
     })
     captured = {}
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', lambda *args, **kwargs: captured.update(args=args, kwargs=kwargs) or {'duplicate': False})
 
     result = invoke_webhook(monkeypatch, {
         'event': 'refund.succeeded',
@@ -136,10 +136,10 @@ def test_get_refund_escapes_id_and_sanitizes_provider_errors(monkeypatch):
 def test_payment_amount_currency_mismatch_fails_closed(monkeypatch, amount, currency):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
     payment = {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': amount, 'currency': currency}}
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: payment)
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: payment)
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro', 'expected_amount': '1490.00', 'expected_currency': 'RUB'})
     process = Mock()
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', process)
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', process)
     with pytest.raises(Exception) as exc:
         invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-1'}})
     assert getattr(exc.value, 'status_code', None) == 422
@@ -148,10 +148,10 @@ def test_payment_amount_currency_mismatch_fails_closed(monkeypatch, amount, curr
 
 def test_payment_missing_expected_checkout_amount_fails_closed(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro'})
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {'id': 'pay-1', 'status': 'succeeded', 'amount': {'value': '1490.00', 'currency': 'RUB'}})
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {'tenant_id': 'tenant-a', 'plan': 'pro'})
     process = Mock()
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', process)
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', process)
     with pytest.raises(Exception) as exc:
         invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-1'}})
     assert getattr(exc.value, 'status_code', None) == 422
@@ -159,16 +159,16 @@ def test_payment_missing_expected_checkout_amount_fails_closed(monkeypatch):
 
 def test_zero_expected_checkout_amount_fails_closed(monkeypatch):
     monkeypatch.setenv('YOOKASSA_WEBHOOK_SECRET', '')
-    monkeypatch.setattr(tbank_webhook, 'get_payment', lambda _payment_id: {
+    monkeypatch.setattr(yookassa_webhook, 'get_payment', lambda _payment_id: {
         'id': 'pay-zero', 'status': 'succeeded',
         'amount': {'value': '0.00', 'currency': 'RUB'},
     })
-    monkeypatch.setattr(tbank_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
+    monkeypatch.setattr(yookassa_webhook, '_checkout_by_provider_payment', lambda provider, payment_id: {
         'tenant_id': 'tenant-a', 'plan': 'pro',
         'expected_amount': '0.00', 'expected_currency': 'RUB',
     })
     process = Mock()
-    monkeypatch.setattr(tbank_webhook, '_process_billing_event', process)
+    monkeypatch.setattr(yookassa_webhook, '_process_billing_event', process)
     with pytest.raises(Exception) as exc:
         invoke_webhook(monkeypatch, {'event': 'payment.succeeded', 'object': {'id': 'pay-zero'}})
     assert getattr(exc.value, 'status_code', None) == 422
