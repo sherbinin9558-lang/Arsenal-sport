@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import patch
 
 import billing
-import tbank_webhook
+import yookassa_webhook
 
 
 class FakeResponse:
@@ -103,7 +103,7 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
     fake.payments["fake-payment-1"]["status"] = "succeeded"
     monkeypatch.setenv("SUPABASE_URL", "https://fake-project.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "fake-service-key")
-    monkeypatch.setattr(tbank_webhook, "_checkout_by_provider_payment",
+    monkeypatch.setattr(yookassa_webhook, "_checkout_by_provider_payment",
                         lambda provider, payment_id: {
                             "tenant_id": session["tenant_id"],
                             "plan": session["plan"],
@@ -121,9 +121,9 @@ def test_checkout_then_verified_webhook_is_network_free(monkeypatch):
     async def read_body(_request):
         return {"event": "payment.succeeded", "object": {"id": "fake-payment-1"}}
 
-    monkeypatch.setattr(tbank_webhook, "_read_body", read_body)
-    response = asyncio.run(tbank_webhook.yookassa_payment_status(Request()))
-    duplicate_response = asyncio.run(tbank_webhook.yookassa_payment_status(Request()))
+    monkeypatch.setattr(yookassa_webhook, "_read_body", read_body)
+    response = asyncio.run(yookassa_webhook.yookassa_payment_status(Request()))
+    duplicate_response = asyncio.run(yookassa_webhook.yookassa_payment_status(Request()))
 
     assert response["ok"] is True
     assert response["status"] == "succeeded"
