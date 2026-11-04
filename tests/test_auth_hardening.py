@@ -1,6 +1,6 @@
 import unittest
 from collections import defaultdict, deque
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import saas_core
 
@@ -31,6 +31,76 @@ class AuthHardeningTests(unittest.TestCase):
                 saas_core._check_global_auth_attempt_limit(email)
             with self.assertRaisesRegex(saas_core.SupabaseRequestError, "Слишком много"):
                 saas_core._check_global_auth_attempt_limit(email)
+
+    def test_rotated_refresh_token_is_persisted_before_user_lookup(self):
+        with patch.object(saas_core, "_persist_refresh_token") as persist, patch.object(
+            saas_core, "get_user", side_effect=RuntimeError("temporary lookup failure")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "temporary lookup failure"):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+        persist.assert_called_once_with("new-rotated-refresh-token")
+
+
+
+    def test_rotated_refresh_token_is_persisted_before_membership_lookup(self):
+        calls = []
+        def persist(token):
+            calls.append(("persist", token))
+            return True
+        def memberships(token, user_id):
+            calls.append(("memberships", user_id))
+            raise RuntimeError("temporary membership lookup failure")
+
+        with (patch.object(saas_core, "_persist_refresh_token", side_effect=persist),
+              patch.object(saas_core, "user_tenants", side_effect=memberships)):
+            with self.assertRaisesRegex(RuntimeError, "temporary membership lookup failure"):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": {"id": "user-123", "email": "user@example.com"},
+                })
+
+        self.assertEqual(calls, [
+            ("persist", "new-rotated-refresh-token"),
+            ("memberships", "user-123"),
+        ])
+
+    def test_session_restore_stops_when_rotated_token_cannot_be_persisted(self):
+        with (patch.object(saas_core, "_persist_refresh_token", return_value=False),
+              patch.object(saas_core, "get_user") as get_user,
+              patch.object(saas_core, "user_tenants") as user_tenants):
+            with self.assertRaisesRegex(
+                saas_core.SupabaseRequestError, "Не удалось сохранить токен"
+            ):
+                saas_core._establish_session({
+                    "access_token": "access-token",
+                    "refresh_token": "new-rotated-refresh-token",
+                    "user": None,
+                })
+
+        get_user.assert_not_called()
+        user_tenants.assert_not_called()
+
+
+    def test_persist_refresh_token_reports_cookie_controller_acceptance(self):
+        controller = Mock()
+        with patch.object(saas_core, "_auth_cookies", return_value=controller):
+            self.assertTrue(saas_core._persist_refresh_token("rotated-token"))
+        controller.set.assert_called_once()
+
+    def test_persist_refresh_token_fails_when_cookie_controller_unavailable(self):
+        with patch.object(saas_core, "_auth_cookies", return_value=None):
+            self.assertFalse(saas_core._persist_refresh_token("rotated-token"))
+
+    def test_persist_refresh_token_fails_when_cookie_write_raises(self):
+        controller = unittest.mock.Mock()
+        controller.set.side_effect = RuntimeError("cookie write rejected")
+        with patch.object(saas_core, "_auth_cookies", return_value=controller):
+            self.assertFalse(saas_core._persist_refresh_token("rotated-token"))
 
     def test_auth_error_is_generic(self):
         self.assertEqual(
