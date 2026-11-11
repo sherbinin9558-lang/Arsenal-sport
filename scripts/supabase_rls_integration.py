@@ -12,6 +12,7 @@ import os
 import sys
 import uuid
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -74,6 +75,12 @@ def create_user(admin: Api, email: str, password: str) -> str:
     return str(data["id"])
 
 
+def _require_delete_success(response: requests.Response, label: str, *, allow_not_found: bool = False) -> None:
+    if response.ok or (allow_not_found and response.status_code == 404):
+        return
+    raise AssertionError(f"{label}: cleanup returned HTTP {response.status_code}")
+
+
 def delete_default_tenants(admin: Api, user_id: str) -> None:
     tenants = admin.json(
         "GET", "/rest/v1/tenants",
@@ -81,14 +88,37 @@ def delete_default_tenants(admin: Api, user_id: str) -> None:
     ) or []
     for tenant in tenants:
         tenant_id = str(tenant["id"])
-        admin.request("DELETE", "/rest/v1/tenants", params={"id": f"eq.{tenant_id}"})
+        response = admin.request(
+            "DELETE", "/rest/v1/tenants",
+            params={"id": f"eq.{tenant_id}"},
+        )
+        _require_delete_success(response, "delete default tenant")
 
 
 def delete_user(admin: Api, user_id: str) -> None:
     response = admin.request("DELETE", f"/auth/v1/admin/users/{user_id}")
-    if not response.ok and response.status_code != 404:
-        print(f"WARNING: cleanup user {user_id} returned HTTP {response.status_code}")
+    _require_delete_success(response, "delete test auth user", allow_not_found=True)
 
+
+def cleanup_test_data(admin: Api, tenant_ids: list[str], user_ids: list[str]) -> list[str]:
+    """Attempt every cleanup operation and return labels for any failed operation."""
+    errors: list[str] = []
+    for tenant_id in tenant_ids:
+        for table in ("app_data", "invitations", "memberships", "tenants"):
+            try:
+                response = admin.request(
+                    "DELETE", f"/rest/v1/{table}",
+                    params={"tenant_id" if table != "tenants" else "id": f"eq.{tenant_id}"},
+                )
+                _require_delete_success(response, f"delete {table}")
+            except Exception as exc:
+                errors.append(f"{table}: {type(exc).__name__}")
+    for user_id in user_ids:
+        try:
+            delete_user(admin, user_id)
+        except Exception as exc:
+            errors.append(f"auth user: {type(exc).__name__}")
+    return errors
 
 def sign_in(public: Api, email: str, password: str) -> str:
     data = public.json(
@@ -111,8 +141,28 @@ def jwt_subject(token: str) -> str:
         raise AssertionError(f"Unable to decode authenticated JWT subject: {exc}") from exc
 
 
+def validate_supabase_target(url: str) -> None:
+    """Fail closed unless this integration suite targets the isolated test project."""
+    expected_ref = "qibncofxwuhasekwyffs"
+    parsed = urlparse(url)
+    valid = (
+        parsed.scheme == "https"
+        and parsed.hostname == f"{expected_ref}.supabase.co"
+        and parsed.port in (None, 443)
+        and parsed.username is None
+        and parsed.password is None
+    )
+    if not valid:
+        raise RuntimeError(
+            "Refusing RLS integration tests: SUPABASE_URL is not the approved isolated test project."
+        )
+
+
 def main() -> int:
     url = env("SUPABASE_URL")
+    # Validate before reading credentials or constructing an API client; this protects
+    # direct/local script execution as well as the GitHub Actions workflow.
+    validate_supabase_target(url)
     anon_key = env("SUPABASE_ANON_KEY")
     service_key = env("SUPABASE_SERVICE_ROLE_KEY")
     admin = Api(url, service_key)
@@ -272,13 +322,18 @@ def main() -> int:
         print("RLS integration suite: PASS")
         return 0
     finally:
-        for tenant_id in tenant_ids:
-            admin.request("DELETE", "/rest/v1/app_data", params={"tenant_id": f"eq.{tenant_id}"})
-            admin.request("DELETE", "/rest/v1/invitations", params={"tenant_id": f"eq.{tenant_id}"})
-            admin.request("DELETE", "/rest/v1/memberships", params={"tenant_id": f"eq.{tenant_id}"})
-            admin.request("DELETE", "/rest/v1/tenants", params={"id": f"eq.{tenant_id}"})
-        for user_id in users:
-            delete_user(admin, user_id)
+        test_already_failed = sys.exc_info()[0] is not None
+        cleanup_errors = cleanup_test_data(admin, tenant_ids, users)
+        if cleanup_errors:
+            print(
+                "RLS cleanup failed for "
+                + str(len(cleanup_errors))
+                + " operation(s): "
+                + ", ".join(cleanup_errors),
+                file=sys.stderr,
+            )
+            if not test_already_failed:
+                raise RuntimeError("RLS integration cleanup did not complete successfully")
 
 
 if __name__ == "__main__":
