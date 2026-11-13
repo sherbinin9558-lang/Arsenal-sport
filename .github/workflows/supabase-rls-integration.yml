@@ -5,7 +5,8 @@ on:
     branches: ["audit/production-readiness-10of10-20261005"]
   workflow_dispatch:
 
-# Audit RLS integration workflow
+# This suite creates and deletes Auth users and tenant data.
+# Never bind it to the Production environment or Production secrets.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -15,25 +16,33 @@ permissions:
 
 jobs:
   rls-integration:
-    environment: production
+    environment: supabase-rehearsal
     runs-on: ubuntu-latest
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_REHEARSAL_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_REHEARSAL_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_REHEARSAL_SERVICE_ROLE_KEY }}
+      SUPABASE_REHEARSAL_PROJECT_REF: ${{ vars.SUPABASE_REHEARSAL_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Require Supabase integration-test credentials
+      - name: Require dedicated rehearsal credentials and target identity
+        shell: bash
         run: |
-          missing=0
-          [ -n "$SUPABASE_URL" ] || { echo "::error::Missing required production secret: SUPABASE_URL"; missing=1; }
-          [ -n "$SUPABASE_ANON_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_ANON_KEY"; missing=1; }
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::Missing required production secret: SUPABASE_SERVICE_ROLE_KEY"; missing=1; }
-          [ "$missing" -eq 0 ]
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo "::error::Missing SUPABASE_REHEARSAL_URL"; exit 1; }
+          test -n "$SUPABASE_ANON_KEY" || { echo "::error::Missing SUPABASE_REHEARSAL_ANON_KEY"; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Missing SUPABASE_REHEARSAL_SERVICE_ROLE_KEY"; exit 1; }
+          test -n "$SUPABASE_REHEARSAL_PROJECT_REF" || { echo "::error::Missing SUPABASE_REHEARSAL_PROJECT_REF"; exit 1; }
+          actual_ref="$(python -c 'import os, urllib.parse; print(urllib.parse.urlparse(os.environ["SUPABASE_URL"]).hostname.split(".")[0])')"
+          if [ "$actual_ref" != "$SUPABASE_REHEARSAL_PROJECT_REF" ]; then
+            echo "::error::Supabase URL project ref does not match the explicitly configured rehearsal project ref."
+            exit 1
+          fi
+          echo "Rehearsal target identity matches the configured project reference."
       - name: Install test dependency
-        run: pip install "requests>=2.32.0"
+        run: python -m pip install "requests>=2.32.0"
       - name: Run real authenticated RLS matrix
         run: python scripts/supabase_rls_integration.py
