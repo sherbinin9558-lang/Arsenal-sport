@@ -108,6 +108,30 @@ def browser_url():
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
+def safe_url(value):
+    """Remove query strings and fragments so diagnostic artifacts cannot leak tokens."""
+    try:
+        parts = urlsplit(str(value))
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    except Exception:
+        return "<unparseable-url>"
+
+
+def classify_visible_state(text):
+    lowered = text.lower()
+    if "email" in lowered and "пароль" in lowered:
+        return "login_form_visible"
+    if any(marker in lowered for marker in ("traceback", "uncaught app exception", "exception occurred")):
+        return "exception_visible"
+    if "status embed installed correctly" in lowered and "email" not in lowered:
+        return "status_embed_only"
+    if "hosted with streamlit" in lowered and not text.strip():
+        return "streamlit_shell_only"
+    if not text.strip():
+        return "blank_or_not_rendered"
+    return "other_content"
+
+
 def visible_label_locator(page, label, timeout_ms):
     """Wait for a visible labelled control, rescanning frames as Streamlit attaches them."""
     deadline = time.monotonic() + timeout_ms / 1000
@@ -130,17 +154,22 @@ def visible_label_locator(page, label, timeout_ms):
     )
 
 
-def visible_page_text(page):
-    """Collect visible text from the top-level page and embedded app frames."""
+def visible_page_text(page, per_frame_timeout_ms=3000):
+    """Collect text without auto-scrolling or waiting for locator visibility."""
     chunks = []
     for frame in page.frames:
         try:
-            text = frame.locator("body").inner_text(timeout=3000).strip()
+            # evaluate reads the current document immediately; inner_text can wait for
+            # attachment/visibility and distort the timestamp being measured.
+            text = frame.locator("body").evaluate(
+                "(el) => el.innerText || ''",
+                timeout=per_frame_timeout_ms,
+            ).strip()
             if text:
                 chunks.append(text)
         except Exception:
             continue
-    return "\n".join(chunks)[:20000]
+    return "\\n".join(chunks)[:20000]
 
 
 def wait_for_expected_login_text(page, timeout_ms=45000):
@@ -166,24 +195,148 @@ def run():
             console_errors = []
             page_errors = []
             request_failures = []
-            page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
-            page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+            http_diagnostics = []
+            state_samples = []
+            startup_timeline = []
+            page.on("console", lambda msg: console_errors.append(msg.text[:1000]) if msg.type == "error" else None)
+            page.on("pageerror", lambda exc: page_errors.append(str(exc)[:1000]))
             page.on(
                 "requestfailed",
-                lambda req: request_failures.append(f"{req.method} {req.url}: {req.failure}"),
+                lambda req: request_failures.append({
+                    "method": req.method,
+                    "url": safe_url(req.url),
+                    "resource_type": req.resource_type,
+                    "failure": str(req.failure)[:300],
+                }),
             )
+
+            def record_http_response(response):
+                try:
+                    if response.status in (403, 404) or response.status >= 500:
+                        request = response.request
+                        http_diagnostics.append({
+                            "status": response.status,
+                            "url": safe_url(response.url),
+                            "method": request.method,
+                            "resource_type": request.resource_type,
+                            "source": (
+                                "application_host"
+                                if urlsplit(response.url).hostname == urlsplit(BASE_URL).hostname
+                                else "third_party_or_platform"
+                            ),
+                            "timestamp_ms": round((time.perf_counter() - started) * 1000),
+                        })
+                except Exception:
+                    # Diagnostics must never make the acceptance test itself fail.
+                    pass
+
             started = time.perf_counter()
+
+            def record_startup_event(event_name, **details):
+                # Keep a bounded, token-free timeline of navigation and iframe lifecycle.
+                if len(startup_timeline) >= 250:
+                    return
+                startup_timeline.append({
+                    "event": event_name,
+                    "timestamp_ms": round((time.perf_counter() - started) * 1000),
+                    **details,
+                })
+
+            def record_document_request(request):
+                try:
+                    if request.resource_type == "document":
+                        record_startup_event(
+                            "document_request",
+                            method=request.method,
+                            url=safe_url(request.url),
+                            frame_url=safe_url(request.frame.url) if request.frame else "",
+                        )
+                except Exception:
+                    pass
+
+            def record_document_response(response):
+                try:
+                    if response.request.resource_type == "document":
+                        record_startup_event(
+                            "document_response",
+                            status=response.status,
+                            url=safe_url(response.url),
+                            frame_url=safe_url(response.request.frame.url) if response.request.frame else "",
+                        )
+                except Exception:
+                    pass
+
+            page.on("request", record_document_request)
+            page.on("response", record_http_response)
+            page.on("response", record_document_response)
+            page.on("frameattached", lambda frame: record_startup_event("frame_attached", url=safe_url(frame.url), name=frame.name))
+            page.on("framenavigated", lambda frame: record_startup_event("frame_navigated", url=safe_url(frame.url), name=frame.name))
+            page.on("framedetached", lambda frame: record_startup_event("frame_detached", url=safe_url(frame.url), name=frame.name))
+            page.on("domcontentloaded", lambda: record_startup_event("domcontentloaded", url=safe_url(page.url)))
+            page.on("load", lambda: record_startup_event("load", url=safe_url(page.url)))
             item = {"name": name, "browser": browser_name, "viewport": [width, height]}
             try:
-                page.goto(browser_url(), wait_until="domcontentloaded", timeout=TIMEOUT_MS)
-                # Streamlit Cloud may first render a transient status/boot shell while the
-                # app starts. Wait for the actual login UI before judging this browser run.
+                # Start sampling as soon as the navigation response commits; waiting for DOMContentLoaded
+                # can skip the very transient shell/login states this test is meant to capture.
+                page.goto(browser_url(), wait_until="commit", timeout=TIMEOUT_MS)
+                # Sample intermediate renders to detect transient red/error screens before
+                # the expected login form appears. Samples contain text markers, not screenshots.
+                for sample_ms in (0, 250, 500, 1000, 2000, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 10000):
+                    elapsed_before_sample = round((time.perf_counter() - started) * 1000)
+                    if sample_ms > elapsed_before_sample:
+                        page.wait_for_timeout(sample_ms - elapsed_before_sample)
+                    sample_text = visible_page_text(page, per_frame_timeout_ms=100)
+                    sample_record = {
+                        "target_elapsed_ms": sample_ms,
+                        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                        "state": classify_visible_state(sample_text),
+                        "has_email": "Email" in sample_text,
+                        "has_password": "Пароль" in sample_text,
+                        "has_status_embed": "Status embed installed correctly" in sample_text,
+                        "has_exception_marker": any(x in sample_text.lower() for x in ("traceback", "uncaught app exception", "exception occurred")),
+                        "text_prefix": sample_text[:500],
+                    }
+                    # Keep a small visual trace of the first renders to detect transient red
+                    # login/error screens that text-only diagnostics cannot reliably identify.
+                    if sample_ms in (0, 1000, 2000, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 10000):
+                        screenshot_name = f"{name}-startup-{sample_ms}ms.png"
+                        page.screenshot(path=str(OUT / screenshot_name), full_page=False)
+                        sample_record["screenshot"] = screenshot_name
+                        # Record frame geometry and current text without locator screenshots:
+                        # screenshot helpers may auto-scroll or wait for fonts/visibility, distorting
+                        # early-state timestamps and causing timeouts.
+                        frame_states = []
+                        for frame_index, frame in enumerate(page.frames):
+                            frame_state = {
+                                "frame_index": frame_index,
+                                "url": safe_url(frame.url),
+                                "name": frame.name,
+                            }
+                            try:
+                                frame_state["text_prefix"] = frame.locator("body").evaluate(
+                                    "(el) => (el.innerText || '').slice(0, 200)",
+                                    timeout=100,
+                                )
+                            except Exception as frame_exc:
+                                frame_state["text_error"] = str(frame_exc)[:160]
+                            try:
+                                frame_state["geometry"] = frame.frame_element().evaluate(
+                                    "(el) => { const r = el.getBoundingClientRect(); "
+                                    "return {x:r.x,y:r.y,width:r.width,height:r.height,"
+                                    "visible:!!(r.width && r.height)}; }",
+                                )
+                            except Exception as frame_exc:
+                                frame_state["geometry_error"] = str(frame_exc)[:160]
+                            frame_states.append(frame_state)
+                        sample_record["frames"] = frame_states
+                    state_samples.append(sample_record)
+                # Continue waiting for the settled login UI after recording the transition.
                 startup_text = wait_for_expected_login_text(page, timeout_ms=45000)
-                item["initial_url"] = page.url
+                item["initial_url"] = safe_url(page.url)
                 item["title"] = page.title()
                 item["body_prefix"] = startup_text
                 item["frames"] = [
-                    {"url": frame.url, "name": frame.name}
+                    {"url": safe_url(frame.url), "name": frame.name}
                     for frame in page.frames
                 ]
                 item["content_markers"] = {
@@ -232,8 +385,8 @@ def run():
                         "Only the Streamlit status-page embed rendered; the app login UI is absent."
                     )
                 item["login_control_context"] = {
-                    "email_frame_url": email_frame_url,
-                    "password_frame_url": password_frame_url,
+                    "email_frame_url": safe_url(email_frame_url),
+                    "password_frame_url": safe_url(password_frame_url),
                 }
                 item["status"] = "PASS"
             except Exception as exc:
@@ -248,6 +401,12 @@ def run():
                 page.screenshot(path=str(OUT / f"{name}.png"), full_page=True)
             finally:
                 item["duration_ms"] = round((time.perf_counter() - started) * 1000)
+                item["state_samples"] = state_samples
+                item["startup_timeline"] = startup_timeline
+                item["http_diagnostics"] = http_diagnostics[-200:]
+                item["console_errors"] = console_errors[-100:]
+                item["page_errors"] = page_errors[-100:]
+                item["request_failures"] = request_failures[-100:]
                 results.append(item)
                 browser.close()
 
