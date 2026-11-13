@@ -35,3 +35,15 @@ def test_observability_supports_sentry_dsn(monkeypatch):
     observability._SENTRY = None
     observability.configure_observability()
     assert observability._CONFIGURED is True
+
+
+def test_sentry_dsn_reads_streamlit_cloud_secrets(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    import observability
+
+    monkeypatch.delenv("SENTRY_DSN", raising=False)
+    fake_streamlit = SimpleNamespace(secrets={"SENTRY_DSN": " https://examplePublicKey@o0.ingest.sentry.io/0 "})
+    with patch.dict(sys.modules, {"streamlit": fake_streamlit}):
+        assert observability._read_sentry_dsn() == "https://examplePublicKey@o0.ingest.sentry.io/0"
