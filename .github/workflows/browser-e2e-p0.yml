@@ -1,0 +1,40 @@
+name: Browser E2E P0
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: browser-e2e-p0-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Playwright desktop/tablet/mobile smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install application dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --disable-pip-version-check -r requirements.txt pytest playwright
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+        run: PYTHONPATH=. pytest -q tests/test_browser_smoke.py
