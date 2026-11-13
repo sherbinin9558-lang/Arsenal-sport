@@ -48,6 +48,7 @@ jobs:
           name: coverage-data
           path: .coverage
           if-no-files-found: ignore
+          include-hidden-files: true
 
   browser-e2e:
     name: Optional public-app E2E
