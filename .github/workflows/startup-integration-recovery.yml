@@ -1,0 +1,78 @@
+name: Startup, integrations and recovery preflight
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-startup:
+    name: Local Streamlit startup diagnostic
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run local startup smoke
+        env:
+          SAAS_PUBLIC_URL: http://127.0.0.1:8502
+        run: python scripts/local_streamlit_startup_smoke.py
+      - name: Upload startup diagnostics
+        if: \${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: local-startup-diagnostics
+          path: artifacts/local-startup/
+          retention-days: 14
+
+  integration-config:
+    name: Integration configuration audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Run read-only integration audit
+        env:
+          SUPABASE_URL: \${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: \${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BILLING_WEBHOOK_URL: \${{ secrets.BILLING_WEBHOOK_URL }}
+          TBANK_TERMINAL_KEY: \${{ secrets.TBANK_TERMINAL_KEY }}
+          TBANK_PASSWORD: \${{ secrets.TBANK_PASSWORD }}
+          YOOKASSA_SHOP_ID: \${{ secrets.YOOKASSA_SHOP_ID }}
+          YOOKASSA_SECRET_KEY: \${{ secrets.YOOKASSA_SECRET_KEY }}
+          TELEGRAM_BOT_TOKEN: \${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL: \${{ secrets.TELEGRAM_CHANNEL }}
+          VK_ACCESS_TOKEN: \${{ secrets.VK_ACCESS_TOKEN }}
+        run: python scripts/integration_config_audit.py
+      - name: Upload integration audit
+        if: \${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: integration-config-audit
+          path: artifacts/integration-config.json
+          retention-days: 14
+
+  recovery-preflight:
+    name: Recovery preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run existing read-only recovery preflight
+        env:
+          SUPABASE_URL: \${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/recovery_preflight.py
